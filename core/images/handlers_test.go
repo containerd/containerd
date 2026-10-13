@@ -32,6 +32,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/containerd/containerd/v2/core/content"
 )
 
 func newDesc(id string) ocispec.Descriptor {
@@ -706,4 +708,87 @@ func TestDispatchCancellationWithNoHandlerError(t *testing.T) {
 
 	err := Dispatch(ctx, handler, nil, descs...)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// labelManager is a minimal content.Manager stub which records the labels
+// passed to Update.
+type labelManager struct {
+	labels map[string]string
+}
+
+func (m *labelManager) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
+	return content.Info{}, errdefs.ErrNotFound
+}
+
+func (m *labelManager) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
+	return nil
+}
+
+func (m *labelManager) Delete(ctx context.Context, dgst digest.Digest) error {
+	return nil
+}
+
+func (m *labelManager) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
+	m.labels = info.Labels
+	return info, nil
+}
+
+// TestSetChildrenMappedLabelsMalformedDigest ensures a malformed child digest,
+// which may come straight from an untrusted manifest, does not panic when the
+// referrer GC label is computed.
+func TestSetChildrenMappedLabelsMalformedDigest(t *testing.T) {
+	valid := digest.FromString("valid")
+	for _, tc := range []struct {
+		name   string
+		digest string
+	}{
+		{"short hex", "sha256:abc123"},
+		{"no separator", "nocolon"},
+		{"empty", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			subject := ocispec.Descriptor{
+				MediaType:   ocispec.MediaTypeImageManifest,
+				Digest:      digest.Digest(tc.digest),
+				Size:        100,
+				Annotations: map[string]string{AnnotationManifestSubject: "x"},
+			}
+
+			manager := &labelManager{}
+			handler := SetChildrenMappedLabels(manager, func(_ context.Context, _ ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				return []ocispec.Descriptor{subject}, nil
+			}, nil)
+
+			ctx := context.Background()
+			_, err := handler.Handle(ctx, ocispec.Descriptor{Digest: valid})
+			require.NoError(t, err)
+
+			for key, value := range manager.labels {
+				assert.NotEqual(t, subject.Digest.String(), value,
+					"malformed digest must not get a referrer label")
+				assert.NotContains(t, key, tc.digest,
+					"malformed digest must not appear in label keys")
+			}
+		})
+	}
+
+	t.Run("valid digest still labeled", func(t *testing.T) {
+		subject := ocispec.Descriptor{
+			MediaType:   ocispec.MediaTypeImageManifest,
+			Digest:      digest.FromString("subject"),
+			Size:        100,
+			Annotations: map[string]string{AnnotationManifestSubject: "x"},
+		}
+
+		manager := &labelManager{}
+		handler := SetChildrenMappedLabels(manager, func(_ context.Context, _ ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			return []ocispec.Descriptor{subject}, nil
+		}, nil)
+
+		_, err := handler.Handle(context.Background(), ocispec.Descriptor{Digest: digest.FromString("root")})
+		require.NoError(t, err)
+
+		key := "containerd.io/gc.ref.content.referrer.sha256." + subject.Digest.Encoded()[:12]
+		assert.Equal(t, subject.Digest.String(), manager.labels[key])
+	})
 }
