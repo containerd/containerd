@@ -198,7 +198,7 @@ There are some differences in how image pull configurations are specified betwee
 | Registry Settings | ✅ All supported | ⚠️ Only ConfigPath and Headers supported<br>(Mirrors, Configs, Auths not supported, also deprecated) |
 | ImageDecryption | ❌ Disabled | ❌ Disabled |
 | MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
-| ImagePullWithSyncFs | ✅ Supported | ❌ Not Supported |
+| ImagePullWithSyncFs | ✅ Supported | ⚠️ Configure `sync_fs` in the diff service plugin: `plugins."io.containerd.service.v1.diff-service"` |
 | StatsCollectPeriod | ✅ Supported | ✅ Supported |
 
 To ensure compatibility, ***containerd 2.1 automatically detects configuration conflicts and falls back to local image pull mode when necessary***.

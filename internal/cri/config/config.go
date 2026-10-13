@@ -595,7 +595,7 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 		{
 			Name:      "ImagePullWithSyncFs",
 			IsPresent: func() bool { return c.ImagePullWithSyncFs },
-			Reason:    "not supported with transfer service",
+			Reason:    "use sync_fs in the diff service plugin instead: plugins.\"io.containerd.service.v1.diff-service\"",
 		},
 	}
 
