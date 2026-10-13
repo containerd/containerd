@@ -38,6 +38,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/klauspost/compress/zstd"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -155,6 +156,90 @@ type beforeCommitWriter struct {
 func (w beforeCommitWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	w.beforeCommit()
 	return w.Writer.Commit(ctx, size, expected, opts...)
+}
+
+func TestFetchRejectsNegativeSize(t *testing.T) {
+	_, err := newHTTPReadSeeker(-2, func(int64) (io.ReadCloser, error) {
+		return nil, nil
+	})
+	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+
+	f := dockerFetcher{&dockerBase{
+		hosts: []RegistryHost{{
+			Host:         "example.com",
+			Scheme:       "https",
+			Capabilities: HostCapabilityPull,
+		}},
+	}}
+	_, err = f.Fetch(t.Context(), ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes([]byte("layer")),
+		Size:      -1,
+	})
+	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+}
+
+func TestFetchRejectsOversizedStream(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+
+	const declaredSize = 121
+	payload := bytes.Repeat([]byte("A"), declaredSize)
+	dgst := digest.FromBytes(payload)
+
+	var streamWrites atomic.Int64
+	streamServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		chunk := bytes.Repeat([]byte("A"), 1024)
+		for {
+			n, err := w.Write(chunk)
+			streamWrites.Add(int64(n))
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+			if err != nil {
+				return
+			}
+		}
+	}))
+	defer streamServer.Close()
+
+	registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer registry.Close()
+
+	resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+	fetcher, err := resolver.Fetcher(ctx, strings.TrimPrefix(registry.URL, "http://")+"/image:latest")
+	require.NoError(t, err)
+
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayerGzip,
+		Digest:    dgst,
+		Size:      declaredSize,
+		URLs:      []string{streamServer.URL + "/layer"},
+	}
+
+	t.Run("direct Fetch reader", func(t *testing.T) {
+		rc, err := fetcher.Fetch(ctx, desc)
+		require.NoError(t, err)
+		defer rc.Close()
+
+		_, err = io.Copy(io.Discard, rc)
+		require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	})
+
+	t.Run("remotes.Fetch to content store", func(t *testing.T) {
+		store, err := local.NewStore(t.TempDir())
+		require.NoError(t, err)
+
+		err = remotes.Fetch(ctx, store, fetcher, desc)
+		require.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+
+		_, err = store.Info(ctx, dgst)
+		require.ErrorIs(t, err, errdefs.ErrNotFound)
+	})
 }
 
 func TestFetcherOpen(t *testing.T) {
