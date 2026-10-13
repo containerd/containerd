@@ -17,15 +17,19 @@
 package remotes
 
 import (
+	"bytes"
 	"context"
 	_ "crypto/sha256"
 	"encoding/json"
+	"errors"
+	"io"
 	"sync"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -216,3 +220,75 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 
 	return labels, nil
 }
+
+func TestFetchSizeValidation(t *testing.T) {
+	ctx := t.Context()
+	cs, err := local.NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload := bytes.Repeat([]byte("A"), 121)
+	dgst := digest.FromBytes(payload)
+
+	for _, tc := range []struct {
+		name string
+		size int64
+	}{
+		{name: "zero size", size: 0},
+		{name: "negative size -1", size: -1},
+		{name: "negative size -100", size: -100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			fetcher := FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+				called = true
+				return io.NopCloser(bytes.NewReader(payload)), nil
+			})
+			desc := ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageLayer,
+				Digest:    dgst,
+				Size:      tc.size,
+			}
+			err := Fetch(ctx, cs, fetcher, desc)
+			if !errors.Is(err, errdefs.ErrInvalidArgument) {
+				t.Fatalf("expected ErrInvalidArgument, got %v", err)
+			}
+			if called {
+				t.Fatal("fetcher should not be called when descriptor size is non-positive")
+			}
+		})
+	}
+
+	t.Run("oversized stream fails before commit", func(t *testing.T) {
+		var bytesServed int64
+		fetcher := FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+			return io.NopCloser(readerFunc(func(p []byte) (int, error) {
+				for i := range p {
+					p[i] = 'A'
+				}
+				bytesServed += int64(len(p))
+				return len(p), nil
+			})), nil
+		})
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Digest:    dgst,
+			Size:      int64(len(payload)),
+		}
+		err := Fetch(ctx, cs, fetcher, desc)
+		if !errors.Is(err, errdefs.ErrFailedPrecondition) {
+			t.Fatalf("expected ErrFailedPrecondition, got %v", err)
+		}
+		if bytesServed != int64(len(payload))+1 {
+			t.Fatalf("expected %d bytes read from stream, got %d", len(payload)+1, bytesServed)
+		}
+		if _, err := cs.Info(ctx, dgst); !errors.Is(err, errdefs.ErrNotFound) {
+			t.Fatalf("expected blob not to be committed, got %v", err)
+		}
+	})
+}
+
+type readerFunc func(p []byte) (int, error)
+
+func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
