@@ -556,8 +556,8 @@ func (u *Unpacker) unpack(
 				return nil
 			}
 
-			// The span covers only the commit itself.
-			commitCtx, commitSpan := tracing.StartSpan(layerCtx, tracing.Name(unpackSpanPrefix, "commit"))
+			// The span covers the snapshot commit and the label update.
+			commitCtx, commitSpan := tracing.StartSpan(layerCtx, tracing.Name(unpackSpanPrefix, "commitAndUpdate"))
 			commitSpan.SetAttributes(layerAttributes(desc)...)
 			defer func() {
 				commitSpan.SetStatus(commitErr)
