@@ -135,7 +135,7 @@ linters:
       - docs
       - docs/man
       - releases
-      - test
+      - ^test/
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -151,4 +151,4 @@ formatters:
       - docs
       - docs/man
       - releases
-      - test
+      - ^test/
