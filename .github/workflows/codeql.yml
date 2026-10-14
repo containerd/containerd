@@ -23,8 +23,8 @@ jobs:
     strategy:
       fail-fast: false
 
-    # CodeQL runs on ubuntu-latest, windows-latest, and macos-latest
-    runs-on: ubuntu-latest
+    # CodeQL runs on ubuntu-24.04, windows-latest, and macos-latest
+    runs-on: ubuntu-24.04
 
     timeout-minutes: 30
 
