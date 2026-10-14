@@ -526,7 +526,9 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		}
 	}
 
-	// TODO: timeout waiting for response
+	// Wait for the response. Prefer internal channels over ctx.Done() when
+	// both are ready, so that we don't prematurely cancel a commit whose
+	// response has arrived but not yet been processed.
 	var resp *http.Response
 	select {
 	case <-pw.done:
@@ -541,6 +543,17 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		// can complete successfully, but the pipe may have changed. In that case, the
 		// content needs to be reset.
 		return pw.replacePipe(p)
+	case <-ctx.Done():
+		// Drain any response that may have already arrived so the HTTP connection
+		// can be reused, then close the writer to abort in-flight requests.
+		select {
+		case resp = <-pw.respC:
+			_, _ = io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		default:
+		}
+		pw.Close()
+		return ctx.Err()
 	}
 
 	// 201 is specified return status, some registries return

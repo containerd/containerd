@@ -871,3 +871,32 @@ func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
 	assert.Equal(t, samplePusherHostname, gotNsParam,
 		"GET fallback on proxy must include ?ns= query parameter")
 }
+
+// TestPushWriterCommitCtxCancel verifies that pushWriter.Commit respects context
+// cancellation instead of blocking indefinitely on internal channels.
+func TestPushWriterCommitCtxCancel(t *testing.T) {
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(&dockerBase{}, "test-ref", "", tracker, false)
+
+	// Create an already-canceled context.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Commit with a canceled context must return promptly (not block for ever).
+	done := make(chan error, 1)
+	go func() {
+		done <- pw.Commit(ctx, 0, "")
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error from Commit with canceled context, got nil")
+		}
+		if err != context.Canceled {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Commit blocked for more than 5s with canceled context — ctx.Done() not handled")
+	}
+}
