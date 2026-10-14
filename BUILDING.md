@@ -61,7 +61,7 @@ Runc is the default container runtime used by `containerd` and is required to
 run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
 container runtime development. Make sure to follow the guidelines for versioning
-in [RUNC.md](/docs/RUNC.md) for the best results.
+in [RUNC.md](docs/RUNC.md) for the best results.
 
 > *Note*: Runc only supports Linux
 
@@ -128,7 +128,7 @@ to use `go mod` command to modify the dependencies. After modifition, you should
 and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up to date.
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
-Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+Please refer to [RUNC.md](docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 > *Note*: On macOS, the containerd daemon can be built and run natively. However, as stated above, runc only supports linux.
 

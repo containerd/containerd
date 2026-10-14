@@ -49,7 +49,7 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 cgroupDriver: "systemd"
 ```
 
-kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/).
+kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#configuring-a-cgroup-driver).
 
 > Note: Kubernetes v1.28 supports automatic detection of the cgroup driver as
 > an alpha feature. With the `KubeletCgroupDriverFromCRI` kubelet feature gate

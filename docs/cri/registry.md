@@ -70,7 +70,7 @@ After modifying this config, you need to restart the `containerd` service.
 If you don't already have Google Container Registry (GCR) set up then you need to do the following steps:
 
 * Create a Google Cloud Platform (GCP) account and project if not already created (see [GCP getting started](https://cloud.google.com/gcp/getting-started))
-* Enable GCR for your project (see [Quickstart for Container Registry](https://cloud.google.com/container-registry/docs/quickstart))
+* Enable GCR for your project (see [Set up repositories with gcr.io domain support](https://cloud.google.com/artifact-registry/docs/transition/setup-gcr-repo))
 * For authentication to GCR: Create [service account and JSON key](https://cloud.google.com/container-registry/docs/advanced-authentication#json-key)
 * The JSON key file needs to be downloaded to your system from the GCP console
 * For access to the GCR storage: Add service account to the GCR storage bucket with storage admin access rights (see [Granting permissions](https://cloud.google.com/container-registry/docs/access-control#grant-bucket))
