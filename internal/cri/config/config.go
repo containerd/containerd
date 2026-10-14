@@ -77,6 +77,8 @@ const (
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
 	IOTypeStreaming = "streaming"
+	// DefaultStreamBatchSize is the maximum number of items per CRI list-streaming response by default.
+	DefaultStreamBatchSize = 5000
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -463,8 +465,17 @@ type Config struct {
 	StateDir string `json:"stateDir"`
 }
 
+// ListStreamingConfig contains the configuration for CRI list-streaming RPCs.
+type ListStreamingConfig struct {
+	// BatchSize is the maximum number of top-level items per response message.
+	// It must be positive and does not limit the serialized message size in bytes.
+	BatchSize int `toml:"batch_size" json:"batchSize"`
+}
+
 // ServerConfig contains all the configuration for the CRI API server.
 type ServerConfig struct {
+	// ListStreaming configures batching for runtime and image list-streaming RPCs.
+	ListStreaming ListStreamingConfig `toml:"list_streaming" json:"listStreaming"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
@@ -686,6 +697,9 @@ func ValidateServerConfig(ctx context.Context, c *ServerConfig) ([]deprecation.W
 			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
 		}
 	}
+	if c.ListStreaming.BatchSize <= 0 {
+		return warnings, errors.New("`list_streaming.batch_size` must be positive")
+	}
 	return warnings, nil
 }
 
@@ -780,6 +794,9 @@ func getRuntimeOptionsType(t string) any {
 
 func DefaultServerConfig() ServerConfig {
 	return ServerConfig{
+		ListStreaming: ListStreamingConfig{
+			BatchSize: DefaultStreamBatchSize,
+		},
 		DisableTCPService:   true,
 		StreamServerAddress: "127.0.0.1",
 		StreamServerPort:    "0",

@@ -38,7 +38,7 @@ func (c *criService) StreamContainers(r *runtime.StreamContainersRequest, s grpc
 
 	containers = c.filterCRIContainers(containers, r.GetFilter())
 
-	err := criutil.SendInBatches(ctx, containers, criutil.DefaultStreamBatchSize, func(batch []*runtime.Container) error {
+	err := criutil.SendInBatches(ctx, containers, c.listStreaming.BatchSize, func(batch []*runtime.Container) error {
 		return s.Send(&runtime.StreamContainersResponse{Containers: batch})
 	})
 

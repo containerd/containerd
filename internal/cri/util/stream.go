@@ -16,15 +16,20 @@
 
 package util
 
-import "context"
-
-const DefaultStreamBatchSize = 5000
+import (
+	"context"
+	"errors"
+)
 
 // SendInBatches sends items in batches using the provided send function.
 // It checks for context cancellation before sending each batch.
-// Returns nil immediately if items is empty (gRPC closes the stream with EOF).
+// The batch size must be positive. For a valid batch size, it returns nil
+// immediately if items is empty (gRPC closes the stream with EOF).
 func SendInBatches[T any](ctx context.Context, items []*T, batchSize int, sendFn func([]*T) error) error {
-	for i := 0; i < len(items); i += batchSize {
+	if batchSize <= 0 {
+		return errors.New("batch size must be positive")
+	}
+	for i := 0; i < len(items); {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -32,6 +37,7 @@ func SendInBatches[T any](ctx context.Context, items []*T, batchSize int, sendFn
 		if err := sendFn(items[i:end]); err != nil {
 			return err
 		}
+		i = end
 	}
 	return nil
 }

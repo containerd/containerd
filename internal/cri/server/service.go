@@ -127,6 +127,8 @@ type criService struct {
 	ImageService
 	// config contains all configurations.
 	config criconfig.Config
+	// listStreaming configures batching for CRI list-streaming RPCs.
+	listStreaming criconfig.ListStreamingConfig
 	// imageFSPaths contains path to image filesystem for snapshotters.
 	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
@@ -187,6 +189,8 @@ type CRIServiceOptions struct {
 
 	StreamingConfig streaming.Config
 
+	ListStreamingConfig criconfig.ListStreamingConfig
+
 	NRI nriservice.API
 
 	// SandboxControllers is a map of all the loaded sandbox controllers
@@ -218,6 +222,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		RuntimeService:     options.RuntimeService,
 		ImageService:       options.ImageService,
 		config:             config,
+		listStreaming:      options.ListStreamingConfig,
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},

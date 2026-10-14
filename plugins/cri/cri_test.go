@@ -20,8 +20,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/plugins"
 )
@@ -48,6 +51,9 @@ func TestCRIGRPCServerConfigMigration(t *testing.T) {
 			"cert_file": "/etc/containerd/certs.d/server.crt",
 			"key_file":  "/etc/containerd/certs.d/server.key",
 		},
+		"list_streaming": map[string]any{
+			"batch_size": int64(2),
+		},
 	}
 	pluginConfigs := map[string]any{
 		pluginName: src,
@@ -66,6 +72,37 @@ func TestCRIGRPCServerConfigMigration(t *testing.T) {
 
 	for k, v := range src {
 		assert.Equal(t, v, dst[k])
+	}
+}
+
+func TestCRIListStreamingConfig(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		config    string
+		batchSize int
+		invalid   bool
+	}{
+		{name: "omitted", batchSize: criconfig.DefaultStreamBatchSize},
+		{name: "empty table", config: "[list_streaming]", batchSize: criconfig.DefaultStreamBatchSize},
+		{name: "override", config: "[list_streaming]\nbatch_size = 2", batchSize: 2},
+		{name: "zero", config: "[list_streaming]\nbatch_size = 0", invalid: true},
+		{name: "negative", config: "[list_streaming]\nbatch_size = -1", batchSize: -1, invalid: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var values map[string]any
+			require.NoError(t, toml.Unmarshal([]byte(test.config), &values))
+			config := srvconfig.Config{Plugins: map[string]any{"io.containerd.grpc.v1.cri": values}}
+			serverConfig := criconfig.DefaultServerConfig()
+			_, err := config.Decode(context.Background(), "io.containerd.grpc.v1.cri", &serverConfig)
+			require.NoError(t, err)
+			assert.Equal(t, test.batchSize, serverConfig.ListStreaming.BatchSize)
+			_, err = criconfig.ValidateServerConfig(context.Background(), &serverConfig)
+			if test.invalid {
+				require.ErrorContains(t, err, "`list_streaming.batch_size` must be positive")
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }
 
