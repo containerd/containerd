@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
           - os: ${{ github.event.repository.private && 'macos-latest' || '' }}
@@ -52,7 +52,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -85,7 +85,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     defaults:
@@ -111,7 +111,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -127,7 +127,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -205,7 +205,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
         go-version: ["1.26.9", "1.27.2"] # 1.25 is not supported due to k8s 1.36 requiring 1.26
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
@@ -600,7 +600,7 @@ jobs:
   integration-vm:
     name: VM integration
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -689,7 +689,7 @@ jobs:
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
@@ -787,7 +787,7 @@ jobs:
   # See https://github.com/orgs/community/discussions/26822
   results:
     name: Report required job statuses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
     needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os, node-e2e]
     if: ${{ always() }}

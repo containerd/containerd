@@ -15,7 +15,7 @@ jobs:
   analysis:
     name: Scorecards analysis
     if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       # Needed to upload the results to code-scanning dashboard.
       security-events: write
