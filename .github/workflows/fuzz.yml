@@ -9,7 +9,7 @@ jobs:
   ci_fuzz:
     name: CI Fuzz
     if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
     - name: Build Fuzzers
@@ -37,7 +37,7 @@ jobs:
   go_test_fuzz:
     name : go test -fuzz
     if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
