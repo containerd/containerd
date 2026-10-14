@@ -529,6 +529,9 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	// TODO: timeout waiting for response
 	var resp *http.Response
 	select {
+	case <-ctx.Done():
+		pw.Close()
+		return ctx.Err()
 	case <-pw.done:
 		return io.ErrClosedPipe
 	case err := <-pw.errC:
