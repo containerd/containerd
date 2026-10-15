@@ -528,10 +528,22 @@ func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, cont
 }
 
 func withContainerIdentity(containerID, imageManifestDigest string) oci.SpecOpts {
-	return oci.WithEnv([]string{
+	identityEnv := []string{
 		"CONTAINER_IMAGE_ID=" + imageManifestDigest,
 		"CONTAINER_INSTANCE_ID=" + containerID,
-	})
+	}
+	return func(ctx context.Context, client oci.Client, container *containers.Container, spec *oci.Spec) error {
+		env := spec.Process.Env[:0]
+		for _, entry := range spec.Process.Env {
+			key, _, _ := strings.Cut(entry, "=")
+			if key == "CONTAINER_IMAGE_ID" || key == "CONTAINER_INSTANCE_ID" {
+				continue
+			}
+			env = append(env, entry)
+		}
+		spec.Process.Env = env
+		return oci.WithEnv(identityEnv)(ctx, client, container, spec)
+	}
 }
 
 // volumeMounts sets up image volumes for container. Rely on the removal of container

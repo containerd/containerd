@@ -117,6 +117,8 @@ func TestWithContainerIdentity(t *testing.T) {
 		Process: &runtimespec.Process{
 			Env: []string{
 				"CONTAINER_IMAGE_ID=from-image",
+				"CONTAINER_IMAGE_ID=from-request",
+				"CONTAINER_INSTANCE_ID=from-image",
 				"CONTAINER_INSTANCE_ID=from-cri",
 				"OTHER=value",
 			},
