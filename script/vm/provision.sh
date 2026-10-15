@@ -116,3 +116,9 @@ containerd-shim-runc-fp-v1 -v
 # and establish /etc/containerd/config.toml
 SELINUX="${SELINUX}" script/setup/config-selinux
 script/setup/config-containerd
+
+# systemd-tmpfiles-clean.timer runs 15 minutes after boot and removes empty
+# directories under /tmp with mtimes older than 10 days. Unpacking an image
+# layer under /tmp applies the layer's directory timestamps before finishing
+# extraction.
+systemctl mask --now systemd-tmpfiles-clean.timer
