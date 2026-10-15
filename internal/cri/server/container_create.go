@@ -36,6 +36,8 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
@@ -279,6 +281,19 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container %q spec: %w", r.containerID, err)
 	}
+	imageManifestDigest, err := resolveImageManifestDigest(
+		r.ctx,
+		(*r.containerdImage).Target(),
+		(*r.containerdImage).ContentStore(),
+		(*r.containerdImage).Name(),
+		platforms.Only(platform),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve image manifest digest: %w", err)
+	}
+	if err := withContainerIdentity(r.containerID, imageManifestDigest)(r.ctx, nil, nil, spec); err != nil {
+		return "", fmt.Errorf("failed to add container identity environment variables: %w", err)
+	}
 
 	r.meta.ProcessLabel = spec.Process.SelinuxLabel
 
@@ -454,6 +469,47 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	)
 
 	return containerRootDir, nil
+}
+
+// resolveImageManifestDigest returns the manifest digest selected for the
+// platform the container will run on. For multi-platform images this is the
+// platform-specific manifest, rather than the parent image index.
+func resolveImageManifestDigest(
+	ctx context.Context,
+	target imagespec.Descriptor,
+	provider content.Provider,
+	imageName string,
+	platform platforms.MatchComparer,
+) (string, error) {
+	var manifestDigest string
+	children := images.LimitManifests(
+		images.FilterPlatforms(images.ChildrenHandler(provider), platform),
+		platform,
+		1,
+	)
+	handler := images.Handlers(
+		images.HandlerFunc(func(_ context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+			if images.IsManifestType(desc.MediaType) {
+				manifestDigest = desc.Digest.String()
+			}
+			return nil, nil
+		}),
+		children,
+	)
+	if err := images.Walk(ctx, handler, target); err != nil {
+		return "", err
+	}
+	if manifestDigest == "" {
+		return "", fmt.Errorf("image %q has no manifest for the requested platform", imageName)
+	}
+	return manifestDigest, nil
+}
+
+func withContainerIdentity(containerID, imageManifestDigest string) oci.SpecOpts {
+	return oci.WithEnv([]string{
+		"CONTAINER_IMAGE_ID=" + imageManifestDigest,
+		"CONTAINER_INSTANCE_ID=" + containerID,
+	})
 }
 
 // volumeMounts sets up image volumes for container. Rely on the removal of container

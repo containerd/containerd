@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/images/imagetest"
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
@@ -61,6 +62,41 @@ func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 }
 
 const testImageName = "container-image-name"
+
+func TestResolveImageManifestDigest(t *testing.T) {
+	ctx := context.Background()
+	store := imagetest.NewContentStore(ctx, t)
+	config := store.RandomBlob(imagespec.MediaTypeImageConfig, 10)
+	linuxPlatform := imagespec.Platform{OS: "linux", Architecture: "amd64"}
+	windowsPlatform := imagespec.Platform{OS: "windows", Architecture: "amd64"}
+	linuxManifest := imagetest.AddPlatform(store.Manifest(config), linuxPlatform)
+	windowsManifest := imagetest.AddPlatform(store.Manifest(config), windowsPlatform)
+	index := store.Index(linuxManifest, windowsManifest)
+
+	digest, err := resolveImageManifestDigest(ctx, index.Descriptor, store.Store, testImageName, platforms.Only(linuxPlatform))
+	require.NoError(t, err)
+	assert.Equal(t, linuxManifest.Descriptor.Digest.String(), digest)
+}
+
+func TestWithContainerIdentity(t *testing.T) {
+	spec := runtimespec.Spec{
+		Process: &runtimespec.Process{
+			Env: []string{
+				"CONTAINER_IMAGE_ID=from-image",
+				"CONTAINER_INSTANCE_ID=from-cri",
+				"OTHER=value",
+			},
+		},
+	}
+
+	err := withContainerIdentity("container-123", "sha256:manifest")(context.Background(), nil, nil, &spec)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{
+		"CONTAINER_IMAGE_ID=sha256:manifest",
+		"CONTAINER_INSTANCE_ID=container-123",
+		"OTHER=value",
+	}, spec.Process.Env)
+}
 
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
