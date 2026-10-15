@@ -106,8 +106,8 @@ func (windowsServer2025Comparer) Less(a, b imagespec.Platform) bool {
 	return a.OSVersion > b.OSVersion
 }
 
-func TestContainerIdentitySpecOptsDisabled(t *testing.T) {
-	opts, err := containerIdentitySpecOpts(context.Background(), nil, "container-123", true)
+func TestContainerIdentitySpecOptsDisabledByDefault(t *testing.T) {
+	opts, err := containerIdentitySpecOpts(context.Background(), nil, "container-123", false)
 	require.NoError(t, err)
 	assert.Nil(t, opts)
 }

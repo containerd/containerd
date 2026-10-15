@@ -266,7 +266,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		r.ctx,
 		*r.containerdImage,
 		r.containerID,
-		c.config.DisableContainerIdentityEnv,
+		c.config.EnableContainerIdentityEnv,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to prepare container identity environment variables: %w", err)
@@ -505,8 +505,8 @@ func resolveImageManifestDigest(
 	return manifestDigest, nil
 }
 
-func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, containerID string, disabled bool) (oci.SpecOpts, error) {
-	if disabled {
+func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, containerID string, enabled bool) (oci.SpecOpts, error) {
+	if !enabled {
 		return nil, nil
 	}
 

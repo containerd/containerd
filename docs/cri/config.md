@@ -11,34 +11,34 @@ and not recognized by other containerd clients such as `ctr`, `nerdctl`, and Doc
 
 ## Container identity environment variables
 
-For every CRI-created container, containerd adds these environment variables to
-the OCI process configuration:
+For CRI-created containers, containerd can add these environment variables to
+the OCI process configuration when enabled:
 
 * `CONTAINER_INSTANCE_ID` contains the container ID assigned by containerd.
 * `CONTAINER_IMAGE_ID` contains the digest of the image manifest selected for
   the container's platform. For a multi-platform image, this is the
   platform-specific manifest digest, not the parent image index digest.
 
-These values are available to processes started in the container. They are
-injected after the image and CRI environment variables, so they take precedence
-if either source sets the same variable.
+When enabled, these values are available to processes started in the container.
+They are injected after the image and CRI environment variables, so they take
+precedence if either source sets the same variable.
 
-Identity environment variables are enabled by default. To disable digest
+Identity environment variables are disabled by default. To enable digest
 resolution and injection for all CRI-created containers, set
-`disable_container_identity_env = true` in the CRI runtime configuration:
+`enable_container_identity_env = true` in the CRI runtime configuration:
 
 ```toml
 # containerd 2.x
 [plugins.'io.containerd.cri.v1.runtime']
-  disable_container_identity_env = true
+  enable_container_identity_env = true
 
 # containerd 1.x
 [plugins."io.containerd.grpc.v1.cri"]
-  disable_container_identity_env = true
+  enable_container_identity_env = true
 ```
 
-When disabled, containerd leaves any values supplied through the CRI request
-unchanged.
+When enabled, containerd replaces any values supplied through the image or CRI
+request with its identity values.
 
 ## Config versions
 The content of `/etc/containerd/config.toml` must start with a version header, for example:
