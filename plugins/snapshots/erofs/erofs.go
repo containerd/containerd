@@ -51,8 +51,7 @@ type SnapshotterConfig struct {
 	enableFsverity bool
 	// setImmutable enables IMMUTABLE_FL file attribute for EROFS layers
 	setImmutable bool
-	// fsyncOnCommit makes Commit sync the layer blob and the snapshot
-	// directories before the snapshot is recorded as committed
+	// fsyncOnCommit enables fsyncing a snapshot's directory before the snapshot is committed
 	fsyncOnCommit bool
 	// defaultSize creates a default size writable layer for active snapshots
 	defaultSize int64
@@ -91,8 +90,7 @@ func WithImmutable() Opt {
 	}
 }
 
-// WithFsyncOnCommit makes Commit sync the layer blob and the snapshot
-// directories to disk before the snapshot is recorded as committed
+// WithFsyncOnCommit enables fsyncing a snapshot's directory before the snapshot is committed
 func WithFsyncOnCommit() Opt {
 	return func(config *SnapshotterConfig) {
 		config.fsyncOnCommit = true
@@ -296,9 +294,7 @@ func (s *snapshotter) layerBlobPath(id string) string {
 	return filepath.Join(s.root, "snapshots", id, "layer.erofs")
 }
 
-// syncDir fsyncs the immediate entries of dir, then dir itself and its parent,
-// so that the files in dir, its entry list and its own entry in the parent are
-// on disk before the caller records them elsewhere. It does not recurse.
+// syncDir fsyncs the entries of dir, then dir and its parent.
 func syncDir(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -1003,16 +999,6 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 	// Note: dm-verity formatting is handled by the EROFS differ, not here
 
-	// The metadata store syncs its own file when the snapshot is committed, so
-	// with fsync_on_commit enabled the layer is made durable first; otherwise
-	// a power loss shortly after a successful pull can leave a committed
-	// snapshot whose blob is truncated or whose directory does not exist, and
-	// nothing re-pulls a layer whose chain ID already exists. Everything in
-	// the snapshot directory is synced rather than a list of known files, then
-	// the directory and its entry in snapshots/, which was created by a rename
-	// in Prepare and may still be unwritten. A blob served from the layer
-	// content cache lives elsewhere and is not synced; whoever populates the
-	// cache must make it durable.
 	if s.fsyncOnCommit {
 		if err := syncDir(filepath.Join(s.root, "snapshots", id)); err != nil {
 			return err

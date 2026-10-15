@@ -141,10 +141,7 @@ forget to restart containerd after changing the configuration.
       # Enable fsverity support for EROFS layers, default is false
       enable_fsverity = true
 
-      # fsync the snapshot directory, everything in it and its entry in
-      # snapshots/ before a snapshot is committed, so a power loss cannot
-      # leave a committed snapshot without its blob or directory. Blobs served
-      # from layer_content_caches are not synced. Costs a few fsyncs per layer,
+      # Enable fsyncing a snapshot's directory before the snapshot is committed,
       # default is false
       fsync_on_commit = true
 
