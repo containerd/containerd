@@ -289,6 +289,31 @@ func TestFetchSizeValidation(t *testing.T) {
 	})
 }
 
+func TestPushSizeValidation(t *testing.T) {
+	ctx := t.Context()
+
+	for _, tc := range []struct {
+		name string
+		size int64
+	}{
+		{name: "negative size -1", size: -1},
+		{name: "negative size -100", size: -100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			desc := ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageLayer,
+				Digest:    digest.FromString("test"),
+				Size:      tc.size,
+			}
+
+			err := push(ctx, nil, nil, desc)
+			if !errors.Is(err, errdefs.ErrInvalidArgument) {
+				t.Fatalf("expected ErrInvalidArgument, got %v", err)
+			}
+		})
+	}
+}
+
 type readerFunc func(p []byte) (int, error)
 
 func (f readerFunc) Read(p []byte) (int, error) { return f(p) }
