@@ -443,6 +443,12 @@ func hostNetwork(config *runtime.PodSandboxConfig) bool {
 	return hostNet
 }
 
+// isNetworkIsolated handles checking if the sandbox was requested to be hermetic, i.e.
+// the CNI plugin should not be invoked to set up or tear down its networking.
+func isNetworkIsolated(config *runtime.PodSandboxConfig) bool {
+	return config.GetDefaultNetwork() == runtime.PodSandboxDefaultNetwork_DEFAULT_NETWORK_NONE
+}
+
 // getCgroupsPath generates container cgroups path.
 func getCgroupsPath(cgroupsParent, id string) string {
 	base := path.Base(cgroupsParent)

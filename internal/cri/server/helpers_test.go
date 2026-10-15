@@ -431,3 +431,44 @@ func TestHostNetwork(t *testing.T) {
 		})
 	}
 }
+
+func TestisNetworkIsolated(t *testing.T) {
+	tests := []struct {
+		name     string
+		c        *runtime.PodSandboxConfig
+		expected bool
+	}{
+		{
+			name:     "when config is nil return false",
+			c:        nil,
+			expected: false,
+		},
+		{
+			name:     "when default network is unset return false",
+			c:        &runtime.PodSandboxConfig{},
+			expected: false,
+		},
+		{
+			name: "when default network is pod return false",
+			c: &runtime.PodSandboxConfig{
+				DefaultNetwork: runtime.PodSandboxDefaultNetwork_DEFAULT_NETWORK_POD,
+			},
+			expected: false,
+		},
+		{
+			name: "when default network is none return true",
+			c: &runtime.PodSandboxConfig{
+				DefaultNetwork: runtime.PodSandboxDefaultNetwork_DEFAULT_NETWORK_NONE,
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if isNetworkIsolated(tt.c) != tt.expected {
+				t.Errorf("failed isHermetic got %t expected %t", isNetworkIsolated(tt.c), tt.expected)
+			}
+		})
+	}
+}
