@@ -299,7 +299,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
-	_, bytesPulled := pullReporter.reqReporter.status()
+	_, bytesPulled, _ := pullReporter.reqReporter.status()
 	return image, bytesPulled, nil
 }
 
@@ -357,7 +357,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
 	}
-	_, bytesPulled := transferProgressReporter.reqReporter.status()
+	_, bytesPulled, _ := transferProgressReporter.reqReporter.status()
 	return image, bytesPulled, nil
 }
 
@@ -719,7 +719,6 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 
 			lastSeenBytesRead = uint64(0)
 			lastSeenTimestamp = time.Now()
-			prevActiveReqs    = int32(0)
 		)
 
 		// check progress more frequently if timeout < default internal
@@ -733,7 +732,10 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				activeReqs, bytesRead := reporter.reqReporter.status()
+				activeReqs, bytesRead, lastProgress := reporter.reqReporter.status()
+				if lastProgress.After(lastSeenTimestamp) {
+					lastSeenTimestamp = lastProgress
+				}
 
 				log.G(ctx).WithField("ref", reporter.ref).
 					WithField("activeReqs", activeReqs).
@@ -743,19 +745,11 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 					WithField("reportInterval", reportInterval).
 					Debugf("progress for image pull")
 
-				// Reset the no-progress timer when idle, when bytes were
-				// read, or when a request has just started after an idle
-				// period. Without the idle→active reset, a request can be
-				// cancelled less than `timeout` after it was issued,
-				// because lastSeenTimestamp was captured on an earlier
-				// tick while activeReqs was still 0.
-				if activeReqs == 0 || bytesRead > lastSeenBytesRead || prevActiveReqs == 0 {
-					lastSeenBytesRead = bytesRead
+				lastSeenBytesRead = bytesRead
+				if activeReqs == 0 {
 					lastSeenTimestamp = time.Now()
-					prevActiveReqs = activeReqs
 					continue
 				}
-				prevActiveReqs = activeReqs
 
 				if time.Since(lastSeenTimestamp) > reporter.timeout {
 					log.G(ctx).Errorf("cancel pulling image %s because of no progress in %v", reporter.ref, reporter.timeout)
@@ -763,7 +757,7 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 					return
 				}
 			case <-ctx.Done():
-				activeReqs, bytesRead := reporter.reqReporter.status()
+				activeReqs, bytesRead, _ := reporter.reqReporter.status()
 				log.G(ctx).Infof("stop pulling image %s: active requests=%v, bytes read=%v", reporter.ref, activeReqs, bytesRead)
 				return
 			}
@@ -804,9 +798,17 @@ type pullRequestReporter struct {
 	// totalBytesRead indicates that the total bytes has been read from
 	// remote registry.
 	totalBytesRead atomic.Uint64
+	// lastProgressNano is the unix nanosecond timestamp of the most recent
+	// request start, response header arrival, or body byte read.
+	lastProgressNano atomic.Int64
+}
+
+func (reporter *pullRequestReporter) touch() {
+	reporter.lastProgressNano.Store(time.Now().UnixNano())
 }
 
 func (reporter *pullRequestReporter) incRequest() {
+	reporter.touch()
 	reporter.activeReqs.Add(1)
 }
 
@@ -815,13 +817,19 @@ func (reporter *pullRequestReporter) decRequest() {
 }
 
 func (reporter *pullRequestReporter) incByteRead(nr uint64) {
-	reporter.totalBytesRead.Add(nr)
+	if nr > 0 {
+		reporter.totalBytesRead.Add(nr)
+		reporter.touch()
+	}
 }
 
-func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64) {
+func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64, lastProgress time.Time) {
 	currentReqs = reporter.activeReqs.Load()
 	totalBytesRead = reporter.totalBytesRead.Load()
-	return currentReqs, totalBytesRead
+	if lastProgressNano := reporter.lastProgressNano.Load(); lastProgressNano > 0 {
+		lastProgress = time.Unix(0, lastProgressNano)
+	}
+	return currentReqs, totalBytesRead, lastProgress
 }
 
 // pullRequestReporterRoundTripper wraps http.RoundTripper with pull request
@@ -853,6 +861,7 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 		rt.reqReporter.decRequest()
 		return nil, err
 	}
+	rt.reqReporter.touch()
 
 	resp.Body = &countingReadCloser{
 		rc:          resp.Body,
@@ -1045,7 +1054,7 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 				reporter.checkProgress(ctx, reportInterval)
 				continue
 			case <-ctx.Done():
-				activeReqs, bytesRead := reporter.reqReporter.status()
+				activeReqs, bytesRead, _ := reporter.reqReporter.status()
 				log.G(ctx).Infof("stop pulling image %s: active requests=%v, bytes read=%v", reporter.ref, activeReqs, bytesRead)
 				return
 			}
@@ -1054,7 +1063,7 @@ func (reporter *transferProgressReporter) start(ctx context.Context) {
 }
 
 func (reporter *transferProgressReporter) checkProgress(ctx context.Context, reportInterval time.Duration) {
-	activeReqs, bytesRead := reporter.reqReporter.status()
+	activeReqs, bytesRead, _ := reporter.reqReporter.status()
 
 	lastSeenBytesRead := reporter.lastSeenBytesRead
 	lastSeenTimestamp := reporter.lastSeenTimestamp
