@@ -66,12 +66,13 @@ const testImageName = "container-image-name"
 func TestResolveImageManifestDigest(t *testing.T) {
 	ctx := context.Background()
 	store := imagetest.NewContentStore(ctx, t)
-	config := store.RandomBlob(imagespec.MediaTypeImageConfig, 10)
+	linuxConfig := store.Blob(imagespec.MediaTypeImageConfig, []byte("linux image config"))
+	windowsConfig := store.Blob(imagespec.MediaTypeImageConfig, []byte("windows image config"))
 	linuxPlatform := imagespec.Platform{OS: "linux", Architecture: "amd64"}
 	windowsPlatform := imagespec.Platform{OS: "windows", Architecture: "amd64"}
-	linuxManifest := imagetest.AddPlatform(store.Manifest(config), linuxPlatform)
-	windowsManifest := imagetest.AddPlatform(store.Manifest(config), windowsPlatform)
-	index := store.Index(linuxManifest, windowsManifest)
+	linuxManifest := imagetest.AddPlatform(store.Manifest(linuxConfig), linuxPlatform)
+	windowsManifest := imagetest.AddPlatform(store.Manifest(windowsConfig), windowsPlatform)
+	index := store.Index(windowsManifest, linuxManifest)
 
 	digest, err := resolveImageManifestDigest(ctx, index.Descriptor, store.Store, testImageName, platforms.Only(linuxPlatform))
 	require.NoError(t, err)
@@ -81,11 +82,12 @@ func TestResolveImageManifestDigest(t *testing.T) {
 func TestResolveImageManifestDigestUsesPlatformOrdering(t *testing.T) {
 	ctx := context.Background()
 	store := imagetest.NewContentStore(ctx, t)
-	config := store.RandomBlob(imagespec.MediaTypeImageConfig, 10)
+	config2022 := store.Blob(imagespec.MediaTypeImageConfig, []byte("windows server 2022 config"))
+	config2025 := store.Blob(imagespec.MediaTypeImageConfig, []byte("windows server 2025 config"))
 	platform2022 := imagespec.Platform{OS: "windows", Architecture: "amd64", OSVersion: "10.0.20348.0"}
 	platform2025 := imagespec.Platform{OS: "windows", Architecture: "amd64", OSVersion: "10.0.26100.0"}
-	manifest2022 := imagetest.AddPlatform(store.Manifest(config), platform2022)
-	manifest2025 := imagetest.AddPlatform(store.Manifest(config), platform2025)
+	manifest2022 := imagetest.AddPlatform(store.Manifest(config2022), platform2022)
+	manifest2025 := imagetest.AddPlatform(store.Manifest(config2025), platform2025)
 	index := store.Index(manifest2022, manifest2025)
 
 	digest, err := resolveImageManifestDigest(ctx, index.Descriptor, store.Store, testImageName, windowsServer2025Comparer{})
