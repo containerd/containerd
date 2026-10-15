@@ -320,7 +320,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 
 func checkCommitExists(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
-	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1}); err != nil {
+	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1, Size: int64(len(c1))}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,7 +375,7 @@ func discardWriter(t *testing.T, w content.Writer) {
 func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 	_, d2 := createContent(256)
-	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1}); err != nil {
+	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1, Size: int64(len(c1))}); err != nil {
 		t.Fatal(err)
 	}
 
