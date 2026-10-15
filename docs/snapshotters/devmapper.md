@@ -195,7 +195,7 @@ See also [Configure direct-lvm mode for production](https://docs.docker.com/stor
 
 For more information on Device-mapper, thin provisioning, etc., you can refer to the following resources:
 
-* https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/logical_volume_manager_administration/device_mapper
+* https://docs.kernel.org/admin-guide/device-mapper/index.html
 * https://en.wikipedia.org/wiki/Device_mapper
 * https://docs.docker.com/storage/storagedriver/device-mapper-driver/
 * https://www.kernel.org/doc/Documentation/device-mapper/thin-provisioning.txt

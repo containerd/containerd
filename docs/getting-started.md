@@ -103,7 +103,7 @@ The `containerd.io` package contains runc too, but does not contain CNI plugins.
 
 ### Option 3: From source
 
-To install containerd and its dependencies from the source, see [`BUILDING.md`](/BUILDING.md).
+To install containerd and its dependencies from the source, see [`BUILDING.md`](../BUILDING.md).
 
 ## Installing containerd on Windows
 
@@ -143,7 +143,7 @@ Start-Service containerd
 > **Tip for Running `containerd` Service on Windows:**
 >
 > `containerd` logs are not persisted when we start it as a service
-using Windows Service Manager. [`nssm`](https://nssm.cc) can be used to
+using Windows Service Manager. [`nssm`](https://github.com/kirillkovalenko/nssm) can be used to
 configure logs to go into a cyclic buffer:
 > ```powershell
 > nssm.exe install containerd
@@ -198,7 +198,7 @@ For non-managed environments, see the following Kubernetes documentations:
 ## Customizing containerd
 
 containerd uses a configuration file located in `/etc/containerd/config.toml` for specifying daemon level options.
-A sample configuration file can be found [here](/docs/man/containerd-config.toml.5.md).
+A sample configuration file can be found [here](man/containerd-config.toml.5.md).
 
 The default configuration can be generated via `containerd config default > /etc/containerd/config.toml`.
 
