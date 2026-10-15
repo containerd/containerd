@@ -132,6 +132,9 @@ func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) (
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
 func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc ocispec.Descriptor, opts ...Opt) error {
+	if desc.Size < 0 {
+		return fmt.Errorf("invalid content size %d: %w", desc.Size, errdefs.ErrInvalidArgument)
+	}
 	cw, err := OpenWriter(ctx, cs, WithRef(ref), WithDescriptor(desc))
 	if err != nil {
 		if !errdefs.IsAlreadyExists(err) {
