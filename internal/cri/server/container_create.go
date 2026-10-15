@@ -266,6 +266,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		r.ctx,
 		*r.containerdImage,
 		r.containerID,
+		platform,
 		c.config.EnableContainerIdentityEnv,
 	)
 	if err != nil {
@@ -505,29 +506,29 @@ func resolveImageManifestDigest(
 	return manifestDigest, nil
 }
 
-func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, containerID string, enabled bool) (oci.SpecOpts, error) {
+func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, containerID string, platform imagespec.Platform, enabled bool) (oci.SpecOpts, error) {
 	if !enabled {
 		return nil, nil
 	}
 
-	platform := image.Platform()
-	if platform == nil {
-		platform = platforms.Default()
+	platformComparer := image.Platform()
+	if platformComparer == nil {
+		platformComparer = platforms.Default()
 	}
 	imageManifestDigest, err := resolveImageManifestDigest(
 		ctx,
 		image.Target(),
 		image.ContentStore(),
 		image.Name(),
-		platform,
+		platformComparer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image manifest digest: %w", err)
 	}
-	return withContainerIdentity(containerID, imageManifestDigest), nil
+	return withContainerIdentity(containerID, imageManifestDigest, platform), nil
 }
 
-func withContainerIdentity(containerID, imageManifestDigest string) oci.SpecOpts {
+func withContainerIdentity(containerID, imageManifestDigest string, platform imagespec.Platform) oci.SpecOpts {
 	identityEnv := []string{
 		"CONTAINER_IMAGE_ID=" + imageManifestDigest,
 		"CONTAINER_INSTANCE_ID=" + containerID,
@@ -536,7 +537,11 @@ func withContainerIdentity(containerID, imageManifestDigest string) oci.SpecOpts
 		env := spec.Process.Env[:0]
 		for _, entry := range spec.Process.Env {
 			key, _, _ := strings.Cut(entry, "=")
-			if key == "CONTAINER_IMAGE_ID" || key == "CONTAINER_INSTANCE_ID" {
+			matchesIdentityKey := key == "CONTAINER_IMAGE_ID" || key == "CONTAINER_INSTANCE_ID"
+			if platform.OS == "windows" {
+				matchesIdentityKey = strings.EqualFold(key, "CONTAINER_IMAGE_ID") || strings.EqualFold(key, "CONTAINER_INSTANCE_ID")
+			}
+			if matchesIdentityKey {
 				continue
 			}
 			env = append(env, entry)

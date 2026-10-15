@@ -107,7 +107,7 @@ func (windowsServer2025Comparer) Less(a, b imagespec.Platform) bool {
 }
 
 func TestContainerIdentitySpecOptsDisabledByDefault(t *testing.T) {
-	opts, err := containerIdentitySpecOpts(context.Background(), nil, "container-123", false)
+	opts, err := containerIdentitySpecOpts(context.Background(), nil, "container-123", imagespec.Platform{}, false)
 	require.NoError(t, err)
 	assert.Nil(t, opts)
 }
@@ -120,17 +120,41 @@ func TestWithContainerIdentity(t *testing.T) {
 				"CONTAINER_IMAGE_ID=from-request",
 				"CONTAINER_INSTANCE_ID=from-image",
 				"CONTAINER_INSTANCE_ID=from-cri",
+				"container_image_id=case-sensitive-on-linux",
 				"OTHER=value",
 			},
 		},
 	}
 
-	err := withContainerIdentity("container-123", "sha256:manifest")(context.Background(), nil, nil, &spec)
+	err := withContainerIdentity("container-123", "sha256:manifest", imagespec.Platform{OS: "linux"})(context.Background(), nil, nil, &spec)
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{
 		"CONTAINER_IMAGE_ID=sha256:manifest",
 		"CONTAINER_INSTANCE_ID=container-123",
+		"container_image_id=case-sensitive-on-linux",
 		"OTHER=value",
+	}, spec.Process.Env)
+}
+
+func TestWithContainerIdentityWindowsEnvKeys(t *testing.T) {
+	spec := runtimespec.Spec{
+		Process: &runtimespec.Process{
+			Env: []string{
+				"container_image_id=from-image",
+				"Container_Image_Id=from-request",
+				"container_instance_id=from-image",
+				"Container_Instance_Id=from-cri",
+				"PATH=C:\\Windows\\System32",
+			},
+		},
+	}
+
+	err := withContainerIdentity("container-123", "sha256:manifest", imagespec.Platform{OS: "windows"})(context.Background(), nil, nil, &spec)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{
+		"CONTAINER_IMAGE_ID=sha256:manifest",
+		"CONTAINER_INSTANCE_ID=container-123",
+		"PATH=C:\\Windows\\System32",
 	}, spec.Process.Env)
 }
 

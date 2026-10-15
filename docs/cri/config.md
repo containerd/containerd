@@ -32,7 +32,7 @@ resolution and injection for all CRI-created containers, set
 [plugins.'io.containerd.cri.v1.runtime']
   enable_container_identity_env = true
 
-# containerd 1.x
+# containerd 2.x with config version 2 (legacy CRI config migrated to the runtime plugin)
 [plugins."io.containerd.grpc.v1.cri"]
   enable_container_identity_env = true
 ```
