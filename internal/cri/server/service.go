@@ -437,6 +437,9 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 		userns := supportsCRIUserns(rawFeatures)
 		h.Features.UserNamespaces = userns
 		log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
+		cgroupns := supportsCRICgroupns(rawFeatures)
+		h.Features.CgroupNamespaces = cgroupns
+		log.G(ctx).Debugf("runtime %q supports CRI cgroupns: %v", name, cgroupns)
 	}
 
 	c.runtimeHandlers[name] = h
@@ -512,4 +515,11 @@ func supportsCRIUserns(f *features.Features) bool {
 
 	// user namespace support in CRI requires userns and idmap support.
 	return userns && idmap
+}
+
+func supportsCRICgroupns(f *features.Features) bool {
+	if f == nil || f.Linux == nil {
+		return false
+	}
+	return slices.Contains(f.Linux.Namespaces, "cgroup")
 }
