@@ -78,6 +78,38 @@ func TestResolveImageManifestDigest(t *testing.T) {
 	assert.Equal(t, linuxManifest.Descriptor.Digest.String(), digest)
 }
 
+func TestResolveImageManifestDigestUsesPlatformOrdering(t *testing.T) {
+	ctx := context.Background()
+	store := imagetest.NewContentStore(ctx, t)
+	config := store.RandomBlob(imagespec.MediaTypeImageConfig, 10)
+	platform2022 := imagespec.Platform{OS: "windows", Architecture: "amd64", OSVersion: "10.0.20348.0"}
+	platform2025 := imagespec.Platform{OS: "windows", Architecture: "amd64", OSVersion: "10.0.26100.0"}
+	manifest2022 := imagetest.AddPlatform(store.Manifest(config), platform2022)
+	manifest2025 := imagetest.AddPlatform(store.Manifest(config), platform2025)
+	index := store.Index(manifest2022, manifest2025)
+
+	digest, err := resolveImageManifestDigest(ctx, index.Descriptor, store.Store, testImageName, windowsServer2025Comparer{})
+	require.NoError(t, err)
+	assert.Equal(t, manifest2025.Descriptor.Digest.String(), digest)
+}
+
+type windowsServer2025Comparer struct{}
+
+func (windowsServer2025Comparer) Match(platform imagespec.Platform) bool {
+	return platform.OS == "windows" && platform.Architecture == "amd64" &&
+		platform.OSVersion >= "10.0.20348.0" && platform.OSVersion <= "10.0.26100.0"
+}
+
+func (windowsServer2025Comparer) Less(a, b imagespec.Platform) bool {
+	return a.OSVersion > b.OSVersion
+}
+
+func TestContainerIdentitySpecOptsDisabled(t *testing.T) {
+	opts, err := containerIdentitySpecOpts(context.Background(), nil, "container-123", true)
+	require.NoError(t, err)
+	assert.Nil(t, opts)
+}
+
 func TestWithContainerIdentity(t *testing.T) {
 	spec := runtimespec.Spec{
 		Process: &runtimespec.Process{

@@ -23,6 +23,23 @@ These values are available to processes started in the container. They are
 injected after the image and CRI environment variables, so they take precedence
 if either source sets the same variable.
 
+Identity environment variables are enabled by default. To disable digest
+resolution and injection for all CRI-created containers, set
+`disable_container_identity_env = true` in the CRI runtime configuration:
+
+```toml
+# containerd 2.x
+[plugins.'io.containerd.cri.v1.runtime']
+  disable_container_identity_env = true
+
+# containerd 1.x
+[plugins."io.containerd.grpc.v1.cri"]
+  disable_container_identity_env = true
+```
+
+When disabled, containerd leaves any values supplied through the CRI request
+unchanged.
+
 ## Config versions
 The content of `/etc/containerd/config.toml` must start with a version header, for example:
 ```toml

@@ -262,6 +262,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if name := r.containerConfig.GetImage().GetUserSpecifiedImage(); name != "" {
 		imageName = name
 	}
+	identityOpts, err := containerIdentitySpecOpts(
+		r.ctx,
+		*r.containerdImage,
+		r.containerID,
+		c.config.DisableContainerIdentityEnv,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to prepare container identity environment variables: %w", err)
+	}
 
 	spec, err := c.buildContainerSpec(
 		platform,
@@ -281,18 +290,15 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container %q spec: %w", r.containerID, err)
 	}
-	imageManifestDigest, err := resolveImageManifestDigest(
-		r.ctx,
-		(*r.containerdImage).Target(),
-		(*r.containerdImage).ContentStore(),
-		(*r.containerdImage).Name(),
-		platforms.Only(platform),
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve image manifest digest: %w", err)
-	}
-	if err := withContainerIdentity(r.containerID, imageManifestDigest)(r.ctx, nil, nil, spec); err != nil {
-		return "", fmt.Errorf("failed to add container identity environment variables: %w", err)
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(spec.Process.SelinuxLabel)
+		}
+	}()
+	if identityOpts != nil {
+		if err := identityOpts(r.ctx, nil, nil, spec); err != nil {
+			return "", fmt.Errorf("failed to add container identity environment variables: %w", err)
+		}
 	}
 
 	r.meta.ProcessLabel = spec.Process.SelinuxLabel
@@ -307,12 +313,6 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		// the unused MCS label can be release later
 		spec.Process.SelinuxLabel = ""
 	}
-	defer func() {
-		if retErr != nil {
-			selinux.ReleaseLabel(spec.Process.SelinuxLabel)
-		}
-	}()
-
 	logger := log.G(r.ctx)
 	if logger.Logger.IsLevelEnabled(log.DebugLevel) {
 		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
@@ -503,6 +503,28 @@ func resolveImageManifestDigest(
 		return "", fmt.Errorf("image %q has no manifest for the requested platform", imageName)
 	}
 	return manifestDigest, nil
+}
+
+func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, containerID string, disabled bool) (oci.SpecOpts, error) {
+	if disabled {
+		return nil, nil
+	}
+
+	platform := image.Platform()
+	if platform == nil {
+		platform = platforms.Default()
+	}
+	imageManifestDigest, err := resolveImageManifestDigest(
+		ctx,
+		image.Target(),
+		image.ContentStore(),
+		image.Name(),
+		platform,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve image manifest digest: %w", err)
+	}
+	return withContainerIdentity(containerID, imageManifestDigest), nil
 }
 
 func withContainerIdentity(containerID, imageManifestDigest string) oci.SpecOpts {
