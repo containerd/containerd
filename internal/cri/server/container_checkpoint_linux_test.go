@@ -20,7 +20,9 @@ package server
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -28,13 +30,124 @@ import (
 	"sync"
 	"testing"
 
+	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+type checkpointTestImageStore struct {
+	images.Store
+	image images.Image
+}
+
+func (s checkpointTestImageStore) Get(context.Context, string) (images.Image, error) {
+	return s.image, nil
+}
+
+type checkpointTestImageService struct {
+	ImageService
+	image imagestore.Image
+}
+
+func (s checkpointTestImageService) LocalResolve(string) (imagestore.Image, error) {
+	return s.image, nil
+}
+
+func (s checkpointTestImageService) RuntimeSnapshotter(context.Context, criconfig.Runtime) string {
+	return "native"
+}
+
+func TestCRImportCheckpointChecksImageMetadataBeforeReading(t *testing.T) {
+	testutil.RequiresRoot(t)
+	for _, filename := range []string{"", crmetadata.SpecDumpFile, crmetadata.ConfigDumpFile, crmetadata.StatusDumpFile} {
+		t.Run(filename, func(t *testing.T) {
+			ctx := context.Background()
+			root := t.TempDir()
+			store, err := local.NewStore(filepath.Join(root, "content"))
+			require.NoError(t, err)
+			snapshotter, err := native.NewSnapshotter(filepath.Join(root, "snapshots"))
+			require.NoError(t, err)
+			t.Cleanup(func() { assert.NoError(t, snapshotter.Close()) })
+			writeJSON := func(mediaType string, value interface{}) v1.Descriptor {
+				t.Helper()
+				data, err := json.Marshal(value)
+				require.NoError(t, err)
+				desc := v1.Descriptor{MediaType: mediaType, Digest: digest.FromBytes(data), Size: int64(len(data))}
+				require.NoError(t, content.WriteBlob(ctx, store, desc.Digest.String(), bytes.NewReader(data), desc))
+				return desc
+			}
+			diffID := digest.FromString("checkpoint-test-layer")
+			platform := platforms.DefaultSpec()
+			config := writeJSON(v1.MediaTypeImageConfig, v1.Image{Platform: platform, RootFS: v1.RootFS{
+				Type: "layers", DiffIDs: []digest.Digest{diffID},
+			}})
+			manifest := writeJSON(v1.MediaTypeImageManifest, v1.Manifest{
+				Versioned: imagespec.Versioned{SchemaVersion: 2}, MediaType: v1.MediaTypeImageManifest, Config: config,
+			})
+			manifest.Platform = &platform
+			index := writeJSON(v1.MediaTypeImageIndex, v1.Index{
+				Versioned: imagespec.Versioned{SchemaVersion: 2}, MediaType: v1.MediaTypeImageIndex,
+				Manifests: []v1.Descriptor{manifest}, Annotations: map[string]string{crmetadata.CheckpointAnnotationName: "test"},
+			})
+			mounts, err := snapshotter.Prepare(ctx, "fixture", "")
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(mounts[0].Source, crmetadata.SpecDumpFile), []byte("{}"), 0o600))
+			if filename != "" {
+				outside := filepath.Join(root, "outside")
+				require.NoError(t, os.WriteFile(outside, []byte("NOT JSON"), 0o600))
+				if filename == crmetadata.SpecDumpFile {
+					require.NoError(t, os.Remove(filepath.Join(mounts[0].Source, filename)))
+				}
+				require.NoError(t, os.Symlink(outside, filepath.Join(mounts[0].Source, filename)))
+			}
+			require.NoError(t, snapshotter.Commit(ctx, identity.ChainID([]digest.Digest{diffID}).String(), "fixture"))
+			image := images.Image{Name: "checkpoint-test", Target: index}
+			client, err := containerd.New("", containerd.WithServices(containerd.WithContentStore(store),
+				containerd.WithImageStore(checkpointTestImageStore{image: image}),
+				containerd.WithSnapshotters(map[string]snapshots.Snapshotter{"native": snapshotter})))
+			require.NoError(t, err)
+			t.Cleanup(func() { assert.NoError(t, client.Close()) })
+			c := newTestCRIService()
+			c.config.EnableExperimentalRestoreViaCreate = true
+			c.checkCriuOnce.Do(func() {})
+			c.client = client
+			c.ImageService = checkpointTestImageService{ImageService: c.ImageService, image: imagestore.Image{
+				ID: image.Name, References: []string{image.Name},
+			}}
+			_, err = c.CRImportCheckpoint(ctx, &containerstore.Metadata{Config: &runtime.ContainerConfig{
+				Image: &runtime.ImageSpec{Image: image.Name},
+			}}, &sandboxstore.Sandbox{}, &runtime.PodSandboxConfig{})
+			require.Error(t, err)
+			if filename == "" {
+				assert.Contains(t, err.Error(), "failed to read \"config.dump\"")
+			} else {
+				assert.Contains(t, err.Error(), "refusing to restore checkpoint")
+				assert.Contains(t, err.Error(), filename)
+				assert.NotContains(t, err.Error(), "invalid character")
+			}
+		})
+	}
+}
 
 func TestCopyNoFollowRegularFile(t *testing.T) {
 	dir := t.TempDir()
