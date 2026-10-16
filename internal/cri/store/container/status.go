@@ -98,6 +98,10 @@ type Status struct {
 	Unknown bool `json:"-"`
 	// Resources has container runtime resource constraints
 	Resources *runtime.ContainerResources
+	// TaskCheckpointImage is a controller-prepared containerd checkpoint image
+	// owned by CRI until it is consumed to create the restored task or the
+	// container is removed. It is empty for ordinary containers.
+	TaskCheckpointImage string
 }
 
 // State returns current state of the container based on the container status.

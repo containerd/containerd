@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -79,19 +80,49 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 		if err != nil {
 			return err
 		}
-		for _, m := range index.Manifests {
-			if m.MediaType == images.MediaTypeContainerd1Checkpoint {
-				info.Checkpoint = &types.Descriptor{
-					MediaType:   m.MediaType,
-					Size:        m.Size,
-					Digest:      m.Digest.String(),
-					Annotations: m.Annotations,
-				}
-				return nil
-			}
+		checkpoint, err := taskCheckpointDescriptor(index)
+		if err != nil {
+			return fmt.Errorf("invalid checkpoint index %s: %w", id, err)
 		}
-		return fmt.Errorf("checkpoint not found in index %s", id)
+		info.Checkpoint = &types.Descriptor{
+			MediaType: checkpoint.MediaType,
+			Size:      checkpoint.Size,
+			Digest:    checkpoint.Digest.String(),
+		}
+		return nil
 	}
+}
+
+// taskCheckpointDescriptor deliberately does not forward descriptor
+// annotations. Checkpoint images are data, and annotations such as
+// RestoreFromPath are interpreted as host-side control input by the task
+// service. Accepting them here would allow an imported image to select a host
+// filesystem path instead of restoring from its content descriptor.
+func taskCheckpointDescriptor(index *ocispec.Index) (*ocispec.Descriptor, error) {
+	var checkpoint *ocispec.Descriptor
+	for i := range index.Manifests {
+		desc := &index.Manifests[i]
+		if desc.MediaType != images.MediaTypeContainerd1Checkpoint {
+			continue
+		}
+		if checkpoint != nil {
+			return nil, errors.New("checkpoint index contains multiple task checkpoints")
+		}
+		if len(desc.Annotations) != 0 {
+			return nil, errors.New("task checkpoint descriptor contains forbidden annotations")
+		}
+		if desc.Size <= 0 {
+			return nil, errors.New("task checkpoint descriptor has an invalid size")
+		}
+		if err := desc.Digest.Validate(); err != nil {
+			return nil, fmt.Errorf("task checkpoint descriptor has an invalid digest: %w", err)
+		}
+		checkpoint = desc
+	}
+	if checkpoint == nil {
+		return nil, errors.New("checkpoint not found")
+	}
+	return checkpoint, nil
 }
 
 // WithCheckpointName sets the image name for the checkpoint

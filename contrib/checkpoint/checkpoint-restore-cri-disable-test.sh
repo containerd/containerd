@@ -86,16 +86,16 @@ export CONTAINER_RUNTIME_ENDPOINT="unix://${CONTAINERD_ADDRESS}"
 TEST_IMAGE=ghcr.io/containerd/alpine
 TESTDATA=testdata
 function start_containerd() {
-	local enable_criu="$1"
+	local enable_checkpoint_restore="$1"
 	local use_path="$2"
-	echo "--> Starting containerd with enable_criu=${enable_criu}"
+	echo "--> Starting containerd with enable_checkpoint_restore=${enable_checkpoint_restore}"
 	cat >"${TESTDIR}/config.toml" <<EOF
 version = 3
 [plugins."io.containerd.cri.v1.runtime"]
 EOF
-	if [ "${enable_criu}" != "omit" ]; then
+	if [ "${enable_checkpoint_restore}" != "omit" ]; then
 		cat >>"${TESTDIR}/config.toml" <<EOF
-  enable_criu = ${enable_criu}
+  enable_checkpoint_restore = ${enable_checkpoint_restore}
 EOF
 	fi
 	cat >>"${TESTDIR}/config.toml" <<EOF
@@ -105,7 +105,7 @@ EOF
 runtime_type = "${TEST_RUNTIME:-io.containerd.runc.v2}"
 EOF
 	mkdir -p "${TESTDIR}"/{root,state}
-	echo "=== STARTING CONTAINERD (enable_criu=${enable_criu}) ===" >> "${TESTDIR}/containerd.log"
+	echo "=== STARTING CONTAINERD (enable_checkpoint_restore=${enable_checkpoint_restore}) ===" >> "${TESTDIR}/containerd.log"
 	if [ -n "${use_path}" ]; then
 		env PATH="${use_path}" ../../bin/containerd \
 			--address "${TESTDIR}/c.sock" \
@@ -177,11 +177,11 @@ function cleanup_container() {
 rm -f "${TESTDIR}/containerd.log"
 
 # ==============================================================================
-# Group 1 (Configuration: enable_criu = false, normal PATH)
+# Group 1 (Configuration: enable_checkpoint_restore = false, normal PATH)
 # ==============================================================================
 start_containerd "false" ""
 
-# Test 1: Checkpoint fails fast when enable_criu = false, and the source container remains running.
+# Test 1: Checkpoint fails fast when enable_checkpoint_restore = false, and the source container remains running.
 ids=$(setup_container)
 pod_id=$(echo "$ids" | cut -d: -f1)
 ctr_id=$(echo "$ids" | cut -d: -f2)
@@ -189,7 +189,7 @@ set +e
 output=$(crictl checkpoint --export="$TESTDIR"/cp.tar "${ctr_id}" 2>&1)
 exit_code=$?
 set -e
-if [ $exit_code -eq 0 ] || [[ ! "$output" =~ "criu support is disabled by configuration" ]]; then
+if [ $exit_code -eq 0 ] || [[ ! "$output" =~ "checkpoint/restore support is disabled by configuration" ]]; then
 	echo "ERROR: Test 1 failed (checkpoint did not fail fast). Output: $output"
 	exit 1
 fi
@@ -204,31 +204,31 @@ cleanup_container "$pod_id" "$ctr_id"
 stop_containerd
 
 # ==============================================================================
-# Group 2 (Configuration: enable_criu omitted/defaults, normal PATH)
+# Group 2 (Configuration: enable_checkpoint_restore omitted/defaults, normal PATH)
 # ==============================================================================
 start_containerd "omit" ""
 
-# Test 2: enable_criu omitted from configuration defaults to true (allowing checkpoint).
+# Test 2: enable_checkpoint_restore omitted from configuration defaults to true (allowing checkpoint).
 ids=$(setup_container)
 pod_id=$(echo "$ids" | cut -d: -f1)
 ctr_id=$(echo "$ids" | cut -d: -f2)
 rm -f "$TESTDIR"/omitted_checkpoint.tar
 crictl checkpoint --export="$TESTDIR"/omitted_checkpoint.tar "${ctr_id}"
-echo "PASS: Test 2: enable_criu omitted from configuration defaults to true"
+echo "PASS: Test 2: enable_checkpoint_restore omitted from configuration defaults to true"
 cleanup_container "$pod_id" "$ctr_id"
 
 stop_containerd
 
 # ==============================================================================
-# Group 3 (Configuration: enable_criu = true, cleaned PATH without CRIU)
+# Group 3 (Configuration: enable_checkpoint_restore = true, cleaned PATH without CRIU)
 # ==============================================================================
 if [ -n "${CRIU_DIR}" ]; then
 	CLEANED_PATH=$(get_cleaned_path)
 
 	start_containerd "true" "${CLEANED_PATH}"
 
-	# Test 3: CRIU missing from PATH, enable_criu = true.
-	# Verifies that when CRIU is enabled but missing, it fails with the binary missing error.
+	# Test 3: CRIU missing from PATH, enable_checkpoint_restore = true.
+	# Verifies that when checkpoint/restore is enabled but CRIU is missing, it fails with the binary missing error.
 	ids=$(setup_container)
 	pod_id=$(echo "$ids" | cut -d: -f1)
 	ctr_id=$(echo "$ids" | cut -d: -f2)
@@ -240,7 +240,7 @@ if [ -n "${CRIU_DIR}" ]; then
 		echo "ERROR: Test 3 failed. Output: $output"
 		exit 1
 	fi
-	echo "PASS: Test 3: Fails with binary not found as expected when enable_criu = true"
+	echo "PASS: Test 3: Fails with binary not found as expected when enable_checkpoint_restore = true"
 	cleanup_container "$pod_id" "$ctr_id"
 
 	stop_containerd
