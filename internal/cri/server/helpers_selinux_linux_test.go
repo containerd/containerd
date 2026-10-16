@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package podsandbox
+package server
 
 import (
 	"testing"
