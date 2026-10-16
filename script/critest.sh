@@ -50,7 +50,9 @@ function cleanup() {
 trap cleanup EXIT
 
 mkdir -p ${BDIR}/{root,state}
-cat > ${BDIR}/config.toml <<EOF
+containerd_config="${CONTAINERD_CONFIG_FILE:-${BDIR}/config.toml}"
+if [[ -z "${CONTAINERD_CONFIG_FILE:-}" ]]; then
+  cat > "${containerd_config}" <<EOF
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
 runtime_type = "${TEST_RUNTIME}"
@@ -63,11 +65,15 @@ runtime_type = "${TEST_RUNTIME}"
 slow_chown = true
 EOF
 
-if [ ! -z "$CGROUP_DRIVER" ] && [ "$CGROUP_DRIVER" = "systemd" ];then
-  cat >> ${BDIR}/config.toml <<EOF
+  if [ ! -z "$CGROUP_DRIVER" ] && [ "$CGROUP_DRIVER" = "systemd" ];then
+    cat >> "${containerd_config}" <<EOF
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
    SystemdCgroup = true
 EOF
+  fi
+elif [[ ! -f "${containerd_config}" ]]; then
+  echo "containerd config ${containerd_config} does not exist" >&2
+  exit 1
 fi
 
 GINKGO_SKIP_TEST=()
@@ -120,15 +126,21 @@ ls /etc/cni/net.d
 
 /usr/local/bin/containerd \
     -a ${BDIR}/c.sock \
-    --config ${BDIR}/config.toml \
+    --config "${containerd_config}" \
     --root ${BDIR}/root \
     --state ${BDIR}/state \
     --log-level debug &> "$report_dir/containerd.log" &
 
 # Make sure containerd is ready before calling critest.
-for i in $(seq 1 10)
-do
-    crictl --runtime-endpoint ${BDIR}/c.sock info && break || sleep 1
+for i in $(seq 1 10); do
+    crictl --runtime-endpoint ${BDIR}/c.sock info 2>/dev/null && break
+    if [[ "${i}" -eq 10 ]]; then
+        echo "containerd did not become ready after 10 seconds" >&2
+        exit 1
+    fi
+    sleep 1
 done
 
-critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" ${EXTRA_CRITEST_OPTIONS:-}
+ginkgo_procs="${GINKGO_NODES:-8}"
+
+critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel="${ginkgo_procs}" "${GINKGO_SKIP_TEST[@]}" "${GINKGO_FOCUS_TEST[@]}" ${EXTRA_CRITEST_OPTIONS:-}

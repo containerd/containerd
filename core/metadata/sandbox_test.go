@@ -264,3 +264,40 @@ func assertEqualInstances(t *testing.T, x, y api.Sandbox) {
 		t.Fatalf("x and y are different: %s", diff)
 	}
 }
+
+// TestSandboxNilInterfaceRoundTrip verifies that a sandbox stored without a
+// Spec or Runtime.Options round-trips back with genuinely nil interface values.
+//
+// compareNil (used by assertEqualInstances) treats a typed-nil pointer wrapped
+// in an interface as equal to a true nil interface, so it would not catch a
+// regression where ReadAny returns (*types.Any)(nil) and that typed-nil is
+// stored directly in the typeurl.Any field — producing a non-nil interface
+// that fails type-URL lookup at runtime.
+func TestSandboxNilInterfaceRoundTrip(t *testing.T) {
+	ctx, db := testDB(t)
+	store := NewSandboxStore(db)
+
+	in := api.Sandbox{
+		ID:      "nil-fields",
+		Runtime: api.RuntimeOpts{Name: "test"},
+		// Spec and Runtime.Options are intentionally left nil.
+	}
+
+	if _, err := store.Create(ctx, in); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := store.Get(ctx, "nil-fields")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Use direct interface comparison — not compareNil — to distinguish a
+	// true nil interface from a typed-nil pointer wrapped in an interface.
+	if out.Spec != nil {
+		t.Errorf("Spec: want nil interface, got %T(%v)", out.Spec, out.Spec)
+	}
+	if out.Runtime.Options != nil {
+		t.Errorf("Runtime.Options: want nil interface, got %T(%v)", out.Runtime.Options, out.Runtime.Options)
+	}
+}

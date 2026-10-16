@@ -134,6 +134,9 @@ func TestImageVolumeBasic(t *testing.T) {
 				if !selinux.GetEnabled() {
 					t.Skip("SELinux is not enabled")
 				}
+				if runtimeHandlerIsRunsc() {
+					t.Skip("runsc does not support SELinux labels in the OCI spec")
+				}
 			}
 
 			podCtx, cnID, err := setupRunningContainerWithImageVolume(t, tc.selinuxLevel, tc.containerImage, tc.imageVolumeImage, tc.imageSubPath, tc.containerPath)
@@ -358,6 +361,9 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 }
 
 func TestImageVolumeWithUserNamespace(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not support host user namespaces")
+	}
 	// Check if user namespace and idmap are supported
 	if !supportsUserNS() {
 		t.Skip("user namespace not supported")
