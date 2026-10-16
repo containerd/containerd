@@ -415,6 +415,19 @@ func (pw *pushWriter) setError(err error) {
 func (pw *pushWriter) setResponse(resp *http.Response) {
 	select {
 	case <-pw.done:
+		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}
+		return
+	default:
+	}
+	select {
+	case <-pw.done:
+		if resp != nil && resp.Body != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			_ = resp.Body.Close()
+		}
 	case pw.respC <- resp:
 	}
 }
@@ -526,9 +539,32 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		}
 	}
 
-	// TODO: timeout waiting for response
+	if err := ctx.Err(); err != nil {
+		pw.Close()
+		select {
+		case resp := <-pw.respC:
+			if resp != nil && resp.Body != nil {
+				_, _ = io.Copy(io.Discard, resp.Body)
+				_ = resp.Body.Close()
+			}
+		default:
+		}
+		return err
+	}
+
 	var resp *http.Response
 	select {
+	case <-ctx.Done():
+		pw.Close()
+		select {
+		case resp := <-pw.respC:
+			if resp != nil && resp.Body != nil {
+				_, _ = io.Copy(io.Discard, resp.Body)
+				_ = resp.Body.Close()
+			}
+		default:
+		}
+		return ctx.Err()
 	case <-pw.done:
 		return io.ErrClosedPipe
 	case err := <-pw.errC:
@@ -536,6 +572,11 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		return err
 	case resp = <-pw.respC:
 		defer resp.Body.Close()
+		if err := ctx.Err(); err != nil {
+			pw.Close()
+			_, _ = io.Copy(io.Discard, resp.Body)
+			return err
+		}
 	case p := <-pw.pipeC:
 		// check whether the pipe has changed in the commit, because sometimes Write
 		// can complete successfully, but the pipe may have changed. In that case, the
