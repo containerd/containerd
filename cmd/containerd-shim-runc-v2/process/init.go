@@ -308,7 +308,8 @@ func (p *Init) delete(ctx context.Context) error {
 	// this is common during a checkpoint, runc will delete the container state
 	// after a checkpoint and the container will no longer exist within runc
 	if err != nil {
-		if strings.Contains(err.Error(), "does not exist") {
+		if strings.Contains(err.Error(), "does not exist") ||
+			strings.Contains(strings.ToLower(err.Error()), "no such file or directory") {
 			err = nil
 		} else {
 			err = p.runtimeError(err, "failed to delete task")
