@@ -47,6 +47,7 @@ require (
 	github.com/klauspost/compress v1.20.0
 	github.com/mdlayher/vsock v1.3.0
 	github.com/moby/locker v1.0.1
+	github.com/moby/profiles/seccomp v0.2.4
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/moby/sys/signal v0.7.1
 	github.com/moby/sys/symlink v0.3.0

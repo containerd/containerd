@@ -447,6 +447,9 @@ github.com/mistifyio/go-zfs/v3
 # github.com/moby/locker v1.0.1
 ## explicit; go 1.13
 github.com/moby/locker
+# github.com/moby/profiles/seccomp v0.2.4
+## explicit; go 1.23.0
+github.com/moby/profiles/seccomp
 # github.com/moby/spdystream v0.5.1
 ## explicit; go 1.13
 github.com/moby/spdystream
