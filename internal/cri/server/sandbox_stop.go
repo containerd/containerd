@@ -152,6 +152,10 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 
 // teardownPodNetwork removes the network from the pod
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
+	if isHermetic(sandbox.Config) && sandbox.CNIResult == nil {
+		log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("skipping cni teardown for hermetic sandbox")
+		return nil
+	}
 	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
