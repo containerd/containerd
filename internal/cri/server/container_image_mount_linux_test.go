@@ -20,6 +20,8 @@ package server
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -28,6 +30,111 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+// TestEnsureImageVolumeMounted covers the check that decides whether the
+// image volume is already mounted, in particular that a target reaching a
+// mountpoint through symlinks is detected.
+// The image volume host path is often below symlinked parent (e.g. /var/run -> /run)
+// and a raw string comparison against the mountpoint missed those targets
+//
+// The test uses "/" as the mountpoint, which exists on every Linux host
+func TestEnsureImageVolumeMounted(t *testing.T) {
+	tmp := t.TempDir()
+
+	plainDir := filepath.Join(tmp, "plain")
+	require.NoError(t, os.Mkdir(plainDir, 0o755))
+
+	regularFile := filepath.Join(tmp, "file")
+	require.NoError(t, os.WriteFile(regularFile, []byte("data"), 0o644))
+
+	// linkToRoot resolves to "/", a mountpoint.
+	linkToRoot := filepath.Join(tmp, "link-to-root")
+	require.NoError(t, os.Symlink("/", linkToRoot))
+
+	// linkToLink resolves to linkToRoot and then to "/".
+	linkToLink := filepath.Join(tmp, "link-to-link")
+	require.NoError(t, os.Symlink(linkToRoot, linkToLink))
+
+	// linkToDir resolves to plainDir, which is not a mountpoint.
+	linkToDir := filepath.Join(tmp, "link-to-dir")
+	require.NoError(t, os.Symlink(plainDir, linkToDir))
+
+	brokenLink := filepath.Join(tmp, "broken-link")
+	require.NoError(t, os.Symlink(filepath.Join(tmp, "does-not-exist"), brokenLink))
+
+	linkLoop := filepath.Join(tmp, "link-loop")
+	require.NoError(t, os.Symlink(linkLoop, linkLoop))
+
+	for _, test := range []struct {
+		name          string
+		target        string
+		expectMounted bool
+		expectError   bool
+	}{
+		{
+			name:          "mountpoint",
+			target:        "/",
+			expectMounted: true,
+		},
+		{
+			name:          "symlink to mountpoint",
+			target:        linkToRoot,
+			expectMounted: true,
+		},
+		{
+			name:          "chained symlink to mountpoint",
+			target:        linkToLink,
+			expectMounted: true,
+		},
+		{
+			name:          "mountpoint below symlinked parent",
+			target:        filepath.Join(linkToRoot, "proc"),
+			expectMounted: true,
+		},
+		{
+			name:   "plain directory",
+			target: plainDir,
+		},
+		{
+			name:   "symlink to plain directory",
+			target: linkToDir,
+		},
+		{
+			name:   "regular file",
+			target: regularFile,
+		},
+		{
+			name:   "non-existent path",
+			target: filepath.Join(tmp, "does-not-exist"),
+		},
+		{
+			name:   "broken symlink",
+			target: brokenLink,
+		},
+		{
+			name:        "symlink loop",
+			target:      linkLoop,
+			expectError: true,
+		},
+		{
+			name:        "path below a regular file",
+			target:      filepath.Join(regularFile, "child"),
+			expectError: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			mounted, err := ensureImageVolumeMounted(test.target)
+
+			if test.expectError {
+				assert.Error(t, err)
+				assert.False(t, mounted)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expectMounted, mounted)
+		})
+	}
+}
 
 func TestGetImageVolumeSnapshotOpts(t *testing.T) {
 	ctx := context.Background()
