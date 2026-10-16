@@ -29,13 +29,18 @@ func TestParseImageReferences(t *testing.T) {
 	refs := []string{
 		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		"gcr.io/library/busybox:1.2",
+		"gcr.io/library/busybox:1.2@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		"sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		"arbitrary-ref",
 	}
 	expectedTags := []string{
 		"gcr.io/library/busybox:1.2",
+		"gcr.io/library/busybox:1.2",
 	}
-	expectedDigests := []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"}
+	expectedDigests := []string{
+		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
+	}
 	tags, digests := ParseImageReferences(refs)
 	assert.Equal(t, expectedTags, tags)
 	assert.Equal(t, expectedDigests, digests)
