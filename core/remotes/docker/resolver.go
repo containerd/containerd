@@ -533,13 +533,14 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
-	refspec        reference.Spec
-	repository     string
-	hosts          []RegistryHost
-	header         http.Header
-	performances   transfer.ImageResolverPerformanceSettings
-	limiter        *semaphore.Weighted
-	warningHandler WarningHandler
+	refspec              reference.Spec
+	repository           string
+	hosts                []RegistryHost
+	header               http.Header
+	performances         transfer.ImageResolverPerformanceSettings
+	limiter              *semaphore.Weighted
+	ignoreDescriptorURLs bool
+	warningHandler       WarningHandler
 }
 
 func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
@@ -562,13 +563,14 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:        refspec,
-		repository:     strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:          hosts,
-		header:         r.header,
-		performances:   r.config.Performances,
-		limiter:        r.config.DownloadLimiter,
-		warningHandler: r.warningHandler,
+		refspec:              refspec,
+		repository:           strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:                hosts,
+		header:               r.header,
+		performances:         r.config.Performances,
+		limiter:              r.config.DownloadLimiter,
+		ignoreDescriptorURLs: r.config.IgnoreDescriptorURLs,
+		warningHandler:       r.warningHandler,
 	}, nil
 }
 

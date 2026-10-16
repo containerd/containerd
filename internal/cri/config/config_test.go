@@ -461,6 +461,13 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 			expectLocalPull: false,
 		},
 		{
+			name: "IgnoreDescriptorURLs triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.IgnoreDescriptorURLs = true
+			},
+			expectLocalPull: true,
+		},
+		{
 			name: "ImagePullWithSyncFs triggers local pull",
 			imageConfigFn: func(ic *ImageConfig) {
 				ic.ImagePullWithSyncFs = true
