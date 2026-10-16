@@ -190,7 +190,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	sandboxLabels := ctrdutil.BuildLabels(config.Labels, imageSpec.Config.Labels, crilabels.ContainerKindSandbox)
 
-	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
+	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(sandboxSnapshotLabels(config.Annotations))}
 	extraSOpts, err := sandboxSnapshotterOpts(config)
 	if err != nil {
 		return cin, err
@@ -357,4 +357,17 @@ func (c *Controller) getSandboxImageName() string {
 	}
 
 	return criconfig.DefaultSandboxImage
+}
+
+// sandboxSnapshotLabels filters out containerd.io/snapshot/uidmapping and
+// .../gidmapping annotations from PodSandboxConfig to prevent snapshotters
+// from chowning the sandbox snapshot directory to user-supplied mapped host uid/gid.
+func sandboxSnapshotLabels(annotations map[string]string) map[string]string {
+	labels := snapshots.FilterInheritedLabels(annotations)
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	delete(labels, snapshots.LabelSnapshotUIDMapping)
+	delete(labels, snapshots.LabelSnapshotGIDMapping)
+	return labels
 }
