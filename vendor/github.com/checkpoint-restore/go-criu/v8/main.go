@@ -5,18 +5,24 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"syscall"
 
-	"github.com/checkpoint-restore/go-criu/v7/rpc"
-	"google.golang.org/protobuf/proto"
+	proto "github.com/checkpoint-restore/go-criu/v8/internal/proto"
+	"github.com/checkpoint-restore/go-criu/v8/rpc"
 )
+
+// extraFilesStartFd is the first fd number assigned to cmd.ExtraFiles by os/exec.
+// As documented in os/exec: "entry i becomes file descriptor 3+i"
+const extraFilesStartFd = 3
 
 // Criu struct
 type Criu struct {
-	swrkCmd  *exec.Cmd
-	swrkSk   *os.File
-	swrkPath string
+	swrkCmd    *exec.Cmd
+	swrkSk     *os.File
+	swrkPath   string
+	inheritFds map[string]*os.File
 }
 
 // MakeCriu returns the Criu object required for most operations
@@ -32,8 +38,52 @@ func (c *Criu) SetCriuPath(path string) {
 	c.swrkPath = path
 }
 
+// AddInheritFd registers a file descriptor to be passed to CRIU.
+// If opts.InheritFd is not set for an operation, it will be populated
+// from these registrations using the same key order.
+func (c *Criu) AddInheritFd(key string, file *os.File) {
+	if c.inheritFds == nil {
+		c.inheritFds = make(map[string]*os.File)
+	}
+	c.inheritFds[key] = file
+}
+
+func (c *Criu) inheritFdKeys() []string {
+	if len(c.inheritFds) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(c.inheritFds))
+	for k := range c.inheritFds {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (c *Criu) ensureInheritFd(opts *rpc.CriuOpts) {
+	if opts == nil || len(opts.GetInheritFd()) > 0 || len(c.inheritFds) == 0 {
+		return
+	}
+	keys := c.inheritFdKeys()
+	if len(keys) == 0 {
+		return
+	}
+	opts.InheritFd = make([]*rpc.InheritFd, 0, len(keys))
+	for i, key := range keys {
+		fd := int32(extraFilesStartFd + i)
+		opts.InheritFd = append(opts.InheritFd, &rpc.InheritFd{
+			Key: proto.Ptr(key),
+			Fd:  proto.Ptr(fd),
+		})
+	}
+}
+
 // Prepare sets up everything for the RPC communication to CRIU
 func (c *Criu) Prepare() error {
+	return c.doPrepare(nil)
+}
+
+func (c *Criu) doPrepare(opts *rpc.CriuOpts) error {
 	fds, err := syscall.Socketpair(syscall.AF_LOCAL, syscall.SOCK_SEQPACKET, 0)
 	if err != nil {
 		return err
@@ -42,15 +92,28 @@ func (c *Criu) Prepare() error {
 	cln := os.NewFile(uintptr(fds[0]), "criu-xprt-cln")
 	syscall.CloseOnExec(fds[0])
 	srv := os.NewFile(uintptr(fds[1]), "criu-xprt-srv")
-	defer srv.Close()
+	defer func() { _ = srv.Close() }()
 
 	args := []string{"swrk", strconv.Itoa(fds[1])}
 	// #nosec G204
 	cmd := exec.Command(c.swrkPath, args...)
 
+	// Collect file descriptors to pass to child
+	inheritKeys := c.inheritFdKeys()
+	extraFiles := make([]*os.File, 0, len(inheritKeys))
+
+	// Add fds from AddInheritFd (sorted for stable ordering)
+	for _, k := range inheritKeys {
+		extraFiles = append(extraFiles, c.inheritFds[k])
+	}
+
+	c.ensureInheritFd(opts)
+
+	cmd.ExtraFiles = extraFiles
+
 	err = cmd.Start()
 	if err != nil {
-		cln.Close()
+		_ = cln.Close()
 		return err
 	}
 
@@ -106,13 +169,15 @@ func (c *Criu) doSwrk(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy Notify) e
 }
 
 func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy Notify, features *rpc.CriuFeatures) (resp *rpc.CriuResp, retErr error) {
+	c.ensureInheritFd(opts)
+
 	req := rpc.CriuReq{
 		Type: &reqType,
 		Opts: opts,
 	}
 
 	if nfy != nil {
-		opts.NotifyScripts = proto.Bool(true)
+		opts.NotifyScripts = proto.Ptr(true)
 	}
 
 	if features != nil {
@@ -120,7 +185,7 @@ func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy N
 	}
 
 	if c.swrkCmd == nil {
-		err := c.Prepare()
+		err := c.doPrepare(opts)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +200,7 @@ func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy N
 	}
 
 	for {
-		reqB, err := proto.Marshal(&req)
+		reqB, err := req.MarshalVT()
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +211,7 @@ func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy N
 		}
 
 		resp = &rpc.CriuResp{}
-		err = proto.Unmarshal(respB[:respS], resp)
+		err = resp.UnmarshalVT(respB[:respS])
 		if err != nil {
 			return nil, err
 		}
@@ -194,7 +259,7 @@ func (c *Criu) doSwrkWithResp(reqType rpc.CriuReqType, opts *rpc.CriuOpts, nfy N
 
 		req = rpc.CriuReq{
 			Type:          &respType,
-			NotifySuccess: proto.Bool(true),
+			NotifySuccess: proto.Ptr(true),
 		}
 	}
 
