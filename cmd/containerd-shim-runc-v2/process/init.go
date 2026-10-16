@@ -52,6 +52,20 @@ type Init struct {
 	// the reaper interface.
 	mu sync.Mutex
 
+	// statusMu guards the observable status — initState, status and exited —
+	// separately from mu so that the read-only accessors can answer from it
+	// while a Delete is in flight. Delete holds mu across slow work (the stdio
+	// drain, the runc delete exec, closing the IO and unmounting the rootfs),
+	// which would otherwise block the task State RPC past its deadline. Lock
+	// order is mu -> statusMu, never the reverse.
+	statusMu sync.Mutex
+
+	// deleting is set for the duration of a Delete. Only then may Status skip
+	// mu: every other lifecycle operation still serializes readers through mu,
+	// so State cannot bypass an in-flight Start or return before SetExited has
+	// published the stopped state.
+	deleting atomic.Bool
+
 	waitBlock chan struct{}
 
 	WorkDir string
@@ -102,7 +116,7 @@ func New(id string, runtime *runc.Runc, stdio stdio.Stdio) *Init {
 		status:    0,
 		waitBlock: make(chan struct{}),
 	}
-	p.initState = &createdState{p: p}
+	p.setInitState(&createdState{p: p})
 	return p
 }
 
@@ -206,10 +220,10 @@ func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error 
 		opts.IO = p.io.IO()
 	}
 
-	p.initState = &createdCheckpointState{
+	p.setInitState(&createdCheckpointState{
 		p:    p,
 		opts: opts,
-	}
+	})
 	return nil
 }
 
@@ -235,16 +249,16 @@ func (p *Init) Pid() int {
 
 // ExitStatus of the process
 func (p *Init) ExitStatus() int {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
 
 	return p.status
 }
 
 // ExitedAt at time when the process exited
 func (p *Init) ExitedAt() time.Time {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
 
 	return p.exited
 }
@@ -255,10 +269,31 @@ func (p *Init) Status(ctx context.Context) (string, error) {
 		return "pausing", nil
 	}
 
+	if p.deleting.Load() {
+		// A Delete is cleaning up while holding mu. Answer from the observable
+		// state rather than blocking the State RPC behind the drain, the runc
+		// delete exec and the rootfs unmount (#14379). The state is still the
+		// pre-delete one until the delete completes, which is the truth: the
+		// task exists until it does not.
+		p.statusMu.Lock()
+		defer p.statusMu.Unlock()
+
+		return p.initState.Status(ctx)
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Status(ctx)
+}
+
+// setInitState swaps the state machine. Callers must hold mu; statusMu is
+// taken as well so the read-only Status accessor observes a consistent
+// initState pointer (lock order mu -> statusMu).
+func (p *Init) setInitState(state initState) {
+	p.statusMu.Lock()
+	p.initState = state
+	p.statusMu.Unlock()
 }
 
 // Start the init process
@@ -283,14 +318,22 @@ func (p *Init) SetExited(status int) {
 }
 
 func (p *Init) setExited(status int) {
+	p.statusMu.Lock()
 	p.exited = time.Now()
 	p.status = status
+	p.statusMu.Unlock()
+
 	p.Platform.ShutdownConsole(context.Background(), p.console)
 	close(p.waitBlock)
 }
 
 // Delete the init process
 func (p *Init) Delete(ctx context.Context) error {
+	// Announce the delete before taking mu so the accessors can answer from the
+	// observable state instead of waiting for the slow cleanup below.
+	p.deleting.Store(true)
+	defer p.deleting.Store(false)
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -422,7 +465,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (Process, e
 		},
 		waitBlock: make(chan struct{}),
 	}
-	e.execState = &execCreatedState{p: e}
+	e.setExecState(&execCreatedState{p: e})
 	return e, nil
 }
 

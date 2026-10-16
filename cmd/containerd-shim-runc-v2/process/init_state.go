@@ -48,11 +48,11 @@ type createdState struct {
 func (s *createdState) transition(name string) error {
 	switch name {
 	case "running":
-		s.p.initState = &runningState{p: s.p}
+		s.p.setInitState(&runningState{p: s.p})
 	case "stopped":
-		s.p.initState = &stoppedState{p: s.p}
+		s.p.setInitState(&stoppedState{p: s.p})
 	case "deleted":
-		s.p.initState = &deletedState{}
+		s.p.setInitState(&deletedState{})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -117,11 +117,11 @@ type createdCheckpointState struct {
 func (s *createdCheckpointState) transition(name string) error {
 	switch name {
 	case "running":
-		s.p.initState = &runningState{p: s.p}
+		s.p.setInitState(&runningState{p: s.p})
 	case "stopped":
-		s.p.initState = &stoppedState{p: s.p}
+		s.p.setInitState(&stoppedState{p: s.p})
 	case "deleted":
-		s.p.initState = &deletedState{}
+		s.p.setInitState(&deletedState{})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -225,9 +225,9 @@ type runningState struct {
 func (s *runningState) transition(name string) error {
 	switch name {
 	case "stopped":
-		s.p.initState = &stoppedState{p: s.p}
+		s.p.setInitState(&stoppedState{p: s.p})
 	case "paused":
-		s.p.initState = &pausedState{p: s.p}
+		s.p.setInitState(&pausedState{p: s.p})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -296,9 +296,9 @@ type pausedState struct {
 func (s *pausedState) transition(name string) error {
 	switch name {
 	case "running":
-		s.p.initState = &runningState{p: s.p}
+		s.p.setInitState(&runningState{p: s.p})
 	case "stopped":
-		s.p.initState = &stoppedState{p: s.p}
+		s.p.setInitState(&stoppedState{p: s.p})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -364,7 +364,7 @@ type stoppedState struct {
 func (s *stoppedState) transition(name string) error {
 	switch name {
 	case "deleted":
-		s.p.initState = &deletedState{}
+		s.p.setInitState(&deletedState{})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}

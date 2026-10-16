@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -44,7 +45,24 @@ type execProcess struct {
 
 	execState execState
 
-	mu      sync.Mutex
+	// mu is used to ensure that the exec process state machine is only
+	// advanced by one operation at a time.
+	mu sync.Mutex
+
+	// statusMu guards the observable status — execState, status and exited —
+	// separately from mu so that the read-only accessors can answer from it
+	// while a Delete is in flight. Delete holds mu across slow work (the stdio
+	// drain, the runc delete exec and closing the IO), which would otherwise
+	// block the State RPC past its deadline. Lock order is mu -> statusMu,
+	// never the reverse.
+	statusMu sync.Mutex
+
+	// deleting is set for the duration of a Delete. Only then may Status skip
+	// mu: every other lifecycle operation still serializes readers through mu,
+	// so State cannot bypass an in-flight Start or return before SetExited has
+	// published the stopped state.
+	deleting atomic.Bool
+
 	id      string
 	console console.Console
 	io      *processIO
@@ -78,15 +96,33 @@ func (e *execProcess) Pid() int {
 	return e.pid.get()
 }
 
+// exitedAt returns the time the process exited. Callers may hold mu;
+// statusMu is taken internally so the field can be shared with the status
+// accessors (lock order mu -> statusMu).
+func (e *execProcess) exitedAt() time.Time {
+	e.statusMu.Lock()
+	defer e.statusMu.Unlock()
+	return e.exited
+}
+
+// setExecState swaps the state machine. Callers must hold mu; statusMu is
+// taken as well so the read-only Status accessor observes a consistent
+// execState pointer (lock order mu -> statusMu).
+func (e *execProcess) setExecState(state execState) {
+	e.statusMu.Lock()
+	e.execState = state
+	e.statusMu.Unlock()
+}
+
 func (e *execProcess) ExitStatus() int {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.statusMu.Lock()
+	defer e.statusMu.Unlock()
 	return e.status
 }
 
 func (e *execProcess) ExitedAt() time.Time {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.statusMu.Lock()
+	defer e.statusMu.Unlock()
 	return e.exited
 }
 
@@ -98,13 +134,21 @@ func (e *execProcess) SetExited(status int) {
 }
 
 func (e *execProcess) setExited(status int) {
+	e.statusMu.Lock()
 	e.status = status
 	e.exited = time.Now()
+	e.statusMu.Unlock()
+
 	e.parent.Platform.ShutdownConsole(context.Background(), e.console)
 	close(e.waitBlock)
 }
 
 func (e *execProcess) Delete(ctx context.Context) error {
+	// Announce the delete before taking mu so the accessors can answer from the
+	// observable state instead of waiting for the slow cleanup below.
+	e.deleting.Store(true)
+	defer e.deleting.Store(false)
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -153,7 +197,7 @@ func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	switch {
 	case pid == 0:
 		return fmt.Errorf("process not created: %w", errdefs.ErrFailedPrecondition)
-	case !e.exited.IsZero():
+	case !e.exitedAt().IsZero():
 		return fmt.Errorf("process already finished: %w", errdefs.ErrNotFound)
 	default:
 		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
@@ -265,6 +309,16 @@ func (e *execProcess) Status(ctx context.Context) (string, error) {
 	case "paused", "pausing":
 		return s, nil
 	}
+
+	if e.deleting.Load() {
+		// A Delete is cleaning up while holding mu; answer from the observable
+		// state rather than blocking the State RPC behind the slow work.
+		e.statusMu.Lock()
+		defer e.statusMu.Unlock()
+
+		return e.execState.Status(ctx)
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.execState.Status(ctx)

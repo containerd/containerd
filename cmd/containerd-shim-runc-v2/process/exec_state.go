@@ -42,11 +42,11 @@ type execCreatedState struct {
 func (s *execCreatedState) transition(name string) error {
 	switch name {
 	case "running":
-		s.p.execState = &execRunningState{p: s.p}
+		s.p.setExecState(&execRunningState{p: s.p})
 	case "stopped":
-		s.p.execState = &execStoppedState{p: s.p}
+		s.p.setExecState(&execStoppedState{p: s.p})
 	case "deleted":
-		s.p.execState = &deletedState{}
+		s.p.setExecState(&deletedState{})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -95,7 +95,7 @@ type execRunningState struct {
 func (s *execRunningState) transition(name string) error {
 	switch name {
 	case "stopped":
-		s.p.execState = &execStoppedState{p: s.p}
+		s.p.setExecState(&execStoppedState{p: s.p})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
@@ -137,7 +137,7 @@ type execStoppedState struct {
 func (s *execStoppedState) transition(name string) error {
 	switch name {
 	case "deleted":
-		s.p.execState = &deletedState{}
+		s.p.setExecState(&deletedState{})
 	default:
 		return fmt.Errorf("invalid state transition %q to %q", stateName(s), name)
 	}
