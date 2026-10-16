@@ -198,7 +198,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		defer socket.Close()
 	} else {
 		if pio, err = createIO(ctx, e.id, e.parent.IoUID, e.parent.IoGID, e.stdio); err != nil {
-			return fmt.Errorf("failed to create init process I/O: %w", err)
+			return fmt.Errorf("failed to create init process I/O for container (init proc being the child of the shim): %w", err)
 		}
 		e.io = pio
 	}
