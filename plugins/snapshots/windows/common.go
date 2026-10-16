@@ -44,9 +44,10 @@ type windowsBaseSnapshotter struct {
 	root string
 	ms   *storage.MetaStore
 	info hcsshim.DriverInfo
+	opts []snapshots.Opt
 }
 
-func newBaseSnapshotter(root string) (*windowsBaseSnapshotter, error) {
+func newBaseSnapshotter(root string, opts ...snapshots.Opt) (*windowsBaseSnapshotter, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
 	}
@@ -64,6 +65,7 @@ func newBaseSnapshotter(root string) (*windowsBaseSnapshotter, error) {
 		root: root,
 		ms:   ms,
 		info: hcsshim.DriverInfo{HomeDir: filepath.Join(root, "snapshots")},
+		opts: opts,
 	}, nil
 }
 
