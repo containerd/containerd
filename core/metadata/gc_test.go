@@ -1118,3 +1118,45 @@ func timeIn(d time.Duration) *time.Time {
 	t := time.Now().UTC().Add(d)
 	return &t
 }
+
+func TestGCNilBucketDefense(t *testing.T) {
+	ctx := context.Background()
+
+	// Verify isExpiredImage safely handles nil bucket without panic
+	assert.False(t, isExpiredImage(ctx, []byte("test-image"), nil, time.Now()))
+
+	// Verify sendLabelRefs safely handles nil bucket without panic
+	gcCtx := &gcContext{}
+	err := gcCtx.sendLabelRefs("ns", nil, labelRefCallbacks{
+		fn:   func(n gc.Node) {},
+		bref: func(n gc.Node) {},
+	})
+	assert.NoError(t, err)
+
+	// Verify GC scanRoots with missing subbucket entry does not panic
+	db, err := newDatabase(t)
+	require.NoError(t, err)
+
+	err = db.Update(func(tx *bolt.Tx) error {
+		bkt, err := tx.CreateBucketIfNotExists(bucketKeyVersion)
+		if err != nil {
+			return err
+		}
+		nsbkt, err := bkt.CreateBucketIfNotExists([]byte("test-ns"))
+		if err != nil {
+			return err
+		}
+		cbkt, err := nsbkt.CreateBucketIfNotExists(bucketKeyObjectContainers)
+		if err != nil {
+			return err
+		}
+		// Put an entry with nil value directly into containers bucket
+		// to simulate a non-bucket key where cbkt.Bucket(k) returns nil.
+		return cbkt.Put([]byte("phantom-container"), nil)
+	})
+	require.NoError(t, err)
+
+	mdb := NewDB(db, nil, nil)
+	_, err = mdb.GarbageCollect(ctx)
+	require.NoError(t, err)
+}
