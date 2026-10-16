@@ -20,7 +20,7 @@ jobs:
   breaking:
     name: Detect breaking API changes
     if: ${{ !github.event.repository.private }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
