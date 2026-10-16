@@ -920,11 +920,39 @@ func (c *criService) buildLinuxSpec(
 		}))
 	}
 
-	specOpts = append(specOpts,
-		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
-		customopts.WithSupplementalGroups(supplementalGroups),
-	)
+	// Resolve pod namespace paths directly when the sandbox provides explicit pins.
+	// This decouples namespace consumption from sandbox PID for pauseless sandboxes
+	// where pid == 0. Falls back to PID-derived /proc/<pid>/ns/* for pause-container pods.
+	var explicitPaths customopts.PodNamespacePaths
+	sb, getErr := c.sandboxStore.Get(sandboxID)
+	if getErr != nil {
+		if sandboxPid == 0 {
+			return nil, fmt.Errorf("failed to get sandbox %q from store to resolve explicit namespace paths: %w", sandboxID, getErr)
+		}
+	} else {
+		// NetNSPath is already stored for network; use it as explicit net path when present.
+		// For non-host network, NetNSPath is non-empty; for host network it is empty (host case).
+		explicitPaths.Net = sb.Metadata.NetNSPath
+		explicitPaths.IPC = sb.Metadata.IPCNSPath
+		explicitPaths.UTS = sb.Metadata.UTSNSPath
+		explicitPaths.PID = sb.Metadata.PIDNSPath
+	}
+
+	if explicitPaths.Net != "" || explicitPaths.IPC != "" || explicitPaths.UTS != "" || explicitPaths.PID != "" || sandboxPid == 0 {
+		// Use path-based namespace joining. This will fail closed if a required path is missing
+		// and pid == 0, instead of silently falling back to /proc/0/ns/* or host.
+		specOpts = append(specOpts,
+			customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
+			customopts.WithPodNamespacesWithPaths(securityContext, sandboxConfig, sandboxPid, targetPid, explicitPaths, uids, gids),
+			customopts.WithSupplementalGroups(supplementalGroups),
+		)
+	} else {
+		specOpts = append(specOpts,
+			customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
+			customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
+			customopts.WithSupplementalGroups(supplementalGroups),
+		)
+	}
 	specOpts = append(
 		specOpts,
 		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
