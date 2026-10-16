@@ -402,22 +402,23 @@ func TestRecoverContainer(t *testing.T) {
 
 	for _, c := range containers {
 		cont := c.container
-		sb, err := controller.RecoverContainer(context.Background(), &cont)
-		assert.NoError(t, err)
+		assert.NoError(t, controller.recoverContainer(context.Background(), &cont))
 
+		// The controller answers Status, Wait, Stop and Shutdown for the
+		// sandbox from its cache.
 		pSb := controller.store.Get(cont.ID())
 		assert.NotNil(t, pSb)
-		assert.Equal(t, c.expectedState, pSb.Status.Get().State, "%s state is not expected", cont.ID())
+		status := pSb.Status.Get()
+		assert.Equal(t, c.expectedState, status.State, "%s state is not expected", cont.ID())
+		if c.expectedPid > 0 {
+			assert.Equal(t, c.expectedPid, status.Pid, "%s sandbox pid is not expected", cont.ID())
+		}
+		assert.Equal(t, cont.c.Runtime.Name, pSb.Runtime.Name, "%s runtime is not expected", cont.ID())
 
 		if c.expectedExitCode > 0 {
 			cont.t.waitExitCh <- struct{}{}
 			exitStatus, _ := pSb.Wait(context.Background())
 			assert.Equal(t, c.expectedExitCode, exitStatus.ExitCode(), "%s state is not expected", cont.ID())
-		}
-		status := sb.Status.Get()
-		assert.Equal(t, c.expectedState, status.State, "%s sandbox state is not expected", cont.ID())
-		if c.expectedPid > 0 {
-			assert.Equal(t, c.expectedPid, status.Pid, "%s sandbox pid is not expected", cont.ID())
 		}
 	}
 
