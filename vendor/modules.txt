@@ -715,7 +715,7 @@ golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/hkdf
 golang.org/x/crypto/sha3
-# golang.org/x/mod v0.41.0
+# golang.org/x/mod v0.42.0
 ## explicit; go 1.26.0
 golang.org/x/mod/semver
 # golang.org/x/net v0.60.0
@@ -740,7 +740,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.26.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.48.0
+# golang.org/x/sys v0.49.0
 ## explicit; go 1.26.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
