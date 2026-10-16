@@ -39,6 +39,9 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 // WithDevices recursively adds devices from the passed in path.
 // If devicePath is a dir it traverses the dir to add all devices in that dir.
 // If devicePath is not a dir, it attempts to add the single device.
+// A devicePath that is a symlink is resolved, so udev stable names such as
+// /dev/serial/by-id/... can be used. Devices found by traversing a dir are
+// not resolved, so each device is added once under its real name.
 func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		devs, err := getDevices(devicePath, containerPath)
