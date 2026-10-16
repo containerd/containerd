@@ -77,6 +77,12 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 		}
 	}
 
+	// The task wait request and the sandbox exit monitor live until the
+	// sandbox exits, so they must not be bound to the recovery timeout.
+	// They are reclaimed through CancelWait when the sandbox is removed
+	// from the store.
+	waitCtx, waitCancel := context.WithCancel(ctrdutil.WithNamespace(context.WithoutCancel(ctx)))
+
 	s, ch, err := func() (sandboxstore.Status, <-chan containerd.ExitStatus, error) {
 		status := sandboxstore.Status{
 			State: sandboxstore.StateUnknown,
@@ -121,7 +127,7 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 			status.State = sandboxstore.StateNotReady
 		} else {
 			if taskStatus.Status == containerd.Running {
-				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
+				exitCh, err := t.Wait(waitCtx)
 				if err != nil {
 					if !errdefs.IsNotFound(err) {
 						return status, channel, fmt.Errorf("failed to wait for sandbox container task: %w", err)
@@ -157,15 +163,28 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 		Options: info.Runtime.Options,
 	}
 	if ch != nil {
-		exitCtx := ctrdutil.WithNamespace(context.WithoutCancel(ctx))
+		exitCtx, exitCancel := context.WithCancel(waitCtx)
+		stopCh := make(chan struct{})
 		go func() {
-			if err := c.waitSandboxExit(exitCtx, podSandbox, ch); err != nil {
+			defer close(stopCh)
+			if err := c.waitSandboxExit(exitCtx, podSandbox, ch); err != nil && err != context.Canceled {
 				log.G(exitCtx).Warnf("failed to wait pod sandbox exit %v", err)
 			}
 		}()
+		podSandbox.RegisterCancelWait(func() {
+			exitCancel()
+			// This ensures that the exit monitor is stopped before the task
+			// wait is cancelled, so no exit event is generated because of
+			// the wait cancellation.
+			<-stopCh
+			waitCancel()
+		})
+	} else {
+		waitCancel()
 	}
 
 	if err := c.store.Save(podSandbox); err != nil {
+		podSandbox.CancelWait()
 		return sandbox, fmt.Errorf("failed to save pod sandbox container in mem store: %w", err)
 	}
 
