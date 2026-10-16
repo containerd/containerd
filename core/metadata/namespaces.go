@@ -142,6 +142,10 @@ func (s *namespaceStore) Delete(ctx context.Context, namespace string, opts ...n
 		}
 	}
 	bkt := getBucket(s.tx, bucketKeyVersion)
+	if bkt == nil {
+		return fmt.Errorf("namespace %q: %w", namespace, errdefs.ErrNotFound)
+	}
+
 	types, err := s.listNs(namespace)
 	if err != nil {
 		return err
