@@ -356,6 +356,8 @@ func (m *DB) publishEvents(events []namespacedEvent) {
 				topic = "/images/delete"
 			case *eventstypes.SnapshotRemove:
 				topic = "/snapshot/remove"
+			case *eventstypes.ContentDelete:
+				topic = "/content/delete"
 			default:
 				log.G(ctx).WithField("event", ne.event).Debug("unhandled event type from garbage collection removal")
 				continue
