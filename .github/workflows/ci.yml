@@ -388,7 +388,7 @@ jobs:
           Write-Host "Skip parameters: $skip"
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' --ginkgo.skip="$skip"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults ${{ matrix.os }} ${{ matrix.cgroup_driver }}
@@ -587,7 +587,7 @@ jobs:
           sudo lsmod
           sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }} ${{ matrix.cgroup_driver }}
@@ -789,7 +789,7 @@ jobs:
         run: |
           sudo dmesg -T | tail -n 200 || true
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults-runsc-${{ matrix.cgroup_driver }}
@@ -879,7 +879,7 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults MacOS
