@@ -19,6 +19,7 @@ package diff
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/errdefs"
@@ -46,7 +47,9 @@ type config struct {
 	Order []string `toml:"default"`
 	// sync_fs is an experimental setting. It's to force sync
 	// filesystem during unpacking to ensure that data integrity.
-	// It is effective for all containerd client.
+	// It is effective for all containerd clients, including unpacks
+	// that go through the transfer service, which reads the exported
+	// value from this service.
 	SyncFs bool `toml:"sync_fs"`
 }
 
@@ -69,6 +72,10 @@ func init() {
 				return nil, err
 			}
 			syncFs := ic.Config.(*config).SyncFs
+			// Export the effective value so plugins that do not apply
+			// through this service (notably the transfer service) can
+			// still honor the setting.
+			ic.Meta.Exports[plugins.DiffServiceSyncFs] = strconv.FormatBool(syncFs)
 			orderedNames := ic.Config.(*config).Order
 			ordered := make([]differ, len(orderedNames))
 			for i, n := range orderedNames {
