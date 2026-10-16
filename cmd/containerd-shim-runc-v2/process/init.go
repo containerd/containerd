@@ -50,7 +50,18 @@ type Init struct {
 	// the right order when invoked in separate goroutines.
 	// This is the case within the shim implementation as it makes use of
 	// the reaper interface.
+	//
+	// mu is intentionally released while delete runs its slow cleanup, so
+	// that Status, ExitStatus and ExitedAt, which take mu directly, do not
+	// wait for it. Every method that changes the process, or that must not
+	// run concurrently with a Delete, MUST take mu through lock(), which
+	// waits for the cleanup to end. Taking mu directly is only for read-only
+	// accessors.
 	mu sync.Mutex
+
+	// deleting is non-nil while delete runs its cleanup with mu released,
+	// and is closed when the cleanup ends. It is only accessed with mu held.
+	deleting chan struct{}
 
 	waitBlock chan struct{}
 
@@ -263,7 +274,7 @@ func (p *Init) Status(ctx context.Context) (string, error) {
 
 // Start the init process
 func (p *Init) Start(ctx context.Context) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Start(ctx)
@@ -276,7 +287,7 @@ func (p *Init) start(ctx context.Context) error {
 
 // SetExited of the init process with the next status
 func (p *Init) SetExited(status int) {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	p.initState.SetExited(status)
@@ -291,13 +302,41 @@ func (p *Init) setExited(status int) {
 
 // Delete the init process
 func (p *Init) Delete(ctx context.Context) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Delete(ctx)
 }
 
+// lock acquires mu, waiting first for a Delete that is running its cleanup.
+// It returns with mu held and deleting nil. Release with p.mu.Unlock.
+func (p *Init) lock() {
+	p.mu.Lock()
+	for p.deleting != nil {
+		d := p.deleting
+		p.mu.Unlock()
+		<-d
+		p.mu.Lock()
+	}
+}
+
+// delete is called and returns with mu held (by lock), but releases it across
+// the cleanup, which can take tens of seconds (stdio drain, runc delete,
+// rootfs umount). Callers of lock wait for it, so the cleanup is still
+// exclusive with every other operation.
 func (p *Init) delete(ctx context.Context) error {
+	done := make(chan struct{})
+	p.deleting = done
+	p.mu.Unlock()
+	defer func() {
+		p.mu.Lock()
+		p.deleting = nil
+		close(done)
+	}()
+	return p.cleanup(ctx)
+}
+
+func (p *Init) cleanup(ctx context.Context) error {
 	if err := waitTimeout(ctx, &p.wg, 10*time.Second); err != nil {
 		log.G(ctx).WithError(err).Errorf("failed to drain init process %s io", p.id)
 	}
@@ -331,7 +370,7 @@ func (p *Init) delete(ctx context.Context) error {
 
 // Resize the init processes console
 func (p *Init) Resize(ws console.WinSize) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	if p.console == nil {
@@ -342,7 +381,7 @@ func (p *Init) Resize(ws console.WinSize) error {
 
 // Pause the init process and all its child processes
 func (p *Init) Pause(ctx context.Context) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Pause(ctx)
@@ -350,7 +389,7 @@ func (p *Init) Pause(ctx context.Context) error {
 
 // Resume the init process and all its child processes
 func (p *Init) Resume(ctx context.Context) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Resume(ctx)
@@ -358,7 +397,7 @@ func (p *Init) Resume(ctx context.Context) error {
 
 // Kill the init process
 func (p *Init) Kill(ctx context.Context, signal uint32, all bool) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Kill(ctx, signal, all)
@@ -373,7 +412,7 @@ func (p *Init) kill(ctx context.Context, signal uint32, all bool) error {
 
 // KillAll processes belonging to the init process
 func (p *Init) KillAll(ctx context.Context) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	err := p.runtime.Kill(ctx, p.id, int(unix.SIGKILL), &runc.KillOpts{
@@ -394,7 +433,7 @@ func (p *Init) Runtime() *runc.Runc {
 
 // Exec returns a new child process
 func (p *Init) Exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Exec(ctx, path, r)
@@ -428,7 +467,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (Process, e
 
 // Checkpoint the init process
 func (p *Init) Checkpoint(ctx context.Context, r *CheckpointConfig) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Checkpoint(ctx, r)
@@ -466,7 +505,7 @@ func (p *Init) checkpoint(ctx context.Context, r *CheckpointConfig) error {
 
 // Update the processes resource configuration
 func (p *Init) Update(ctx context.Context, r *google_protobuf.Any) error {
-	p.mu.Lock()
+	p.lock()
 	defer p.mu.Unlock()
 
 	return p.initState.Update(ctx, r)
