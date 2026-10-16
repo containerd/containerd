@@ -141,6 +141,10 @@ forget to restart containerd after changing the configuration.
       # Enable fsverity support for EROFS layers, default is false
       enable_fsverity = true
 
+      # Enable fsyncing a snapshot's directory before the snapshot is committed,
+      # default is false
+      fsync_on_commit = true
+
       # Optional: Additional mount options for overlayfs
       ovl_mount_options = []
 
