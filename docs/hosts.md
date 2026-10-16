@@ -373,6 +373,74 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## dial_addr field
+
+`dial_addr` replaces the transport's dialer for this host so that connections
+are made to a local Unix domain socket instead of over TCP. The request URL
+(scheme, host, path) is unchanged, so the configured host's `Host:` header
+still reaches the local proxy and any existing auth/scope logic continues to
+work. Only the `unix` scheme is accepted.
+
+This lets containerd reach a host-local service over a Unix domain socket — for
+example a co-located local proxy or pull-through cache. It avoids the loopback
+TCP stack for the host-local hop and lets filesystem permissions on the socket
+replace TCP ACLs (no listener needs to be exposed on `lo`).
+
+Accepted form:
+
+- `unix:///absolute/path/to.sock` — a pathname socket (note the three
+  slashes). This is the only accepted form.
+
+Abstract sockets (`unix://@name`) are intentionally **not** supported: they have
+no filesystem permissions and live in the network namespace rather than the
+mount namespace, which is the reachability weakness behind
+[CVE-2020-15257](https://github.com/containerd/containerd/security/advisories/GHSA-36xw-fx78-c5r4).
+The security model of `dial_addr` relies on filesystem permissions plus
+mount-namespace isolation, so only filesystem-backed pathname sockets are
+allowed.
+
+**Platform support:** `dial_addr` is available on non-Windows platforms only
+(Linux, macOS, the BSDs). Unix domain sockets are — as the name says — a Unix
+primitive, and the security properties this feature relies on come from
+filesystem permissions and mount-namespace isolation. `AF_UNIX` and the
+surrounding networking stack behave differently on Windows, so support is
+deferred until there is a specific Windows use case and its own design review;
+setting `dial_addr` on Windows is rejected with a clear error.
+
+`dial_addr` composes with `dial_timeout` (the timeout still applies to the
+unix dial).
+
+Because `dial_addr` connects directly to the socket, the `HTTP_PROXY` /
+`HTTPS_PROXY` environment variables are ignored for hosts that set it; the
+socket is always the direct connection target.
+
+The host entry may be `http://` or `https://`. `dial_addr` only redirects the
+transport — it does **not** change the scheme — so an `https://` host still
+performs a full TLS handshake over the socket against the configured host name.
+The process listening on the socket must therefore terminate TLS and present a
+certificate valid for that host name (or the host must set `skip_verify = true`).
+An `http://` host does not negotiate TLS; `dial_addr` does not tunnel plain HTTP
+under an `https://` entry.
+
+```toml
+server = "https://registry-1.docker.io"
+
+[host."https://registry-1.docker.io"]
+  capabilities = ["pull", "resolve"]
+  dial_addr = "unix:///run/registry-cache.sock"
+  dial_timeout = "5s"
+```
+
+As with any `hosts.toml` field that redirects traffic, the socket path is
+trusted to the same degree as the `hosts.toml` file itself, so the file
+and the socket should be protected by appropriate filesystem permissions. Two
+separate sets of permissions apply: the parent directory's mode controls
+whether a process may create and `bind()` the socket there (an unprivileged
+proxy cannot `bind()` directly in a root-owned directory such as `/run` — it
+returns `EACCES` — so place the socket in a directory the proxy owns, for
+example a systemd `RuntimeDirectory`), while the socket inode has its own mode
+that controls which clients may `connect()` to it.
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the

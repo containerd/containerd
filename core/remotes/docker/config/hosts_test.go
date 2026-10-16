@@ -590,6 +590,10 @@ func compareHostConfig(j, k hostConfig) bool {
 		return false
 	}
 
+	if j.dialAddr != k.dialAddr {
+		return false
+	}
+
 	return true
 }
 
@@ -610,6 +614,9 @@ func printHostConfig(hc []hostConfig) string {
 		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
 		if hc[i].dialTimeout != nil {
 			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", hc[i].dialTimeout)
+		}
+		if hc[i].dialAddr != "" {
+			fmt.Fprintf(b, "\t\tdial-addr: %q\n", hc[i].dialAddr)
 		}
 	}
 	return b.String()
