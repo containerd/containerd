@@ -111,14 +111,18 @@ func (iis *ImageExportStream) Export(ctx context.Context, cs content.Store, imgs
 
 func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
 	sid := tstreaming.GenerateID("export")
-	stream, err := sm.Create(ctx, sid)
+	streamCtx, cancel := context.WithCancel(ctx)
+	stream, err := sm.Create(streamCtx, sid)
 	if err != nil {
+		cancel()
 		return nil, err
 	}
 
 	// Receive stream and copy to writer
 	go func() {
-		if _, err := io.Copy(iis.stream, tstreaming.ReceiveStream(ctx, stream)); err != nil {
+		// Release the receiver and its transport if the destination stops reading.
+		defer cancel()
+		if _, err := io.Copy(iis.stream, tstreaming.ReceiveStream(streamCtx, stream)); err != nil {
 			log.G(ctx).WithError(err).WithField("streamid", sid).Errorf("error copying stream")
 		}
 		iis.stream.Close()
