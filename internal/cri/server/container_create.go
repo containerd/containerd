@@ -798,8 +798,13 @@ func (c *criService) buildLinuxSpec(
 		}
 	}
 
-	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
-		customopts.WithCapabilities(securityContext, c.allCaps))
+	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext))
+	if ociRuntime.CapabilityProfile != "" {
+		// Only override the base/default capability set when a profile is
+		// explicitly configured, so BaseRuntimeSpec capabilities are preserved otherwise.
+		specOpts = append(specOpts, oci.WithCapabilityProfile(ociRuntime.CapabilityProfile))
+	}
+	specOpts = append(specOpts, customopts.WithCapabilities(securityContext, c.allCaps))
 
 	if securityContext.GetPrivileged() {
 		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
