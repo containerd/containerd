@@ -82,6 +82,7 @@ type CRIImageService struct {
 
 type GRPCCRIImageService struct {
 	*CRIImageService
+	listStreaming criconfig.ListStreamingConfig
 }
 
 type CRIImageServiceOptions struct {
@@ -223,6 +224,9 @@ func (c *CRIImageService) Config() criconfig.ImageConfig {
 }
 
 // GRPCService returns a new CRI Image Service grpc server.
-func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
-	return &GRPCCRIImageService{c}
+func (c *CRIImageService) GRPCService(listStreaming criconfig.ListStreamingConfig) runtime.ImageServiceServer {
+	return &GRPCCRIImageService{
+		CRIImageService: c,
+		listStreaming:   listStreaming,
+	}
 }

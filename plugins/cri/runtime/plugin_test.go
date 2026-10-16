@@ -36,6 +36,9 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 		"max_concurrent_downloads":    3,    // removed since it's moved to cri image service
 		"disable_tcp_service":         true, // removed since it's moved to cri grpc service
 		"enable_cdi":                  true,
+		"list_streaming": map[string]any{
+			"batch_size": int64(2),
+		},
 		"containerd": map[string]any{
 			"runtimes": map[string]any{
 				"runc": map[string]any{
@@ -60,6 +63,7 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	assert.Equal(t, grpcCri["max_container_log_line_size"], runtimeConf["max_container_log_line_size"])
 	assert.NotContains(t, runtimeConf, "max_concurrent_downloads")
 	assert.NotContains(t, runtimeConf, "disable_tcp_service")
+	assert.NotContains(t, runtimeConf, "list_streaming")
 	assert.NotContains(t, runtimeConf, "enable_cdi")
 
 	ctd, ok := runtimeConf["containerd"].(map[string]any)
