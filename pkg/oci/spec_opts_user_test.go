@@ -87,16 +87,25 @@ guest:x:100:guest
 			expectedGID: 100,
 		},
 		{
-			user: "405:2147483648",
-			err:  "invalid USER value \"405:2147483648\": gid out of range",
+			user:        "405:4294967294",
+			expectedUID: 405,
+			expectedGID: 4294967294,
+		},
+		{
+			user: "405:4294967295",
+			err:  "invalid USER value \"405:4294967295\": gid out of range",
 		},
 		{
 			user: "-1000",
 			err:  "invalid USER value \"-1000\": uid out of range",
 		},
 		{
-			user: "2147483648",
-			err:  "invalid USER value \"2147483648\": uid out of range",
+			user:        "4294967294",
+			expectedUID: 4294967294,
+		},
+		{
+			user: "4294967295",
+			err:  "invalid USER value \"4294967295\": uid out of range",
 		},
 		{
 			user: "999999999999999999999999999999999999",
@@ -313,6 +322,8 @@ func TestWithAppendAdditionalGroups(t *testing.T) {
 	expectedContent := `root:x:0:root
 bin:x:1:root,bin,daemon
 daemon:x:2:root,bin,daemon
+overgrp:x:4294967295:daemon
+4242:x:4294967295:daemon
 `
 	td := t.TempDir()
 	apply := fstest.Apply(
@@ -363,6 +374,35 @@ daemon:x:2:root,bin,daemon
 			err:      "unable to find group unknown",
 			expected: []uint32{0},
 		},
+		{
+			name:     "numeric gid past the OCI bound",
+			groups:   []string{"4294967295"},
+			err:      `group "4294967295" has gid 4294967295 out of range`,
+			expected: []uint32{0},
+		},
+		{
+			name:     "numeric gid past uint32",
+			groups:   []string{"4294967296"},
+			err:      `group "4294967296" has gid 4294967296 out of range`,
+			expected: []uint32{0},
+		},
+		{
+			name:     "numeric gid past uint64",
+			groups:   []string{"99999999999999999999999999"},
+			err:      `group "99999999999999999999999999" has gid out of range`,
+			expected: []uint32{0},
+		},
+		{
+			name:     "group name resolving to gid past the OCI bound",
+			groups:   []string{"overgrp"},
+			err:      `group "overgrp" has gid 4294967295 out of range`,
+			expected: []uint32{0},
+		},
+		{
+			name:     "numeric gid that is also a group name",
+			groups:   []string{"4242"},
+			expected: []uint32{0, 4242},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -380,8 +420,10 @@ daemon:x:2:root,bin,daemon
 				},
 			}
 			err := WithAppendAdditionalGroups(testCase.groups...)(context.Background(), nil, &c, &s)
-			if err != nil {
+			if testCase.err != "" {
 				assert.EqualError(t, err, testCase.err)
+			} else {
+				assert.NoError(t, err)
 			}
 			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
 		})
