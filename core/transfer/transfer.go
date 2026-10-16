@@ -44,8 +44,27 @@ type ImageResolverOptionSetter interface {
 type ImageResolverOption func(*ImageResolverOptions)
 
 type ImageResolverOptions struct {
-	DownloadLimiter *semaphore.Weighted
-	Performances    ImageResolverPerformanceSettings
+	DownloadLimiter      *semaphore.Weighted
+	Performances         ImageResolverPerformanceSettings
+	IgnoreDescriptorURLs bool
+	Stats                *ImageResolverStats
+}
+
+// Counter increments a metric count.
+type Counter interface {
+	Inc(vs ...float64)
+}
+
+// ImageResolverStats holds optional metric counters for an ImageResolver.
+type ImageResolverStats struct {
+	DescriptorURLRequests Counter
+}
+
+// IncDescriptorURLRequests increments DescriptorURLRequests if non-nil.
+func (s *ImageResolverStats) IncDescriptorURLRequests() {
+	if s != nil && s.DescriptorURLRequests != nil {
+		s.DescriptorURLRequests.Inc()
+	}
 }
 
 type ImageResolverPerformanceSettings struct {
@@ -68,6 +87,18 @@ func WithMaxConcurrentDownloads(maxConcurrentDownloads int) ImageResolverOption 
 func WithConcurrentLayerFetchBuffer(ConcurrentLayerFetchBuffer int) ImageResolverOption {
 	return func(opts *ImageResolverOptions) {
 		opts.Performances.ConcurrentLayerFetchBuffer = ConcurrentLayerFetchBuffer
+	}
+}
+
+func WithIgnoreDescriptorURLs(ignore bool) ImageResolverOption {
+	return func(opts *ImageResolverOptions) {
+		opts.IgnoreDescriptorURLs = ignore
+	}
+}
+
+func WithResolverStats(stats *ImageResolverStats) ImageResolverOption {
+	return func(opts *ImageResolverOptions) {
+		opts.Stats = stats
 	}
 }
 
