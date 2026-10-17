@@ -100,6 +100,17 @@ func ociReferenceName(name string) string {
 	var ociRef string
 	if spec, err := reference.Parse(name); err == nil && spec.Object != "" && spec.Object[0] != '@' {
 		ociRef = spec.Object
+	} else if ref, err := distref.ParseAnyReference(name); err == nil {
+		// reference.Parse rejects names without a repository path such as
+		// "nginx:latest" because the tag is mistaken for an invalid port.
+		// Fall back to the distribution grammar so a bare tag reference
+		// still exports the tag as the OCI reference name instead of the
+		// full name, which is not a valid OCI grammar (it contains ':').
+		if tagged, ok := ref.(distref.Tagged); ok {
+			ociRef = tagged.Tag()
+		} else {
+			ociRef = name
+		}
 	} else {
 		ociRef = name
 	}
