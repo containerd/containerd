@@ -357,6 +357,8 @@ type RuntimeConfig struct {
 	CniConfig `toml:"cni" json:"cni"`
 	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux"`
+	// EnableContainerIdentityEnv enables injecting container and image identity environment variables.
+	EnableContainerIdentityEnv bool `toml:"enable_container_identity_env" json:"enableContainerIdentityEnv"`
 	// SelinuxCategoryRange allows the upper bound on the category range to be set.
 	// If not specified or set to 0, defaults to 1024 from the selinux package.
 	SelinuxCategoryRange int `toml:"selinux_category_range" json:"selinuxCategoryRange"`
