@@ -255,6 +255,39 @@ func TestIsStaged(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			// e.g. nix-snapshotter appends read-only bind mounts for store
+			// paths after the writable rootfs mount.
+			name: "read-only child mounts on top of a writable root",
+			mounts: []mount.Mount{
+				{Type: "overlay", Source: "overlay", Options: []string{"lowerdir=/lower", "upperdir=/upper", "workdir=/work"}},
+				{Type: "bind", Source: "/nix/store/a", Target: "/nix/store/a", Options: []string{"ro", "rbind"}},
+				{Type: "bind", Source: "/nix/store/b", Target: "/nix/store/b", Options: []string{"ro", "rbind"}},
+			},
+			expect: false,
+		},
+		{
+			name: "writable child mount on top of a read-only root",
+			mounts: []mount.Mount{
+				{Type: "erofs", Source: "/path/to/layer.erofs", Options: []string{"loop"}},
+				{Type: "bind", Source: "/path", Target: "/sub", Options: []string{"rbind"}},
+			},
+			expect: true,
+		},
+		{
+			name: "root mount with explicit root target",
+			mounts: []mount.Mount{
+				{Type: "erofs", Source: "/path/to/layer.erofs", Target: "/", Options: []string{"loop"}},
+			},
+			expect: true,
+		},
+		{
+			name: "only child mounts",
+			mounts: []mount.Mount{
+				{Type: "bind", Source: "/nix/store/a", Target: "/nix/store/a", Options: []string{"ro", "rbind"}},
+			},
+			expect: false,
+		},
 	}
 
 	for _, tc := range testCases {
