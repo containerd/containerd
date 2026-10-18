@@ -313,12 +313,18 @@ func (manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *boo
 }
 
 func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
-	cwd, err := os.Getwd()
+	// containerd runs "delete" with the bundle as cwd and also passes it as
+	// -bundle. The bundle can be removed while this process is starting, and
+	// os.Getwd then fails, so use -bundle. An empty -bundle means the working
+	// directory (Abs("") is the cwd). If the bundle is already gone, the runc
+	// Root and BinaryName in its options are unavailable and the defaults are used.
+	o, _ := ctx.Value(shim.OptsKey{}).(shim.Opts)
+	bundle, err := filepath.Abs(o.BundlePath)
 	if err != nil {
 		return shim.StopStatus{}, err
 	}
 
-	path := filepath.Join(filepath.Dir(cwd), id)
+	path := filepath.Join(filepath.Dir(bundle), id)
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return shim.StopStatus{}, err
@@ -337,6 +343,9 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	}
 
 	r := process.NewRunc(root, path, ns, runtime, false)
+	// runc cannot open --log inside a bundle that may already be removed, and
+	// the failed delete's output is still logged below, so do not pass it.
+	r.Log = ""
 	if err := r.Delete(ctx, id, &runcC.DeleteOpts{
 		Force: true,
 	}); err != nil {
