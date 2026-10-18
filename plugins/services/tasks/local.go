@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
@@ -280,16 +281,59 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	}
 	labels := map[string]string{"runtime": container.Runtime.Name}
 	if err := l.monitor.Monitor(c, labels); err != nil {
+		l.cleanupCreated(ctx, c)
 		return nil, fmt.Errorf("monitor task: %w", err)
 	}
 	pid, err := c.PID(ctx)
 	if err != nil {
+		l.cleanupCreated(ctx, c)
 		return nil, fmt.Errorf("failed to get task pid: %w", err)
 	}
 	return &api.CreateTaskResponse{
 		ContainerID: r.ContainerID,
 		Pid:         pid,
 	}, nil
+}
+
+// createCleanupTimeout bounds each phase of cleanupCreated. Delete must outlast
+// the shim's 10s IO drain plus the runtime delete.
+var createCleanupTimeout = 15 * time.Second
+
+// cleanupCreated deletes a task nobody else will: a leftover record makes a
+// later container delete fail as "running task". The task is killed first
+// because a shim refuses to delete a running (or restored) task, and a created
+// task's IO drain, up to 10s, cannot finish while init holds the pipes. Both
+// phases run detached from ctx, each with its own timeout, so a
+// stuck Wait cannot expire Delete.
+func (l *local) cleanupCreated(ctx context.Context, t runtime.Task) {
+	ctx = context.WithoutCancel(ctx)
+	logger := log.G(ctx).WithField("id", t.ID())
+
+	// A failed Monitor may still have left partial monitor state behind.
+	if err := l.monitor.Stop(t); err != nil {
+		logger.WithError(err).Error("failed to stop monitoring task after failed create")
+	}
+
+	// Best effort: a task that is already gone or stopped is still deleted.
+	// NotFound is not logged: it means the task was already cleaned up.
+	kctx, cancel := context.WithTimeout(ctx, createCleanupTimeout)
+	err := t.Kill(kctx, uint32(syscall.SIGKILL), true)
+	// Kill can return NotFound after it killed the process, so still wait for
+	// the exit: a running task cannot be deleted.
+	if err == nil || errdefs.IsNotFound(err) {
+		_, err = t.Wait(kctx)
+	}
+	cancel()
+	if err != nil && !errdefs.IsNotFound(err) {
+		logger.WithError(err).Warn("failed to stop task after failed create")
+	}
+
+	dctx, cancel := context.WithTimeout(ctx, createCleanupTimeout)
+	defer cancel()
+	_, err = l.v2Runtime.Delete(dctx, t.ID())
+	if err != nil && !errdefs.IsNotFound(err) {
+		logger.WithError(err).Error("failed to delete task after failed create")
+	}
 }
 
 func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOption) (*api.StartResponse, error) {
