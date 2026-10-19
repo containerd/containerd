@@ -19,11 +19,16 @@ package images
 import (
 	"context"
 	"encoding/base64"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/platforms"
@@ -557,7 +562,7 @@ func TestTransferProgressReporter(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
-				activeReqs, totalBytesRead := r.reqReporter.status()
+				activeReqs, totalBytesRead, _ := r.reqReporter.status()
 				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
 				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
 			},
@@ -589,7 +594,7 @@ func TestTransferProgressReporter(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
-				activeReqs, totalBytesRead := r.reqReporter.status()
+				activeReqs, totalBytesRead, _ := r.reqReporter.status()
 				assert.Equal(t, int32(0), activeReqs, "Expected 0 active requests")
 				assert.Equal(t, uint64(1000), totalBytesRead, "Expected 1000 bytes read")
 			},
@@ -625,7 +630,7 @@ func TestTransferProgressReporter(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
-				activeReqs, totalBytesRead := r.reqReporter.status()
+				activeReqs, totalBytesRead, _ := r.reqReporter.status()
 				assert.Equal(t, int32(0), activeReqs, "Expected zero active request")
 				assert.Equal(t, uint64(0), totalBytesRead, "Expected zero bytes read")
 			},
@@ -726,7 +731,7 @@ func TestTransferProgressReporter(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
-				activeReqs, totalBytesRead := r.reqReporter.status()
+				activeReqs, totalBytesRead, _ := r.reqReporter.status()
 				assert.Equal(t, int32(1), activeReqs, "Expected one active request")
 				assert.Equal(t, uint64(2000), totalBytesRead, "Expected 2000 bytes read")
 			},
@@ -769,13 +774,6 @@ func TestTransferProgressReporter(t *testing.T) {
 // TestPullProgressReporter covers the core no-progress cancellation
 // behavior of pullProgressReporter: a stuck request (active, no bytes)
 // is eventually cancelled, while a progressing request is not.
-//
-// The flaky failure in TestCRIImagePullTimeout/HoldingContentOpenWriterWithLocalPull
-// — which this fix addresses — is a timing race that's not cleanly
-// expressible as a unit test: the boundary between the buggy and fixed
-// cancel times coincides at 1.5*timeout, so any check near that
-// threshold is scheduler-jitter prone. The semantic regression is
-// covered by the existing integration test.
 func TestPullProgressReporter(t *testing.T) {
 	t.Run("StuckRequestStillGetsCancelled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -841,6 +839,118 @@ func TestPullProgressReporter(t *testing.T) {
 		case <-done:
 		}
 	})
+
+	t.Run("ZeroBodyResponseFollowedByRequestIsNotCancelled", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cancelCalled := make(chan struct{})
+			reporter := newPullProgressReporter("test-image:latest", func() {
+				select {
+				case <-cancelCalled:
+				default:
+					close(cancelCalled)
+				}
+			}, 200*time.Millisecond)
+
+			client := &http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					switch req.URL.Path {
+					case "/token":
+						time.Sleep(190 * time.Millisecond)
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("token")),
+						}, nil
+					case "/v2/test/manifests/latest":
+						time.Sleep(160 * time.Millisecond)
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       http.NoBody,
+						}, nil
+					case "/v2/test/manifests/sha256:1234":
+						time.Sleep(160 * time.Millisecond)
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader("manifest")),
+						}, nil
+					default:
+						t.Fatalf("unexpected request path: %s", req.URL.Path)
+						return nil, nil
+					}
+				}),
+			}
+			assert.NoError(t, reporter.optionUpdateClient(client))
+			reporter.start(ctx)
+
+			doReq := func(method, url string) {
+				req, err := http.NewRequestWithContext(ctx, method, url, nil)
+				require.NoError(t, err)
+				resp, err := client.Do(req)
+				require.NoError(t, err)
+				_, err = io.Copy(io.Discard, resp.Body)
+				assert.NoError(t, err)
+				assert.NoError(t, resp.Body.Close())
+			}
+
+			doReq(http.MethodGet, "https://example.com/token")
+			doReq(http.MethodHead, "https://example.com/v2/test/manifests/latest")
+			doReq(http.MethodGet, "https://example.com/v2/test/manifests/sha256:1234")
+
+			select {
+			case <-cancelCalled:
+				t.Fatal("pull was cancelled during active GET following a 0-byte HEAD response")
+			default:
+			}
+		})
+	})
+
+	t.Run("RequestAfterMissedIdleTransitionIsNotCancelled", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cancelCalled := make(chan struct{})
+			reporter := newPullProgressReporter("test-image:latest", func() {
+				select {
+				case <-cancelCalled:
+				default:
+					close(cancelCalled)
+				}
+			}, 200*time.Millisecond)
+
+			// With a 200ms timeout, the reporter ticks every 100ms. Each
+			// request finishes within 200ms, and the idle periods fall
+			// between ticks.
+			reporter.reqReporter.incRequest()
+			reporter.reqReporter.incByteRead(1024)
+			reporter.start(ctx)
+
+			time.Sleep(120 * time.Millisecond)
+			reporter.reqReporter.decRequest()
+
+			time.Sleep(60 * time.Millisecond)
+			reporter.reqReporter.incRequest()
+			time.Sleep(90 * time.Millisecond)
+			reporter.reqReporter.decRequest()
+
+			time.Sleep(20 * time.Millisecond)
+			reporter.reqReporter.incRequest()
+
+			select {
+			case <-cancelCalled:
+				t.Fatal("pull was cancelled before any request exceeded timeout")
+			case <-time.After(130 * time.Millisecond):
+			}
+		})
+	})
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }
 
 // fakeObserver records every Observe call so tests can assert both the
