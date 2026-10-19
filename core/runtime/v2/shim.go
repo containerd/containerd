@@ -646,9 +646,15 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 		ID: s.ID(),
 	})
 	if shimErr != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Error("failed to delete task")
-		if !errors.Is(shimErr, ttrpc.ErrClosed) {
-			shimErr = errgrpc.ToNative(shimErr)
+		closed := errors.Is(shimErr, ttrpc.ErrClosed)
+		native := errgrpc.ToNative(shimErr)
+		level := log.ErrorLevel
+		if closed || errdefs.IsNotFound(native) {
+			level = log.DebugLevel
+		}
+		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Log(level, "failed to delete task")
+		if !closed {
+			shimErr = native
 			if !errdefs.IsNotFound(shimErr) {
 				return nil, shimErr
 			}
@@ -933,6 +939,9 @@ func (s *shimTask) Stats(ctx context.Context) (*ptypes.Any, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
+		if errors.Is(err, ttrpc.ErrClosed) {
+			return nil, errdefs.ErrNotFound
+		}
 		return nil, errgrpc.ToNative(err)
 	}
 	return response.Stats, nil
