@@ -283,8 +283,10 @@ func TestShutdownAfterCloseLeavesAReusedFdAlone(t *testing.T) {
 			return
 		}
 		defer r.Close()
-		buf := make([]byte, 64)
-		n, _ := r.Read(buf)
+		// The pty pushes the text and the translated newline separately,
+		// so a single read may stop short of the newline. Read the whole line.
+		buf := make([]byte, len("still here\r\n"))
+		n, _ := io.ReadFull(r, buf)
 		got <- string(buf[:n])
 	}()
 	var wgB sync.WaitGroup
