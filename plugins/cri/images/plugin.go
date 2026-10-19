@@ -232,22 +232,22 @@ func migrateConfig(dst, src map[string]interface{}) {
 	}
 
 	var runtimePlatforms map[string]interface{}
-	if v, ok := dst["runtime_platform"]; ok {
+	if v, ok := dst["runtime_platforms"]; ok {
 		runtimePlatforms = v.(map[string]interface{})
 	} else {
 		runtimePlatforms = map[string]interface{}{}
 	}
 	for runtime, v := range runtimesConf.(map[string]interface{}) {
 		runtimeConf := v.(map[string]interface{})
-		if snapshotter, ok := runtimeConf["snapshot"]; ok && snapshotter != "" {
+		if snapshotter, ok := runtimeConf["snapshotter"]; ok && snapshotter != "" {
 			runtimePlatforms[runtime] = map[string]interface{}{
-				"platform":    platforms.DefaultStrict(),
+				"platform":    platforms.DefaultString(),
 				"snapshotter": snapshotter,
 			}
 		}
 	}
 	if len(runtimePlatforms) > 0 {
-		dst["runtime_platform"] = runtimePlatforms
+		dst["runtime_platforms"] = runtimePlatforms
 	}
 
 	for _, key := range []string{
