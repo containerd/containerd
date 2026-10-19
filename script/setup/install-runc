@@ -38,7 +38,14 @@ function install_runc() {
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
-	env -u VERSION make BUILDTAGS='seccomp' runc
+	# Static build, like the runc release binaries, so the binary does not
+	# depend on the build host's glibc and libseccomp. Needs libseccomp.a;
+	# set RUNC_DYNAMIC=1 where it is not available (e.g. EL).
+	if [ -n "${RUNC_DYNAMIC:-}" ]; then
+		env -u VERSION make BUILDTAGS='seccomp' runc
+	else
+		env -u VERSION make BUILDTAGS='seccomp' static
+	fi
 	$SUDO make install
 	popd
 }
