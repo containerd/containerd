@@ -42,7 +42,7 @@ require (
 	github.com/google/certtostore v1.0.7
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
+	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.1
 	github.com/intel/goresctrl v0.13.0
 	github.com/klauspost/compress v1.20.1
 	github.com/mdlayher/vsock v1.3.0
