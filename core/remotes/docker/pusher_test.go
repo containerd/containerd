@@ -871,3 +871,214 @@ func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
 	assert.Equal(t, samplePusherHostname, gotNsParam,
 		"GET fallback on proxy must include ?ns= query parameter")
 }
+
+func TestPushWriterCommitContextCancelled(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := pw.Commit(ctx, 0, "")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestPushWriterCommitContextTimeout(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	defer cancel()
+
+	err := pw.Commit(ctx, 0, "")
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+type trackingReadCloser struct {
+	io.Reader
+	closed  bool
+	drained bool
+}
+
+func (tr *trackingReadCloser) Read(p []byte) (int, error) {
+	n, err := tr.Reader.Read(p)
+	if errors.Is(err, io.EOF) || n == 0 {
+		tr.drained = true
+	}
+	return n, err
+}
+
+func (tr *trackingReadCloser) Close() error {
+	tr.closed = true
+	return nil
+}
+
+func TestPushWriterCommitContextCancelledWithQueuedResponse(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+
+	body := &trackingReadCloser{Reader: strings.NewReader("response body content")}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       body,
+	}
+	pw.respC <- resp
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := pw.Commit(ctx, 0, "")
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.True(t, body.closed, "response body should be closed")
+	assert.True(t, body.drained, "response body should be drained")
+}
+
+func TestPushWriterSetResponseAfterDone(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+	_ = pw.Close()
+
+	body := &trackingReadCloser{Reader: strings.NewReader("response body content")}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       body,
+	}
+	pw.setResponse(resp)
+
+	assert.True(t, body.closed, "response body should be closed when setResponse called after done")
+	assert.True(t, body.drained, "response body should be drained when setResponse called after done")
+}
+
+func TestPushWriterCommitContextCancelledWhileBlocking(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- pw.Commit(ctx, 0, "")
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-errCh:
+		assert.ErrorIs(t, err, context.Canceled)
+	case <-time.After(3 * time.Second):
+		t.Fatal("Commit blocked indefinitely despite context cancellation")
+	}
+}
+
+func TestPushWriterCommitNilResponseAndBody(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+
+	// Sub-test 1: respC has a response with nil Body, context canceled
+	t.Run("nil Body in respC", func(t *testing.T) {
+		pw := newPushWriter(nil, "test-ref-1", "", tracker, false)
+		pw.respC <- &http.Response{StatusCode: http.StatusOK, Body: nil}
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		err := pw.Commit(ctx, 0, "")
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+
+	// Sub-test 2: setResponse called with nil and nil Body after Close
+	t.Run("nil resp in setResponse after Close", func(t *testing.T) {
+		pw := newPushWriter(nil, "test-ref-2", "", tracker, false)
+		_ = pw.Close()
+		assert.NotPanics(t, func() {
+			pw.setResponse(nil)
+			pw.setResponse(&http.Response{Body: nil})
+		})
+	})
+}
+
+func TestPushWriterCommitLargeBodyDrained(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+
+	const size = 1024 * 1024 // 1 MB
+	largeData := bytes.Repeat([]byte("A"), size)
+	body := &trackingReadCloser{Reader: bytes.NewReader(largeData)}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       body,
+	}
+	pw.respC <- resp
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := pw.Commit(ctx, 0, "")
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.True(t, body.closed, "large response body must be closed")
+	assert.True(t, body.drained, "large response body must be fully drained")
+}
+
+func TestPushWriterCommitWithPipe(t *testing.T) {
+	t.Parallel()
+	tracker := NewInMemoryTracker()
+	pw := newPushWriter(nil, "test-ref", "", tracker, false)
+
+	pr, pipew := io.Pipe()
+	pw.pipe = pipew
+
+	// Drain the read end in background so pipe close doesn't block on write
+	go io.Copy(io.Discard, pr)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := pw.Commit(ctx, 0, "")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestPushWriterCommitConcurrentRace(t *testing.T) {
+	t.Parallel()
+	for i := 0; i < 50; i++ {
+		tracker := NewInMemoryTracker()
+		pw := newPushWriter(nil, fmt.Sprintf("test-ref-%d", i), "", tracker, false)
+
+		body := &trackingReadCloser{Reader: strings.NewReader("sample payload")}
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       body,
+		}
+
+		ctx, cancel := context.WithTimeout(t.Context(), time.Duration(i%5+1)*time.Millisecond)
+
+		var wg sync.WaitGroup
+		wg.Add(3)
+
+		go func() {
+			defer wg.Done()
+			_ = pw.Commit(ctx, 0, "")
+		}()
+
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Duration(i%3) * time.Millisecond)
+			pw.setResponse(resp)
+		}()
+
+		go func() {
+			defer wg.Done()
+			time.Sleep(time.Duration((i+1)%3) * time.Millisecond)
+			cancel()
+		}()
+
+		wg.Wait()
+		cancel()
+	}
+}
