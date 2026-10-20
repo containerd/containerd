@@ -75,6 +75,8 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	s := &service{
 		context:              ctx,
 		events:               make(chan any, 128),
+		stopForward:          make(chan struct{}),
+		forwardDone:          make(chan struct{}),
 		ec:                   reaper.Default.Subscribe(),
 		cg1oom:               ep,
 		cg2oom:               oomv2.New(),
@@ -93,6 +95,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
+	sd.RegisterCallback(s.stopForwarding)
 
 	if address, err := shim.ReadAddress("address"); err == nil {
 		sd.RegisterCallback(func(context.Context) error {
@@ -114,6 +117,11 @@ type service struct {
 	cg2oom   oomv2.Interface
 
 	publisher events.Publisher
+
+	// stopForward tells forward to publish the queued events and return.
+	stopForward chan struct{}
+	// forwardDone is closed when forward returns.
+	forwardDone chan struct{}
 
 	containers map[string]*runc.Container
 
@@ -815,8 +823,22 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 	return pids, nil
 }
 
+// stopForwarding stops forward and waits until it has published the queued
+// events, so that they are not lost when the shim exits. It runs as a shutdown
+// callback: the shim exits once these have returned.
+func (s *service) stopForwarding(ctx context.Context) error {
+	close(s.stopForward)
+	select {
+	case <-s.forwardDone:
+	case <-ctx.Done():
+		log.G(s.context).WithError(ctx.Err()).Warn("shim exits before publishing all its events")
+	}
+	return nil
+}
+
 func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 	ctx = context.WithoutCancel(ctx)
+	defer close(s.forwardDone)
 	defer publisher.Close()
 
 	publish := func(e any) {
@@ -829,7 +851,7 @@ func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 		select {
 		case e := <-s.events:
 			publish(e)
-		case <-s.shutdown.Done():
+		case <-s.stopForward:
 			for {
 				select {
 				case e := <-s.events:
