@@ -79,8 +79,8 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.ToLower(fsType) != "ntfs" {
-		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
+	if !isSupportedSnapshotterFileSystem(fsType) {
+		return nil, fmt.Errorf("%s is not on an NTFS or ReFS volume - only NTFS and ReFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
 	if err := os.MkdirAll(root, 0700); err != nil {
@@ -99,6 +99,10 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		root: root,
 		ms:   ms,
 	}, nil
+}
+
+func isSupportedSnapshotterFileSystem(fsType string) bool {
+	return strings.EqualFold(fsType, "ntfs") || strings.EqualFold(fsType, "refs")
 }
 
 // Stat returns the info for an active or committed snapshot by name or
