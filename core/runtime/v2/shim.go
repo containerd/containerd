@@ -44,6 +44,7 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/archive"
@@ -52,6 +53,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -222,7 +224,14 @@ type clientVersionDowngrader interface {
 func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	var params client.BootstrapParams
 
-	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
+	var result bootapi.BootstrapResult
+	if err := proto.Unmarshal(response, &result); err == nil && result.Version >= 2 {
+		params = client.BootstrapParams{
+			Version:  int(result.Version),
+			Address:  result.Address,
+			Protocol: result.Protocol,
+		}
+	} else if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
 		params.Address = string(response)
 		params.Protocol = "ttrpc"

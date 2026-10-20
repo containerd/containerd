@@ -67,7 +67,7 @@ func NewTaskClient(client interface{}, version int) (TaskServiceClient, error) {
 	case *ttrpc.Client:
 		switch version {
 		case 2:
-			return &ttrpcV2Bridge{client: v2.NewTaskClient(c)}, nil
+			return &ttrpcV2Bridge{client: v2.NewTTRPCTaskClient(c)}, nil
 		case 3:
 			return api.NewTTRPCTaskClient(c), nil
 		default:
@@ -87,7 +87,7 @@ func NewTaskClient(client interface{}, version int) (TaskServiceClient, error) {
 
 // ttrpcV2Bridge is a bridge from TTRPC v2 task service.
 type ttrpcV2Bridge struct {
-	client v2.TaskService
+	client v2.TTRPCTaskService
 }
 
 var _ TaskServiceClient = (*ttrpcV2Bridge)(nil)
