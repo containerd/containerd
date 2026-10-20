@@ -205,10 +205,34 @@ func TestCopy(t *testing.T) {
 			expectedErr: errdefs.ErrFailedPrecondition,
 		},
 		{
-			name: "copy fails when size is negative",
+			name: "copy with unspecified size (zero)",
+			source: copySource{
+				reader: strings.NewReader("content"),
+				size:   0,
+				digest: digest.FromString("content"),
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
+			expected: "content",
+		},
+		{
+			name: "copy with unspecified size (-1)",
 			source: copySource{
 				reader: strings.NewReader("content"),
 				size:   -1,
+				digest: digest.FromString("content"),
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
+			expected: "content",
+		},
+		{
+			name: "copy with invalid negative size",
+			source: copySource{
+				reader: strings.NewReader("content"),
+				size:   -2,
 			},
 			writer: fakeWriter{
 				Buffer: &bytes.Buffer{},
@@ -230,7 +254,9 @@ func TestCopy(t *testing.T) {
 				assert.ErrorIs(t, err, testcase.expectedErr)
 				return
 			}
-
+			if testcase.source.size == -1 {
+				assert.Zero(t, testcase.writer.committedSize)
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, testcase.source.digest, testcase.writer.committedDigest)
 			assert.Equal(t, testcase.expected, testcase.writer.String())
@@ -273,6 +299,7 @@ type commitFunction func() error
 
 type fakeWriter struct {
 	*bytes.Buffer
+	committedSize   int64
 	committedDigest digest.Digest
 	status          Status
 	commitFunc      commitFunction
@@ -284,6 +311,7 @@ func (f *fakeWriter) Close() error {
 }
 
 func (f *fakeWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...Opt) error {
+	f.committedSize = size
 	f.committedDigest = expected
 	if f.commitFunc == nil {
 		return nil
