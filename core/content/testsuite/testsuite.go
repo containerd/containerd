@@ -57,6 +57,7 @@ func ContentSuite(t *testing.T, name string, storeFn StoreInitFn) {
 	t.Run("ResumeCopySeeker", makeTest(t, name, storeFn, checkResume(resumeCopySeeker)))
 	t.Run("ResumeCopyReaderAt", makeTest(t, name, storeFn, checkResume(resumeCopyReaderAt)))
 	t.Run("SmallBlob", makeTest(t, name, storeFn, checkSmallBlob))
+	t.Run("InvalidBlobSize", makeTest(t, name, storeFn, checkInvalidBlobSize))
 	t.Run("Labels", makeTest(t, name, storeFn, checkLabels))
 
 	t.Run("CommitErrorState", makeTest(t, name, storeFn, checkCommitErrorState))
@@ -320,7 +321,7 @@ func checkResumeWriter(ctx context.Context, t *testing.T, cs content.Store) {
 
 func checkCommitExists(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
-	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1}); err != nil {
+	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1, Size: int64(len(c1))}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,7 +376,7 @@ func discardWriter(t *testing.T, w content.Writer) {
 func checkCommitErrorState(ctx context.Context, t *testing.T, cs content.Store) {
 	c1, d1 := createContent(256)
 	_, d2 := createContent(256)
-	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1}); err != nil {
+	if err := content.WriteBlob(ctx, cs, "c1", bytes.NewReader(c1), ocispec.Descriptor{Digest: d1, Size: int64(len(c1))}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -822,6 +823,25 @@ func checkSmallBlob(ctx context.Context, t *testing.T, store content.Store) {
 	if blobDigest != d {
 		t.Fatalf("expected %s (%q), got %s (%q)", blobDigest, string(blob),
 			d, string(b))
+	}
+}
+
+func checkInvalidBlobSize(ctx context.Context, t *testing.T, cs content.Store) {
+	b, dgst := createContent(256)
+
+	for _, size := range []int64{-1, -2} {
+		t.Run(fmt.Sprintf("size=%d", size), func(t *testing.T) {
+			err := content.WriteBlob(ctx, cs, t.Name(),
+				bytes.NewReader(b),
+				ocispec.Descriptor{
+					Size:   size,
+					Digest: dgst,
+				},
+			)
+			if !errdefs.IsInvalidArgument(err) {
+				t.Fatalf("expected invalid argument error, got %v", err)
+			}
+		})
 	}
 }
 
