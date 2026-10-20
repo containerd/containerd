@@ -22,13 +22,13 @@ rpc/rpc.proto:
 	curl -sSL https://raw.githubusercontent.com/checkpoint-restore/criu/master/images/rpc.proto -o $@
 
 rpc/rpc.pb.go: rpc/rpc.proto
-	protoc --go_out=. --go_opt=M$^=rpc/ $^
+	protoc --go-lite_out=. --go-lite_opt=M$^=rpc/ $^
 
 stats/stats.proto:
 	curl -sSL https://raw.githubusercontent.com/checkpoint-restore/criu/master/images/stats.proto -o $@
 
 stats/stats.pb.go: stats/stats.proto
-	protoc --go_out=. --go_opt=M$^=stats/ $^
+	protoc --go-lite_out=. --go-lite_opt=M$^=stats/ $^
 
 vendor:
 	$(GO) mod tidy
