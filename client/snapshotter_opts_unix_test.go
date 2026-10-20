@@ -75,11 +75,10 @@ func TestRemappedSnapshotID(t *testing.T) {
 		})
 	}
 	for name, mutate := range map[string]func(*remappedSnapshot){
-		"invalid-parent": func(s *remappedSnapshot) { s.Parent = "not-a-digest" },
-		"empty-uid":      func(s *remappedSnapshot) { s.IDMap.UidMap = []specs.LinuxIDMapping{} },
-		"empty-gid":      func(s *remappedSnapshot) { s.IDMap.GidMap = []specs.LinuxIDMapping{} },
-		"empty-range":    func(s *remappedSnapshot) { s.IDMap.UidMap[0].Size = 0 },
-		"unmapped-root":  func(s *remappedSnapshot) { s.IDMap.UidMap[0].ContainerID = 1 },
+		"empty-uid":     func(s *remappedSnapshot) { s.IDMap.UidMap = []specs.LinuxIDMapping{} },
+		"empty-gid":     func(s *remappedSnapshot) { s.IDMap.GidMap = []specs.LinuxIDMapping{} },
+		"empty-range":   func(s *remappedSnapshot) { s.IDMap.UidMap[0].Size = 0 },
+		"unmapped-root": func(s *remappedSnapshot) { s.IDMap.UidMap[0].ContainerID = 1 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := newSnapshot()

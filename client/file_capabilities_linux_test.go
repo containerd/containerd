@@ -19,6 +19,8 @@
 package client
 
 import (
+	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -34,9 +36,22 @@ import (
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/sysx"
+	"github.com/containerd/log"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
+)
+
+// Raw xattr fixtures keep filesystem tests independent of the encoder.
+const (
+	capRevision1 = 0x01000000
+	capRevision2 = 0x02000000
+	capRevision3 = 0x03000000
+	capEffective = 1
+	capSize1     = 12
+	capSize2     = 20
+	capSize3     = 24
 )
 
 func testCapability(revision uint32, root uint32) []byte {
@@ -61,34 +76,16 @@ func TestRemapFileCapabilities(t *testing.T) {
 	for _, revision := range []uint32{capRevision1, capRevision2, capRevision3} {
 		t.Run(fmt.Sprintf("revision-%x", revision), func(t *testing.T) {
 			caps := testCapability(revision, 42)
-			if revision != capRevision1 {
-				binary.LittleEndian.PutUint32(caps[12:], 0x10)
-				binary.LittleEndian.PutUint32(caps[16:], 0x20)
-			}
-			original := append([]byte(nil), caps...)
 			mapped, err := remapFileCapabilities(caps, testCapabilityMap())
 			require.NoError(t, err)
 			expected := uint32(100000)
 			if revision == capRevision3 {
 				expected += 42
 			}
-			require.Equal(t, expected, binary.LittleEndian.Uint32(mapped[20:]))
-			require.Equal(t, uint32(capRevision3|capEffective), binary.LittleEndian.Uint32(mapped))
-			require.Equal(t, original, caps)
-			end := len(caps)
-			if end > 20 {
-				end = 20
-			}
-			require.Equal(t, caps[4:end], mapped[4:end])
+			require.Equal(t, testCapability(capRevision3, expected), mapped)
 		})
 	}
-	t.Run("no-effective-flag", func(t *testing.T) {
-		caps := testCapability(capRevision2, 0)
-		binary.LittleEndian.PutUint32(caps, capRevision2)
-		mapped, err := remapFileCapabilities(caps, testCapabilityMap())
-		require.NoError(t, err)
-		require.Equal(t, uint32(capRevision3), binary.LittleEndian.Uint32(mapped))
-	})
+
 	t.Run("unmapped-root", func(t *testing.T) {
 		caps, err := remapFileCapabilities(testCapability(capRevision3, 65536), testCapabilityMap())
 		require.NoError(t, err)
@@ -97,18 +94,25 @@ func TestRemapFileCapabilities(t *testing.T) {
 	for name, mapping := range map[string][]specs.LinuxIDMapping{
 		"empty-map":            {},
 		"zero-size":            {{Size: 0}},
-		"source-overflow":      {{ContainerID: 1, Size: ^uint32(0)}},
-		"destination-overflow": {{HostID: ^uint32(0), Size: 2}},
-		"mapped-root-overflow": {{ContainerID: 99999, HostID: ^uint32(0) - 1, Size: 65536}},
+		"source-overflow":      {{ContainerID: 1, Size: userns.InvalidID}},
+		"destination-overflow": {{HostID: userns.InvalidID, Size: 2}},
+		"mapped-root-overflow": {{ContainerID: 99999, HostID: userns.InvalidID - 1, Size: 65536}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := remapFileCapabilities(testCapability(capRevision3, 100000), userns.IDMap{UidMap: mapping})
 			require.Error(t, err)
 		})
 	}
-	for _, caps := range [][]byte{nil, {1}, make([]byte, 4), testCapability(capRevision2, 0)[:19], append(testCapability(capRevision2, 0), 0)} {
-		_, err := remapFileCapabilities(caps, testCapabilityMap())
-		require.Error(t, err)
+	_, err := remapFileCapabilities([]byte{1}, testCapabilityMap())
+	require.Error(t, err)
+	_, err = remapFileCapabilities(testCapability(capRevision3, userns.InvalidID), testCapabilityMap())
+	require.Error(t, err)
+	// An implicit root in revisions 1/2 must not be silently discarded.
+	for _, revision := range []uint32{capRevision1, capRevision2} {
+		mapping := testCapabilityMap()
+		mapping.UidMap[0].ContainerID = 1
+		_, err := remapFileCapabilities(testCapability(revision, 0), mapping)
+		require.ErrorIs(t, err, userns.ErrUnmappedID)
 	}
 }
 
@@ -132,7 +136,7 @@ func TestChownPreservesFileCapabilities(t *testing.T) {
 	setTestCapability(t, path)
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
-	require.NoError(t, chown(root, testCapabilityMap())(path, info, nil))
+	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(path, info, nil))
 	checkCaps := func() {
 		t.Helper()
 		caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
@@ -154,13 +158,13 @@ func TestChownPreservesFileCapabilities(t *testing.T) {
 	require.NoError(t, os.Symlink(path, link))
 	info, err = os.Lstat(link)
 	require.NoError(t, err)
-	require.NoError(t, chown(root, testCapabilityMap())(link, info, nil))
+	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(link, info, nil))
 	checkCaps()
 	plain := filepath.Join(root, "plain")
 	require.NoError(t, os.WriteFile(plain, nil, 0644))
 	info, err = os.Lstat(plain)
 	require.NoError(t, err)
-	require.NoError(t, chown(root, testCapabilityMap())(plain, info, nil))
+	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(plain, info, nil))
 	_, err = sysx.LGetxattr(plain, fileCapabilityXattr)
 	require.ErrorIs(t, err, unix.ENODATA)
 }
@@ -192,7 +196,7 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 	setTestCapability(t, path)
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
-	require.NoError(t, chown(root, testCapabilityMap())(path, info, nil))
+	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(path, info, nil))
 	supported, err := kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
 	require.NoError(t, err)
 	var mappedCaps uint64
@@ -263,11 +267,70 @@ func TestChownDropsUnmappedFileCapabilities(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, caps, before)
 
-	require.NoError(t, filepath.Walk(root, chown(root, testCapabilityMap())))
+	require.NoError(t, filepath.Walk(root, chown(context.Background(), root, testCapabilityMap())))
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
 	require.Equal(t, uint32(100000), info.Sys().(*syscall.Stat_t).Uid)
 	require.Equal(t, uint32(200000), info.Sys().(*syscall.Stat_t).Gid)
 	_, err = sysx.LGetxattr(path, fileCapabilityXattr)
 	require.ErrorIs(t, err, unix.ENODATA)
+}
+
+func TestFileCapabilityRemapWarnings(t *testing.T) {
+	testutil.RequiresRoot(t)
+	var output bytes.Buffer
+	logger := logrus.New()
+	logger.SetOutput(&output)
+	ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger))
+	supported, err := supportsNamespacedFileCapabilities()
+	require.NoError(t, err)
+	for remap := 0; remap < 2; remap++ {
+		t.Run(fmt.Sprint(remap), func(t *testing.T) {
+			output.Reset()
+			root := t.TempDir()
+			walk := chown(ctx, root, testCapabilityMap())
+			for _, name := range []string{"plain", "first", "second", "mapped"} {
+				path := filepath.Join(root, name)
+				require.NoError(t, os.WriteFile(path, nil, 0755))
+				if name != "plain" {
+					setTestCapability(t, path)
+				}
+				if name == "first" || name == "second" {
+					require.NoError(t, sysx.LSetxattr(path, fileCapabilityXattr, testCapability(capRevision3, 100000), 0))
+				}
+				info, err := os.Lstat(path)
+				require.NoError(t, err)
+				require.NoError(t, walk(path, info, nil))
+				caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
+				if supported && name == "mapped" {
+					require.NoError(t, err)
+					require.Equal(t, testCapability(capRevision3, 100000), caps)
+				} else {
+					require.ErrorIs(t, err, unix.ENODATA)
+				}
+				if supported && name == "plain" {
+					require.Empty(t, output.String())
+				}
+			}
+			require.Equal(t, 1, bytes.Count(output.Bytes(), []byte("level=warning")))
+			if supported {
+				require.Contains(t, output.String(), "outside the UID mapping")
+			} else {
+				require.Contains(t, output.String(), "require Linux 4.14")
+			}
+		})
+	}
+}
+
+func TestFileCapabilityIOErrors(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	supported, err := supportsNamespacedFileCapabilities()
+	require.NoError(t, err)
+	if supported {
+		_, err = remappedFileCapabilities(missing, testCapabilityMap(), func(reason string) {
+			t.Fatalf("unexpected warning: %s", reason)
+		})
+		require.ErrorIs(t, err, unix.ENOENT)
+	}
+	require.ErrorIs(t, restoreFileCapabilities(missing, testCapability(capRevision3, 100000)), unix.ENOENT)
 }

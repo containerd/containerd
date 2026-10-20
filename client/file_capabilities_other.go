@@ -24,7 +24,7 @@ func supportsNamespacedFileCapabilities() (bool, error) {
 	return false, nil
 }
 
-func remappedFileCapabilities(string, userns.IDMap) ([]byte, error) {
+func remappedFileCapabilities(string, userns.IDMap, func(string)) ([]byte, error) {
 	return nil, nil
 }
 

@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/userns"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -120,11 +121,18 @@ func withRemappedSnapshotBase(id string, i Image, uidmaps, gidmaps []specs.Linux
 
 func remapRootFS(ctx context.Context, mounts []mount.Mount, idMap userns.IDMap) error {
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
-		return filepath.Walk(root, chown(root, idMap))
+		return filepath.Walk(root, chown(ctx, root, idMap))
 	})
 }
 
-func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
+func chown(ctx context.Context, root string, idMap userns.IDMap) filepath.WalkFunc {
+	warned := false
+	warn := func(reason string) {
+		if !warned {
+			log.G(ctx).WithField("root", root).WithField("reason", reason).Warn("Cannot preserve file capabilities during snapshot remapping")
+			warned = true
+		}
+	}
 	return func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -138,7 +146,7 @@ func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
 		// ownership, then restore them after all metadata changes.
 		var caps []byte
 		if info.Mode().IsRegular() {
-			caps, cerr = remappedFileCapabilities(path, idMap)
+			caps, cerr = remappedFileCapabilities(path, idMap, warn)
 			if cerr != nil {
 				return cerr
 			}

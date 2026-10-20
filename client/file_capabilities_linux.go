@@ -19,34 +19,25 @@
 package client
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/v2/internal/userns"
+	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/sysx"
 	"golang.org/x/sys/unix"
 )
 
-// Linux UAPI: include/uapi/linux/capability.h.
-const (
-	fileCapabilityXattr = "security.capability"
-	capRevisionMask     = 0xff000000
-	capRevision1        = 0x01000000
-	capRevision2        = 0x02000000
-	capRevision3        = 0x03000000
-	capEffective        = 1
-	capSize1            = 12
-	capSize2            = 20
-	capSize3            = 24
-)
+const fileCapabilityXattr = "security.capability"
 
 func supportsNamespacedFileCapabilities() (bool, error) {
 	return kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
 }
 
-func remappedFileCapabilities(path string, idMap userns.IDMap) ([]byte, error) {
+// Missing/unsupported xattrs are tolerated on read. Older kernels and valid
+// unmapped roots retain stripping with a warning; all other failures are fatal.
+func remappedFileCapabilities(path string, idMap userns.IDMap, warn func(string)) ([]byte, error) {
 	supported, err := supportsNamespacedFileCapabilities()
 	if err != nil {
 		return nil, fmt.Errorf("check namespaced file capability support: %w", err)
@@ -54,6 +45,7 @@ func remappedFileCapabilities(path string, idMap userns.IDMap) ([]byte, error) {
 	if !supported {
 		// Older kernels can store revision 3 xattrs but fail to execute the
 		// file. Retain the previous behavior of letting Lchown clear them.
+		warn("namespaced file capabilities require Linux 4.14")
 		return nil, nil
 	}
 	caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
@@ -67,61 +59,33 @@ func remappedFileCapabilities(path string, idMap userns.IDMap) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("remap file capabilities for %q: %w", path, err)
 	}
+	if caps == nil {
+		warn("file capability root is outside the UID mapping")
+	}
 	return caps, nil
 }
 
 // remapFileCapabilities scopes the saved capabilities to their original root
-// UID translated into the destination user namespace. Restoring a revision 2
-// xattr verbatim would leave it scoped to host root, not the remapped root.
-func remapFileCapabilities(caps []byte, idMap userns.IDMap) ([]byte, error) {
-	if len(caps) < 4 {
-		return nil, fmt.Errorf("invalid file capability length %d", len(caps))
-	}
-	magic := binary.LittleEndian.Uint32(caps)
-	revision := magic & capRevisionMask
-	var size int
-	var rootUID uint32
-	switch revision {
-	case capRevision1:
-		size = capSize1
-	case capRevision2:
-		size = capSize2
-	case capRevision3:
-		size = capSize3
-	default:
-		return nil, fmt.Errorf("unsupported file capability revision %#x", revision)
-	}
-	if len(caps) != size || magic & ^uint32(capRevisionMask|capEffective) != 0 {
-		return nil, errors.New("invalid file capability encoding")
-	}
-	if revision == capRevision3 {
-		rootUID = binary.LittleEndian.Uint32(caps[capSize2:capSize3])
+// UID translated into the destination user namespace.
+func remapFileCapabilities(data []byte, idMap userns.IDMap) ([]byte, error) {
+	caps, err := cap.ParseFileCapabilities(data)
+	if err != nil {
+		return nil, err
 	}
 	// Capability root IDs are UIDs; the GID mapping is unrelated.
 	uidMap := userns.IDMap{UidMap: idMap.UidMap}
-	root, err := uidMap.ToHost(userns.User{Uid: rootUID})
+	root, err := uidMap.ToHost(userns.User{Uid: caps.RootID})
 	if err != nil {
-		if revision != capRevision3 || rootUID == ^uint32(0) || len(idMap.UidMap) == 0 {
-			return nil, err
+		if caps.Namespaced() && errors.Is(err, userns.ErrUnmappedID) {
+			return nil, nil // Let Lchown clear capabilities whose root cannot be mapped.
 		}
-		for _, m := range idMap.UidMap {
-			if m.Size == 0 || uint64(m.ContainerID)+uint64(m.Size) > uint64(^uint32(0)) ||
-				uint64(m.HostID)+uint64(m.Size) > uint64(^uint32(0)) ||
-				(rootUID >= m.ContainerID && rootUID-m.ContainerID < m.Size) {
-				return nil, err
-			}
-		}
-		// This capability's root cannot be represented in the remapped
-		// namespace. Let Lchown clear it instead of preventing container creation.
-		return nil, nil
+		return nil, err
 	}
-	mapped := make([]byte, capSize3)
-	copy(mapped, caps)
-	binary.LittleEndian.PutUint32(mapped, capRevision3|(magic&capEffective))
-	binary.LittleEndian.PutUint32(mapped[capSize2:capSize3], root.Uid)
-	return mapped, nil
+	caps.RootID = root.Uid
+	return caps.Encode(), nil
 }
 
+// Restore failures remain fatal, including unsupported writes.
 func restoreFileCapabilities(path string, caps []byte) error {
 	if caps == nil {
 		return nil

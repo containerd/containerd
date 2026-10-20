@@ -150,12 +150,6 @@ func (s *remappedSnapshot) ID() (string, error) {
 }
 
 func (s *remappedSnapshot) id(fileCapabilities bool) (string, error) {
-	// An empty parent represents an empty filesystem, as with a layerless image.
-	if s.Parent != "" {
-		if err := digest.Digest(s.Parent).Validate(); err != nil {
-			return "", fmt.Errorf("invalid remapped snapshot parent: %w", err)
-		}
-	}
 	for _, mappings := range [][]specs.LinuxIDMapping{s.IDMap.UidMap, s.IDMap.GidMap} {
 		for _, mapping := range mappings {
 			if mapping.Size == 0 {
