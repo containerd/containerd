@@ -87,6 +87,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		runningExecs:         make(map[*runc.Container]int),
 		execCountSubscribers: make(map[*runc.Container]chan<- int),
 		containerInitExit:    make(map[*runc.Container]runcC.Exit),
+		initExitSent:         make(map[*runc.Container]chan struct{}),
 		exitSubscribers:      make(map[*map[int][]runcC.Exit]struct{}),
 	}
 	go s.processExits()
@@ -140,6 +141,12 @@ type service struct {
 	// Note that this flag gets updated before the container's [process.Init.Status]
 	// is transitioned to "stopped".
 	containerInitExit map[*runc.Container]runcC.Exit
+	// container -> closed once the init process exit event is queued,
+	// guarded by lifecycleMu.
+	// Set before the init process is marked as exited, which a started
+	// process must be before it can be deleted, so that Delete can send the
+	// delete event after the exit event.
+	initExitSent map[*runc.Container]chan struct{}
 	// Subscriptions to exits for PIDs. Adding/deleting subscriptions and
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
@@ -369,15 +376,12 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	}
 	// if we deleted an init task, send the task delete event
 	if r.ExecID == "" {
+		// Send the delete event before removing the container, which allows
+		// the shim to be shut down.
+		s.sendDelete(ctx, container, p)
 		s.mu.Lock()
 		delete(s.containers, r.ID)
 		s.mu.Unlock()
-		s.send(&eventstypes.TaskDelete{
-			ContainerID: container.ID,
-			Pid:         uint32(p.Pid()),
-			ExitStatus:  uint32(p.ExitStatus()),
-			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
-		})
 		s.lifecycleMu.Lock()
 		delete(s.containerInitExit, container)
 		s.lifecycleMu.Unlock()
@@ -772,8 +776,16 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 }
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
-	p.SetExited(e.Status)
 	_, isInit := p.(*process.Init)
+	if isInit {
+		exitSent := make(chan struct{})
+		defer close(exitSent)
+		s.lifecycleMu.Lock()
+		s.initExitSent[c] = exitSent
+		s.lifecycleMu.Unlock()
+	}
+
+	p.SetExited(e.Status)
 	if isInit {
 		e.Timestamp = p.ExitedAt()
 		if err := runc.WriteExitStatus(c.Bundle, e); err != nil {
@@ -805,6 +817,28 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		}
 		s.lifecycleMu.Unlock()
 	}
+}
+
+// sendDelete sends the delete event of the container's init process. If the
+// process has exited, it first waits for its exit event to be queued, as
+// docs/runtime-v2.md requires the exit event to come first.
+func (s *service) sendDelete(ctx context.Context, c *runc.Container, p process.Process) {
+	s.lifecycleMu.Lock()
+	exitSent := s.initExitSent[c]
+	delete(s.initExitSent, c)
+	s.lifecycleMu.Unlock()
+	if exitSent != nil {
+		select {
+		case <-exitSent:
+		case <-ctx.Done():
+		}
+	}
+	s.send(&eventstypes.TaskDelete{
+		ContainerID: c.ID,
+		Pid:         uint32(p.Pid()),
+		ExitStatus:  uint32(p.ExitStatus()),
+		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+	})
 }
 
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
