@@ -135,20 +135,22 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
-		dest func(wc io.WriteCloser, rc io.Closer)
+		dest func(wc io.WriteCloser, rc io.Closer, isFifo bool)
 	}{
 		{
 			name: stdout,
-			dest: func(wc io.WriteCloser, rc io.Closer) {
+			dest: func(wc io.WriteCloser, rc io.Closer, isFifo bool) {
 				wg.Add(1)
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
+					stop := startFifoWatcher(stdout, wc, isFifo)
 					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
 						log.G(ctx).Warn("error copying stdout")
 					}
+					stop()
 					wg.Done()
 					wc.Close()
 					if rc != nil {
@@ -158,16 +160,18 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			},
 		}, {
 			name: stderr,
-			dest: func(wc io.WriteCloser, rc io.Closer) {
+			dest: func(wc io.WriteCloser, rc io.Closer, isFifo bool) {
 				wg.Add(1)
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
 					p := bufPool.Get().(*[]byte)
 					defer bufPool.Put(p)
+					stop := startFifoWatcher(stderr, wc, isFifo)
 					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
 						log.G(ctx).Warn("error copying stderr")
 					}
+					stop()
 					wg.Done()
 					wc.Close()
 					if rc != nil {
@@ -177,7 +181,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			},
 		},
 	} {
-		ok, err := fifo.IsFifo(i.name)
+		isFifo, err := fifo.IsFifo(i.name)
 		if err != nil {
 			return err
 		}
@@ -185,7 +189,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			fw io.WriteCloser
 			fr io.Closer
 		)
-		if ok {
+		if isFifo {
 			if fw, err = fifo.OpenFifo(ctx, i.name, syscall.O_WRONLY, 0); err != nil {
 				return fmt.Errorf("containerd-shim: opening w/o fifo %q failed: %w", i.name, err)
 			}
@@ -195,7 +199,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		} else {
 			if sameFile != nil {
 				sameFile.bumpCount(1)
-				i.dest(sameFile, nil)
+				i.dest(sameFile, nil, false)
 				continue
 			}
 			if fw, err = os.OpenFile(i.name, syscall.O_WRONLY|syscall.O_APPEND, 0); err != nil {
@@ -205,7 +209,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				sameFile = newCountingWriteCloser(fw, 1)
 			}
 		}
-		i.dest(fw, fr)
+		i.dest(fw, fr, isFifo)
 	}
 	if stdin == "" {
 		return nil
@@ -219,12 +223,46 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 		cwg.Done()
 		p := bufPool.Get().(*[]byte)
 		defer bufPool.Put(p)
-
+		stop := startFifoWatcher(stdin, f, true)
 		io.CopyBuffer(rio.Stdin(), f, *p)
+		stop()
 		rio.Stdin().Close()
 		f.Close()
 	}()
 	return nil
+}
+
+// startFifoWatcher monitors a fifo path and closes the given closer if the fifo
+// is removed from the filesystem. This allows an in-progress io.CopyBuffer to
+// unblock and stop copying once its backing fifo has been deleted. When isFifo
+// is false (e.g. a regular log file that may legitimately be rotated away) no
+// monitoring is performed. The returned stop function must be called exactly
+// once when copying completes to release the watcher goroutine.
+func startFifoWatcher(path string, closer io.Closer, isFifo bool) func() {
+	if !isFifo || path == "" {
+		return func() {}
+	}
+	stop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				return
+			case <-ticker.C:
+				if _, err := os.Stat(path); err != nil && os.IsNotExist(err) {
+					// The fifo was removed from the filesystem; close the
+					// writer/reader so io.CopyBuffer returns.
+					closer.Close()
+					return
+				}
+			}
+		}
+	}()
+	return func() {
+		close(stop)
+	}
 }
 
 // countingWriteCloser masks io.Closer() until close has been invoked a certain number of times.
