@@ -33,7 +33,7 @@ const (
 	// other events can be handled.
 	// Add a timeout for each event handling, events that timeout will be requeued and
 	// handled again in the future.
-	handleEventTimeout = 10 * time.Second
+	handleEventTimeout = 20 * time.Second
 )
 
 type podSandboxEventHandler struct {
