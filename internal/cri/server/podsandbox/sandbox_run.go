@@ -340,7 +340,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
 	metadata := sandboxstore.Metadata{}
-	if err := info.GetExtension(MetadataKey, &metadata); err != nil {
+	if err := info.GetExtension(sandboxstore.MetadataKey, &metadata); err != nil {
 		return fmt.Errorf("failed to get sandbox %q metadata: %w", info.ID, err)
 	}
 	podSandbox := types.NewPodSandbox(info.ID, sandboxstore.Status{State: sandboxstore.StateUnknown})
