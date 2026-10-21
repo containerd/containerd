@@ -774,6 +774,10 @@ func makeWritableCopy(dir, data string) (retErr error) {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
+	// Windows does not allow replacing the destination while it is open.
+	if err := src.Close(); err != nil {
+		return err
+	}
 	if err := os.Rename(tmp.Name(), data); err != nil {
 		return err
 	}

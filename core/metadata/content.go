@@ -27,6 +27,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
@@ -436,12 +437,14 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 
 		brefb := bkt.Get(bucketKeyRef)
 		if brefb == nil {
-			sid, err := bkt.NextSequence()
+			// The identity must survive neither abort nor bucket recreation:
+			// a stale writer must not match a new ingest with the same ref.
+			id, err := uuid.NewRandom()
 			if err != nil {
 				return err
 			}
 
-			bref = createKey(sid, ns, wOpts.Ref)
+			bref = fmt.Sprintf("%s/%s/%s", ns, id, wOpts.Ref)
 			if err := bkt.Put(bucketKeyRef, []byte(bref)); err != nil {
 				return err
 			}
@@ -584,6 +587,7 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 
 	nw.l.RLock()
 	defer nw.l.RUnlock()
+	defer nw.Close()
 
 	var innerErr error
 	var actualDgst digest.Digest
@@ -597,7 +601,6 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	// REF:
 	// [1]: https://github.com/containerd/containerd/blob/c4c3c6ea568ce0cfbcf754863abadeea37d77c8f/plugins/content/local/writer.go#L95
 	if err := nw.Sync(); err != nil {
-		nw.Close()
 		return fmt.Errorf("failed to perform sync: %w", err)
 	}
 
@@ -606,22 +609,18 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	var base content.Info
 	for _, opt := range opts {
 		if err := opt(&base); err != nil {
-			nw.Close()
 			return err
 		}
 	}
 	if err := validateInfo(&base); err != nil {
-		nw.Close()
 		return err
 	}
 	if nw.w != nil {
 		status, err := nw.w.Status()
 		if err != nil {
-			nw.Close()
 			return err
 		}
 		if size != 0 && size != status.Offset {
-			nw.Close()
 			return fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
 		}
 		size = status.Offset
@@ -634,7 +633,6 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 				if err := preparer.Precommit(ctx, size, expected); err != nil {
 					return err
 				}
-				defer nw.Close()
 			}
 		}
 	}

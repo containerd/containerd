@@ -302,6 +302,110 @@ func (w *abortPrecommitWriter) Precommit(ctx context.Context, size int64, expect
 	return w.prepare(ctx, size, expected)
 }
 
+func TestContentPrecommitAbortAndRecreate(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore().(*contentStore)
+	backend := cs.Store
+	blob := []byte("shared backend content")
+	dgst := digest.FromBytes(blob)
+	desc := ocispec.Descriptor{Digest: dgst, Size: int64(len(blob))}
+	if err := content.WriteBlob(ctx, backend, "seed", bytes.NewReader(blob), desc); err != nil {
+		t.Fatal(err)
+	}
+	var replacement content.Writer
+	cs.Store = &precommitStore{Store: backend, prepare: func(context.Context, int64, digest.Digest) error {
+		if err := cs.Abort(ctx, "recreated"); err != nil {
+			return err
+		}
+		var err error
+		// Shared content has no backend writer, so its creation is not blocked
+		// by the old writer's backend ref lock.
+		replacement, err = cs.Writer(ctx, content.WithRef("recreated"), content.WithDescriptor(desc))
+		return err
+	}}
+	old, err := cs.Writer(ctx, content.WithRef("recreated"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer old.Close()
+	if _, err := old.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	nw := old.(*namespacedWriter)
+	nw.w = &abortPrecommitWriter{Writer: nw.w, prepare: cs.Store.(*precommitStore).prepare}
+	if err := old.Commit(ctx, desc.Size, dgst); !errdefs.IsNotFound(err) {
+		t.Fatalf("stale ingest commit returned %v", err)
+	}
+	if replacement == nil {
+		t.Fatal("replacement writer not created")
+	}
+	defer replacement.Close()
+	if nw.bref == replacement.(*namespacedWriter).bref {
+		t.Fatal("replacement reused the aborted ingest identity")
+	}
+	if err := db.View(func(tx *bolt.Tx) error {
+		bkt := getIngestBucket(tx, "testing", "recreated")
+		if bkt == nil || string(bkt.Get(bucketKeyRef)) != replacement.(*namespacedWriter).bref {
+			return errors.New("replacement metadata was lost")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cs.Info(ctx, dgst); !errdefs.IsNotFound(err) {
+		t.Fatalf("aborted upload was published: %v", err)
+	}
+	if err := replacement.Commit(ctx, desc.Size, dgst); err != nil {
+		t.Fatalf("replacement commit failed: %v", err)
+	}
+}
+
+// Embedding only Writer hides the backend's optional preparation capability.
+type nonPrecommitWriter struct {
+	content.Writer
+}
+
+func TestContentCommitClosesWithoutPrecommit(t *testing.T) {
+	for _, callerTransaction := range []bool{false, true} {
+		t.Run(fmt.Sprintf("callerTransaction=%v", callerTransaction), func(t *testing.T) {
+			ctx, db := testDB(t)
+			cs := db.ContentStore()
+			w, err := cs.Writer(ctx, content.WithRef("closed"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			blob := []byte("close aborted backend session")
+			if _, err := w.Write(blob); err != nil {
+				t.Fatal(err)
+			}
+			nw := w.(*namespacedWriter)
+			nw.w = &nonPrecommitWriter{Writer: nw.w}
+			if err := cs.Abort(ctx, "closed"); err != nil {
+				t.Fatal(err)
+			}
+			commit := func(ctx context.Context) error {
+				return w.Commit(ctx, int64(len(blob)), digest.FromBytes(blob))
+			}
+			if callerTransaction {
+				err = db.Update(func(tx *bolt.Tx) error { return commit(boltutil.WithTransaction(ctx, tx)) })
+			} else {
+				err = commit(ctx)
+			}
+			if !errdefs.IsNotFound(err) {
+				t.Fatalf("commit returned %v", err)
+			}
+			// Check the actual backend lock, without explicitly closing w.
+			backend := cs.(*contentStore).Store
+			resumed, err := backend.Writer(ctx, content.WithRef(nw.bref))
+			if err != nil {
+				t.Fatalf("commit left backend ref locked: %v", err)
+			}
+			resumed.Close()
+		})
+	}
+}
+
 func TestContentPrecommitTransactionFailure(t *testing.T) {
 	ctx, db := testDB(t)
 	cs := db.ContentStore().(*contentStore)
