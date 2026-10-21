@@ -60,9 +60,10 @@ type Opt func(*proxyContentStore)
 // reads committed blobs, never ingests, and needs no write access.
 //
 // Readers then open blobs from the directory directly rather than receiving
-// them over the API. The remote store is still asked for the content's info
-// first, so it remains the authority on what is available. Content which
-// cannot be opened locally is read over the API.
+// them over the API, without asking the remote store first: the metadata
+// store in front of the proxy decides what content is available. The remote
+// store must remove a blob from the directory when it deletes it. Content
+// which cannot be opened locally is read over the API.
 func WithLocalBlobs(blobs string) Opt {
 	return func(pcs *proxyContentStore) {
 		pcs.localBlobs = blobs
@@ -145,13 +146,11 @@ func (pcs *proxyContentStore) Delete(ctx context.Context, dgst digest.Digest) er
 
 // ReaderAt ignores MediaType.
 func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
-	i, err := pcs.Info(ctx, desc.Digest)
-	if err != nil {
-		return nil, err
-	}
-
 	if pcs.localBlobs != "" {
-		ra, err := openLocal(pcs.localBlobs, desc.Digest, i.Size)
+		if err := desc.Digest.Validate(); err != nil {
+			return nil, fmt.Errorf("%v: %w", err, errdefs.ErrInvalidArgument)
+		}
+		ra, err := openLocal(pcs.localBlobs, desc.Digest, desc.Size)
 		if err == nil {
 			return ra, nil
 		}
@@ -168,6 +167,10 @@ func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descrip
 		}
 	}
 
+	i, err := pcs.Info(ctx, desc.Digest)
+	if err != nil {
+		return nil, err
+	}
 	return newRemoteReaderAt(ctx, desc.Digest, i.Size, pcs.client), nil
 }
 

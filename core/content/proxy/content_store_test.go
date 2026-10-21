@@ -347,8 +347,29 @@ func TestReaderAtLocalBlobsNotFound(t *testing.T) {
 	s := newTestServer(t, root, nil)
 	cs := s.proxy(t, WithLocalBlobs(localBlobs))
 
+	// Content missing from both the directory and the remote store is not
+	// found.
 	_, desc := randomBlob(t, 10)
-	// The remote store decides what exists, even when the file is present.
+	if _, err := cs.ReaderAt(context.Background(), desc); !errdefs.IsNotFound(err) {
+		t.Fatalf("expected not found, got %v", err)
+	}
+}
+
+// noInfoClient fails any Info call, so a test can check a read does not make
+// one.
+type noInfoClient struct {
+	contentapi.TTRPCContentClient
+	t *testing.T
+}
+
+func (c noInfoClient) Info(context.Context, *contentapi.InfoRequest) (*contentapi.InfoResponse, error) {
+	c.t.Error("unexpected Info call")
+	return nil, errdefs.ErrNotImplemented
+}
+
+func TestReaderAtLocalBlobsWithoutInfo(t *testing.T) {
+	localBlobs := t.TempDir()
+	b, desc := randomBlob(t, 1024)
 	p, err := localBlobPath(localBlobs, desc.Digest)
 	if err != nil {
 		t.Fatal(err)
@@ -356,8 +377,27 @@ func TestReaderAtLocalBlobsNotFound(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cs.ReaderAt(context.Background(), desc); !errdefs.IsNotFound(err) {
-		t.Fatalf("expected not found, got %v", err)
+	if err := os.WriteFile(p, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cs := NewContentStore(noInfoClient{t: t}, WithLocalBlobs(localBlobs))
+
+	for _, tc := range []struct {
+		name string
+		desc ocispec.Descriptor
+	}{
+		{name: "WithSize", desc: desc},
+		// ReaderAt only requires the digest; the size comes from the file.
+		{name: "DigestOnly", desc: ocispec.Descriptor{Digest: desc.Digest}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ra, err := cs.ReaderAt(context.Background(), tc.desc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer ra.Close()
+			checkRead(t, ra, b)
+		})
 	}
 }
 

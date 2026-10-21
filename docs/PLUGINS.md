@@ -86,12 +86,13 @@ proxy plugin replaces the built-in one, which must be disabled.
 A content proxy plugin which keeps its blobs on the same host may export a
 `blobs` directory holding its committed blobs in the layout of the built-in
 content store, `<blobs>/<algorithm>/<encoded>`. containerd then opens blobs
-directly from that directory rather than receiving them over the API. The
-plugin is still asked for the content's info first, and content which cannot
-be opened locally is read over the API. The plugin must only make complete
-blobs visible in the directory. Content which is missing from the directory
-is read over the API silently, while other failures to use it, such as a size
-mismatch or a permission error, are logged as warnings.
+directly from that directory rather than receiving them over the API, without
+asking the plugin first; containerd's metadata store decides what content is
+available. The plugin must only make complete blobs visible in the directory
+and must remove a blob from it when the blob is deleted. Content which is
+missing from the directory is read over the API silently, while other
+failures to use it, such as a size mismatch or a permission error, are logged
+as warnings.
 
 This is the blobs directory alone, not the plugin's `root`: containerd only
 reads committed blobs, never the plugin's ingests, and needs no write access,
