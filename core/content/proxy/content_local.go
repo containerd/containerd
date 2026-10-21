@@ -37,7 +37,8 @@ func localBlobPath(blobs string, dgst digest.Digest) (string, error) {
 }
 
 // openLocal opens a blob under the blobs directory for reading. The blob must be
-// a regular file of the expected size, otherwise it is not used.
+// a regular file and, when size is non-zero, of that size, otherwise it is not
+// used.
 func openLocal(blobs string, dgst digest.Digest, size int64) (*localReaderAt, error) {
 	p, err := localBlobPath(blobs, dgst)
 	if err != nil {
@@ -56,11 +57,11 @@ func openLocal(blobs string, dgst digest.Digest, size int64) (*localReaderAt, er
 		fp.Close()
 		return nil, fmt.Errorf("%s is not a regular file", p)
 	}
-	if fi.Size() != size {
+	if size != 0 && fi.Size() != size {
 		fp.Close()
 		return nil, fmt.Errorf("%s has size %d, expected %d", p, fi.Size(), size)
 	}
-	return &localReaderAt{fp: fp, size: size}, nil
+	return &localReaderAt{fp: fp, size: fi.Size()}, nil
 }
 
 // localReaderAt reads a blob from a local file.
