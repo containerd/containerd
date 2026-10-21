@@ -153,7 +153,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 	sandbox.Sandboxer = ociRuntime.Sandboxer
-
+	sandbox.NetworkReady = make(chan error, 1)
 	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
@@ -192,6 +192,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
+	var networkMeta sandboxstore.Metadata
 	// Setup the network namespace if host networking wasn't requested.
 	if !hostNetwork(config) {
 		span.AddEvent("setup pod network")
@@ -263,19 +264,17 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// In this case however caching the IP will add a subtle performance enhancement by avoiding
 		// calls to network namespace of the pod to query the IP of the veth interface on every
 		// SandboxStatus request.
-		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
-			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
-		}
-		sandboxCreateNetworkTimer.UpdateSince(netStart)
-
-		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
-		}
-
-		// Save sandbox metadata to store
-		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
-		}
+		go func() {
+			log.G(ctx).WithField("podsandboxid", id).Info("test001 setupPodNetwork")
+			networkMeta, err = c.setupPodNetwork(ctx, sandbox)
+			if err != nil {
+				log.G(ctx).WithField("podsandboxid", id).Info("test002 setupPodNetwork")
+				sandbox.NetworkReady <- fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
+			}
+			close(sandbox.NetworkReady)
+			log.G(ctx).WithField("podsandboxid", id).Info("test003 setupPodNetwork")
+			sandboxCreateNetworkTimer.UpdateSince(netStart)
+		}()
 	}
 
 	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
@@ -329,6 +328,30 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
+	if sandbox.NetworkReady != nil && !hostNetwork(sandbox.Config) {
+		select {
+		case err := <-sandbox.NetworkReady:
+			if err != nil {
+				return nil, err
+			}
+		case <-ctx.Done():
+			return nil, fmt.Errorf("waiting for sandbox network setup: %w", ctx.Err())
+		}
+		log.G(ctx).WithField("podsandboxid", id).Info("test004")
+		sandbox.Metadata.IP = networkMeta.IP
+		sandbox.Metadata.AdditionalIPs = networkMeta.AdditionalIPs
+		sandbox.Metadata.CNIResult = networkMeta.CNIResult
+		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		}
+		log.G(ctx).WithField("podsandboxid", id).Info("test005")
+		// Save sandbox metadata to store
+		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
+		}
+		log.G(ctx).WithField("podsandboxid", id).Info("test006")
+	}
+
 	if ctrl.Address != "" {
 		sandbox.Endpoint = sandboxstore.Endpoint{
 			Version: ctrl.Version,
@@ -374,6 +397,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}()
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		log.G(ctx).WithField("podsandboxid", id).Info("test007")
 		// Set the pod sandbox as ready after successfully start sandbox container.
 		status.State = sandboxstore.StateReady
 		return status, nil
@@ -385,6 +409,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
+	log.G(ctx).WithField("podsandboxid", id).Info("test008")
 	// We no longer need to stop sandbox with a cleanup defer since it is in the store.
 	rollbackSandbox = false
 
@@ -453,7 +478,7 @@ func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
 }
 
 // setupPodNetwork setups up the network for a pod
-func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) (retErr error) {
+func (c *criService) setupPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) (meta sandboxstore.Metadata, retErr error) {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name("cni", "setup_pod_network"),
 		tracing.WithNamespace(ctx),
 	)
@@ -481,17 +506,17 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	)
 
 	if netPlugin == nil {
-		return errors.New("cni config not initialized")
+		return meta, errors.New("cni config not initialized")
 	}
 	if c.config.UseInternalLoopback {
 		err := c.bringUpLoopback(path)
 		if err != nil {
-			return fmt.Errorf("unable to set lo to up: %w", err)
+			return meta, fmt.Errorf("unable to set lo to up: %w", err)
 		}
 	}
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
-		return fmt.Errorf("get cni namespace options: %w", err)
+		return meta, fmt.Errorf("get cni namespace options: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
@@ -506,14 +531,14 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	networkPluginOperationsLatency.WithValues(networkSetUpOp).UpdateSince(netStart)
 	if err != nil {
 		networkPluginOperationsErrors.WithValues(networkSetUpOp).Inc()
-		return err
+		return meta, err
 	}
 
 	span.AddEvent("cni.setup.complete")
 	logDebugCNIResult(ctx, id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
+		meta.IP, meta.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
 		sandbox.CNIResult = result
 
 		// Add IP information to span
@@ -521,9 +546,9 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 			tracing.Attribute("sandbox.ip", sandbox.IP),
 			tracing.Attribute("sandbox.additional_ips.count", len(sandbox.AdditionalIPs)),
 		)
-		return nil
+		return meta, nil
 	}
-	return fmt.Errorf("failed to find network info for sandbox %q", id)
+	return meta, fmt.Errorf("failed to find network info for sandbox %q", id)
 }
 
 // cniNamespaceOpts get CNI namespace options from sandbox config.
