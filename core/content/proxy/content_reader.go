@@ -19,10 +19,12 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 
 	contentapi "github.com/containerd/containerd/api/services/content/v1"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	digest "github.com/opencontainers/go-digest"
 )
@@ -37,8 +39,8 @@ type remoteReaderAt struct {
 	size   int64
 	client contentapi.TTRPCContentClient
 
-	// streams holds the open streams of readers returned from Reader, so
-	// Close can release them. newRemoteReaderAt initializes it; Close then
+	// streams holds the open streams of ReadAt and of readers returned from
+	// Reader, so Close can release them. newRemoteReaderAt initializes it; Close then
 	// sets it to nil, so nil means closed. open checks that to release a
 	// stream opened after Close.
 	mu      sync.Mutex
@@ -60,37 +62,33 @@ func (ra *remoteReaderAt) Size() int64 {
 	return ra.size
 }
 
-func (ra *remoteReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
-	rr := &contentapi.ReadContentRequest{
-		Digest: ra.digest.String(),
-		Offset: off,
-		Size:   int64(len(p)),
+func (ra *remoteReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	if off < 0 {
+		return 0, fmt.Errorf("negative offset %d: %w", off, errdefs.ErrInvalidArgument)
 	}
-	// we need a child context with cancel, or the eventually called
-	// grpc.NewStream will leak the goroutine until the whole thing is cleared.
-	// See comment at https://godoc.org/google.golang.org/grpc#ClientConn.NewStream
-	childCtx, cancel := context.WithCancel(ra.ctx)
-	// we MUST cancel the child context; see comment above
-	defer cancel()
-	rc, err := ra.client.Read(childCtx, rr)
-	if err != nil {
-		return 0, errgrpc.ToNative(err)
+	if off >= ra.size {
+		return 0, io.EOF
 	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	size := min(int64(len(p)), ra.size-off)
+	s := ra.open(off, size)
+	defer s.release()
 
-	for len(p) > 0 {
-		var resp *contentapi.ReadContentResponse
-		// fill our buffer up until we can fill p.
-		resp, err = rc.Recv()
-		if err != nil {
-			if err == io.EOF {
-				return n, err
-			}
-			return n, errgrpc.ToNative(err)
+	var n int
+	for int64(n) < size {
+		m, err := s.read(p[n:size])
+		n += m
+		if err == io.EOF {
+			break
 		}
-
-		copied := copy(p, resp.Data)
-		n += copied
-		p = p[copied:]
+		if err != nil {
+			return n, err
+		}
+	}
+	if n < len(p) {
+		return n, io.EOF
 	}
 	return n, nil
 }
@@ -108,7 +106,8 @@ func (ra *remoteReaderAt) Reader() io.Reader {
 	return &remoteReader{ra: ra}
 }
 
-// Close releases the open streams of readers returned from Reader.
+// Close releases the open streams of ReadAt and of readers returned from
+// Reader.
 func (ra *remoteReaderAt) Close() error {
 	ra.mu.Lock()
 	streams := ra.streams
@@ -163,7 +162,7 @@ func (r *remoteReader) Read(p []byte) (int, error) {
 				return 0, r.fail(io.EOF)
 			}
 			// Request the next window while this one is consumed.
-			r.cur = r.ra.open(r.offset)
+			r.cur = r.ra.open(r.offset, min(readWindow, r.ra.size-r.offset))
 			r.readAhead()
 		}
 
@@ -196,7 +195,7 @@ func (r *remoteReader) readAhead() {
 	if end >= r.ra.size {
 		return
 	}
-	r.next = r.ra.open(end)
+	r.next = r.ra.open(end, min(readWindow, r.ra.size-end))
 }
 
 // fail records err as the terminal state of the reader and releases its
@@ -210,10 +209,8 @@ func (r *remoteReader) fail(err error) error {
 	return err
 }
 
-// open starts a stream for the window of readWindow bytes, or less at the end
-// of the content, beginning at offset.
-func (ra *remoteReaderAt) open(offset int64) *stream {
-	size := min(readWindow, ra.size-offset)
+// open starts a stream for size bytes of the content beginning at offset.
+func (ra *remoteReaderAt) open(offset, size int64) *stream {
 	ctx, cancel := context.WithCancelCause(ra.ctx)
 	s := &stream{
 		ra:     ra,
@@ -253,7 +250,8 @@ func (ra *remoteReaderAt) open(offset int64) *stream {
 	return s
 }
 
-// stream receives one window of content over a single Read stream.
+// stream receives a range of content, a window for readers returned from
+// Reader, over a single Read stream.
 type stream struct {
 	ra     *remoteReaderAt
 	buf    []byte

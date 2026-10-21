@@ -771,6 +771,47 @@ func TestRemoteReaderReceivesStreamsToEnd(t *testing.T) {
 	}
 }
 
+func TestRemoteReaderAtReadAt(t *testing.T) {
+	const data = "hello world"
+	client := &rangeReadClient{data: []byte(data), chunk: 3}
+	ra := newRemoteReaderAt(context.Background(), digest.FromString(data), int64(len(data)), client)
+	defer ra.Close()
+
+	for _, tc := range []struct {
+		name    string
+		off     int64
+		n       int
+		want    string
+		wantErr error
+	}{
+		{name: "Middle", off: 2, n: 5, want: "llo w"},
+		{name: "ToEnd", off: 6, n: 5, want: "world"},
+		{name: "PastEnd", off: 6, n: 8, want: "world", wantErr: io.EOF},
+		{name: "AtEnd", off: 11, n: 4, wantErr: io.EOF},
+		{name: "Negative", off: -1, n: 4, wantErr: errdefs.ErrInvalidArgument},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := make([]byte, tc.n)
+			n, err := ra.ReadAt(p, tc.off)
+			if !errors.Is(err, tc.wantErr) {
+				t.Errorf("ReadAt(%d, %d) error = %v, want %v", tc.n, tc.off, err, tc.wantErr)
+			}
+			if got := string(p[:n]); got != tc.want {
+				t.Errorf("ReadAt(%d, %d) = %q, want %q", tc.n, tc.off, got, tc.want)
+			}
+		})
+	}
+
+	// Each ReadAt stream is received to its end in the background.
+	deadline := time.Now().Add(5 * time.Second)
+	for client.open() > 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if n := client.open(); n != 0 {
+		t.Errorf("streams not received to their end = %d, want 0", n)
+	}
+}
+
 func withReadWindow(n int64) func() {
 	old := readWindow
 	readWindow = n
@@ -802,7 +843,7 @@ func TestRemoteReaderAtCloseWhileOpening(t *testing.T) {
 	ra := newRemoteReaderAt(context.Background(), digest.FromString(data), int64(len(data)), client)
 
 	opened := make(chan *stream, 1)
-	go func() { opened <- ra.open(0) }()
+	go func() { opened <- ra.open(0, int64(len(data))) }()
 
 	<-client.entered // open is blocked in client.Read.
 	if err := ra.Close(); err != nil {
