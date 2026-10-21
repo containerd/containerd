@@ -52,6 +52,14 @@ type Metadata struct {
 	Config *runtime.PodSandboxConfig
 	// NetNSPath is the network namespace used by the sandbox.
 	NetNSPath string
+	// IPCNSPath is the IPC namespace path explicitly pinned by the sandbox shim, if available.
+	// When non-empty, it should be used instead of deriving from sandbox PID.
+	IPCNSPath string
+	// UTSNSPath is the UTS namespace path explicitly pinned by the sandbox shim, if available.
+	UTSNSPath string
+	// PIDNSPath is the PID namespace path explicitly pinned by the sandbox shim, if available.
+	// Used for shareProcessNamespace pods where the sandbox owns the PID namespace.
+	PIDNSPath string
 	// IP of Pod if it is attached to non host network
 	IP string
 	// AdditionalIPs of the Pod if it is attached to non host network
