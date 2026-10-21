@@ -102,7 +102,7 @@ func TestSandboxWindowsNetworkNamespace(t *testing.T) {
 	c := newControllerService()
 
 	config, imageConfig, specCheck := getRunPodSandboxTestData(c.config)
-	spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
+	spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, "", nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, spec)
