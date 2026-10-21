@@ -440,3 +440,177 @@ func TestWriteReadEmptyFileTimestamp(t *testing.T) {
 		t.Errorf("read empty timestamp file should return time.Time{}, but got: %v", timestamp)
 	}
 }
+
+func TestPrecommitLifecycle(t *testing.T) {
+	ctx, _, cs, cleanup := contentStoreEnv(t)
+	defer cleanup()
+
+	p := []byte("precommit content")
+	dgst := digest.FromBytes(p)
+
+	open := func(ref string) content.Writer {
+		cw, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: int64(len(p)), Digest: dgst}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cw
+	}
+	pc := func(w content.Writer) content.Precommitter {
+		x, ok := w.(content.Precommitter)
+		if !ok {
+			t.Fatal("writer does not implement Precommit")
+		}
+		return x
+	}
+
+	// failed validation closes, unlocks, and retains data for retry
+	cw := open("ref-a")
+	if _, err := cw.Write(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc(cw).Precommit(ctx, int64(len(p)), digest.FromString("nope")); !errdefs.IsFailedPrecondition(err) {
+		t.Fatalf("expected failed precondition, got %v", err)
+	}
+	if err := cw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	cw = open("ref-a")
+	st, _ := cw.Status()
+	if st.Offset != int64(len(p)) {
+		t.Fatalf("expected retained offset %d, got %d", len(p), st.Offset)
+	}
+	// Precommit twice, then write must error not panic
+	if err := pc(cw).Precommit(ctx, int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+	if err := pc(cw).Precommit(ctx, int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cw.Write([]byte("x")); err == nil {
+		t.Fatal("expected write error after precommit")
+	}
+	if err := cw.Truncate(0); err == nil {
+		t.Fatal("expected truncate error after precommit")
+	}
+	if ok, serr := fsverity.IsSupported(filepath.Dir(cw.(*writer).path)); !ok {
+		t.Logf("SKIP seal/recovery checks: fsverity unsupported on this filesystem: %v", serr)
+	} else {
+		if en, err := fsverity.IsEnabled(filepath.Join(cw.(*writer).path, "data")); err != nil || !en {
+			t.Fatalf("ingest not sealed: %v", err)
+		}
+		t.Log("verified fs-verity on prepared ingest; reopening exercises sealed-ingest recovery")
+	}
+	// Close after precommit leaves sealed ingest and unlocks; reopen resumes
+	if err := cw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	cw = open("ref-a")
+	st, _ = cw.Status()
+	if st.Offset != int64(len(p)) {
+		t.Fatalf("expected resumed offset %d, got %d", len(p), st.Offset)
+	}
+	if err := pc(cw).Precommit(ctx, int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+	if err := cw.Commit(ctx, int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+	if err := cw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// ref must be unlocked and usable again
+	other, err := cs.Writer(ctx, content.WithRef("ref-a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other.Close()
+	if got, err := os.ReadFile(checkBlobPath(t, cs, dgst)); err != nil || !bytes.Equal(got, p) {
+		t.Fatalf("bad blob: %v", err)
+	}
+}
+
+func TestStaleWriterAfterClose(t *testing.T) {
+	ctx, _, cs, cleanup := contentStoreEnv(t)
+	defer cleanup()
+
+	p := []byte("stale writer content")
+	dgst := digest.FromBytes(p)
+	old, err := cs.Writer(ctx, content.WithRef("ref-s"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Write(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.(content.Precommitter).Precommit(ctx, int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	nw, err := cs.Writer(ctx, content.WithRef("ref-s"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nw.Close()
+
+	if err := old.(content.Precommitter).Precommit(ctx, int64(len(p)), dgst); err == nil {
+		t.Fatal("stale Precommit must fail")
+	}
+	if err := old.Commit(ctx, int64(len(p)), dgst); err == nil {
+		t.Fatal("stale Commit must fail")
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// new writer still owns the ref: lock held, ingest intact
+	if _, err := cs.Writer(ctx, content.WithRef("ref-s")); err == nil {
+		t.Fatal("ref should still be locked by new writer")
+	}
+	if _, err := cs.Info(ctx, dgst); err == nil {
+		t.Fatal("stale writer must not have published the blob")
+	}
+	if st, _ := nw.Status(); st.Offset != int64(len(p)) {
+		t.Fatalf("new writer offset %d", st.Offset)
+	}
+	if err := nw.Commit(ctx, int64(len(p)), dgst); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMakeWritableCopy(t *testing.T) {
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	p := bytes.Repeat([]byte("abc"), 5000)
+	if err := os.WriteFile(data, p, 0640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(data, 0640); err != nil {
+		t.Fatal(err)
+	}
+	if err := makeWritableCopy(dir, data); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(data)
+	if err != nil || !bytes.Equal(got, p) {
+		t.Fatalf("content mismatch: %v", err)
+	}
+	if runtime.GOOS != "windows" {
+		fi, err := os.Stat(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fi.Mode().Perm() != 0640 {
+			t.Fatalf("mode: %v", fi.Mode())
+		}
+	}
+	ents, _ := os.ReadDir(dir)
+	if len(ents) != 1 {
+		t.Fatalf("temporary files left behind: %v", ents)
+	}
+}

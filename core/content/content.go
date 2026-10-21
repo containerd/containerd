@@ -165,6 +165,18 @@ type Writer interface {
 	Truncate(size int64) error
 }
 
+// Precommitter optionally prepares a writer for Commit without publishing its content.
+// Preparation may perform expensive validation and integrity setup, allowing the
+// caller to do this work before opening a metadata transaction. On success the
+// writer must retain ownership of the ingest until Commit or Close, and Commit
+// with the same size and expected digest must not repeat the preparation.
+// After preparation the writer must not accept further writes or truncation.
+// Close must leave the ingest resumable, including after a process restart.
+// On error the writer is closed, as with Commit.
+type Precommitter interface {
+	Precommit(ctx context.Context, size int64, expected digest.Digest) error
+}
+
 type Syncer interface {
 	// Sync flushes the in-flight writes to the disk (when applicable)
 	Sync() error

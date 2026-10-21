@@ -607,7 +607,18 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 	fp, err := os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open data file: %w", err)
+		// A previously sealed (fsverity) ingest cannot be opened for writing,
+		// replace it with a writable copy to preserve the uploaded data.
+		if enabled, verr := fsverity.IsEnabled(data); verr != nil || !enabled {
+			return nil, fmt.Errorf("failed to open data file: %w", err)
+		}
+		if rerr := makeWritableCopy(path, data); rerr != nil {
+			return nil, fmt.Errorf("failed to recover sealed ingest data file: %w", rerr)
+		}
+		fp, err = os.OpenFile(data, os.O_WRONLY|os.O_CREATE, 0666)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open data file: %w", err)
+		}
 	}
 
 	if _, err := fp.Seek(offset, io.SeekStart); err != nil {
@@ -724,4 +735,47 @@ func writeToCompletion(path string, data []byte, mode os.FileMode) error {
 		return fmt.Errorf("rename tmp file: %w", err)
 	}
 	return nil
+}
+
+// makeWritableCopy atomically replaces a sealed (read-only fsverity) data file
+// with a writable copy of the same content and permissions.
+func makeWritableCopy(dir, data string) (retErr error) {
+	src, err := os.Open(data)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+	fi, err := src.Stat()
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".data-recover-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if retErr != nil {
+			tmp.Close()
+			os.Remove(tmp.Name())
+		}
+	}()
+	p := bufPool.Get().(*[]byte)
+	_, err = io.CopyBuffer(tmp, src, *p)
+	bufPool.Put(p)
+	if err != nil {
+		return err
+	}
+	if err := tmp.Chmod(fi.Mode().Perm()); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp.Name(), data); err != nil {
+		return err
+	}
+	return syncDir(dir)
 }

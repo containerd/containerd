@@ -45,6 +45,11 @@ type writer struct {
 	digester  digest.Digester
 	startedAt time.Time
 	updatedAt time.Time
+
+	released   bool // ref lock released
+	prepared   bool
+	prepFi     os.FileInfo
+	prepDigest digest.Digest
 }
 
 func (w *writer) Status() (content.Status, error) {
@@ -69,6 +74,9 @@ func (w *writer) Digest() digest.Digest {
 // Note that writes are unbuffered to the backing file. When writing, it is
 // recommended to wrap in a bufio.Writer or, preferably, use io.CopyBuffer.
 func (w *writer) Write(p []byte) (n int, err error) {
+	if w.fp == nil {
+		return 0, fmt.Errorf("write on closed or prepared writer: %w", errdefs.ErrFailedPrecondition)
+	}
 	n, err = w.fp.Write(p)
 	w.digester.Hash().Write(p[:n])
 	w.offset += int64(len(p))
@@ -76,9 +84,124 @@ func (w *writer) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
+// release unlocks the backend ref exactly once.
+func (w *writer) release() {
+	if !w.released {
+		w.released = true
+		w.s.unlock(w.ref)
+	}
+}
+
+// prepare validates the ingest and, when supported, seals it with fsverity
+// before it is published. On success the result is cached so that repeated
+// calls only revalidate against the cached state. It never releases the lock.
+func (w *writer) prepare(ctx context.Context, size int64, expected digest.Digest) (digest.Digest, error) {
+	if w.released {
+		return "", fmt.Errorf("cannot commit on closed writer: %w", errdefs.ErrFailedPrecondition)
+	}
+	if w.prepared {
+		// The optional Precommitter contract guarantees the same arguments,
+		// so reject any mismatch with the prepared state.
+		if size > 0 && size != w.prepFi.Size() {
+			return "", fmt.Errorf("unexpected commit size %d, expected %d: %w", w.prepFi.Size(), size, errdefs.ErrFailedPrecondition)
+		}
+		if expected != "" && expected != w.prepDigest {
+			return "", fmt.Errorf("unexpected commit digest %s, expected %s: %w", w.prepDigest, expected, errdefs.ErrFailedPrecondition)
+		}
+		return w.prepDigest, nil
+	}
+
+	fp := w.fp
+	if fp == nil {
+		return "", fmt.Errorf("cannot commit on closed writer: %w", errdefs.ErrFailedPrecondition)
+	}
+	w.fp = nil
+
+	if err := fp.Sync(); err != nil {
+		fp.Close()
+		return "", fmt.Errorf("sync failed: %w", err)
+	}
+
+	fi, err := fp.Stat()
+	closeErr := fp.Close()
+	if err != nil {
+		return "", fmt.Errorf("stat on ingest file failed: %w", err)
+	}
+	if closeErr != nil {
+		return "", fmt.Errorf("failed to close ingest file: %w", closeErr)
+	}
+
+	if size > 0 && size != fi.Size() {
+		return "", fmt.Errorf("unexpected commit size %d, expected %d: %w", fi.Size(), size, errdefs.ErrFailedPrecondition)
+	}
+
+	dgst := w.digester.Digest()
+	if expected != "" && expected.Algorithm() != dgst.Algorithm() && expected.Algorithm().Available() {
+		// Writer was opened without a descriptor specifying the digest algorithm (but we got a non-canonical one here in commit), so we have to re-hash our now completed and closed content to compare
+		var err error
+		dgst, err = w.rehash(ctx, expected.Algorithm())
+		if err != nil {
+			return "", err
+		}
+	}
+	if expected != "" && expected != dgst {
+		return "", fmt.Errorf("unexpected commit digest %s, expected %s: %w", dgst, expected, errdefs.ErrFailedPrecondition)
+	}
+
+	// Seal the ingest before it is published (best effort)
+	if w.s.integritySupported {
+		ingest := filepath.Join(w.path, "data")
+		if err := fsverity.Enable(ingest); err != nil {
+			log.G(ctx).Warnf("failed to enable integrity for ingest %v: %s", ingest, err.Error())
+		}
+	}
+
+	w.prepared = true
+	w.prepFi = fi
+	w.prepDigest = dgst
+	return dgst, nil
+}
+
+func (w *writer) rehash(ctx context.Context, alg digest.Algorithm) (digest.Digest, error) {
+	start := time.Now()
+	f, err := os.Open(filepath.Join(w.path, "data"))
+	if err != nil {
+		return "", fmt.Errorf("failed to open ingest data for re-hashing to %s: %w", alg.String(), err)
+	}
+	w.digester = alg.Digester()
+	_, err = io.Copy(w.digester.Hash(), f)
+	f.Close()
+	if err != nil {
+		return "", fmt.Errorf("failed to re-hash ingest data to %s: %w", alg.String(), err)
+	}
+	dgst := w.digester.Digest()
+	if duration := time.Since(start); duration > 250*time.Millisecond {
+		log.G(ctx).WithField("digest", dgst).WithField("duration", duration).Warnf("commit for blob required expensive re-hash")
+	}
+	return dgst, nil
+}
+
+// Precommit validates and seals the ingest without publishing it. On
+// validation failure the writer is closed and the ref unlocked, preserving
+// the ingest data. On success the ref lock is kept until Commit or Close.
+func (w *writer) Precommit(ctx context.Context, size int64, expected digest.Digest) error {
+	if _, err := w.prepare(ctx, size, expected); err != nil {
+		w.release()
+		return err
+	}
+	return nil
+}
+
 func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
-	// Ensure even on error the writer is fully closed
-	defer w.s.unlock(w.ref)
+	// Ensure even on error the writer is fully closed and the ref unlocked
+	// (only if this writer still owns it).
+	defer func() {
+		if w.fp != nil {
+			w.fp.Close()
+			w.fp = nil
+		}
+		w.release()
+	}()
 
 	var base content.Info
 	for _, opt := range opts {
@@ -87,53 +210,11 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		}
 	}
 
-	fp := w.fp
-	w.fp = nil
-
-	if fp == nil {
-		return fmt.Errorf("cannot commit on closed writer: %w", errdefs.ErrFailedPrecondition)
-	}
-
-	if err := fp.Sync(); err != nil {
-		fp.Close()
-		return fmt.Errorf("sync failed: %w", err)
-	}
-
-	fi, err := fp.Stat()
-	closeErr := fp.Close()
+	dgst, err := w.prepare(ctx, size, expected)
 	if err != nil {
-		return fmt.Errorf("stat on ingest file failed: %w", err)
+		return err
 	}
-	if closeErr != nil {
-		return fmt.Errorf("failed to close ingest file: %w", closeErr)
-	}
-
-	if size > 0 && size != fi.Size() {
-		return fmt.Errorf("unexpected commit size %d, expected %d: %w", fi.Size(), size, errdefs.ErrFailedPrecondition)
-	}
-
-	dgst := w.digester.Digest()
-	if expected != "" && expected.Algorithm() != dgst.Algorithm() && expected.Algorithm().Available() {
-		// Writer was opened without a descriptor specifying the digest algorithm (but we got a non-canonical one here in commit), so we have to re-hash our now completed and closed content to compare
-		start := time.Now()
-		f, err := os.Open(filepath.Join(w.path, "data"))
-		if err != nil {
-			return fmt.Errorf("failed to open ingest data for re-hashing to %s: %w", expected.Algorithm().String(), err)
-		}
-		w.digester = expected.Algorithm().Digester()
-		_, err = io.Copy(w.digester.Hash(), f)
-		f.Close()
-		if err != nil {
-			return fmt.Errorf("failed to re-hash ingest data to %s: %w", expected.Algorithm().String(), err)
-		}
-		dgst = w.digester.Digest()
-		if duration := time.Since(start); duration > 250*time.Millisecond {
-			log.G(ctx).WithField("digest", dgst).WithField("duration", duration).Warnf("commit for blob required expensive re-hash")
-		}
-	}
-	if expected != "" && expected != dgst {
-		return fmt.Errorf("unexpected commit digest %s, expected %s: %w", dgst, expected, errdefs.ErrFailedPrecondition)
-	}
+	fi := w.prepFi
 
 	var (
 		ingest    = filepath.Join(w.path, "data")
@@ -160,14 +241,6 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	if err := syncDir(filepath.Dir(target)); err != nil {
 		return err
 	}
-	// Enable content blob integrity verification if supported
-
-	if w.s.integritySupported {
-		if err := fsverity.Enable(target); err != nil {
-			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", target, err.Error())
-		}
-	}
-
 	// Ingest has now been made available in the content store, attempt to complete
 	// setting metadata but errors should only be logged and not returned since
 	// the content store cannot be cleanly rolled back.
@@ -214,13 +287,20 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 // To abandon a transaction completely, first call close then `IngestManager.Abort` to
 // clean up the associated resources.
 func (w *writer) Close() (err error) {
+	if w.released {
+		return nil
+	}
 	if w.fp != nil {
 		w.fp.Sync()
 		err = w.fp.Close()
 		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
 		w.fp = nil
-		w.s.unlock(w.ref)
+		w.release()
 		return
+	}
+	if w.prepared && !w.released {
+		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
+		w.release()
 	}
 
 	return nil
@@ -229,6 +309,9 @@ func (w *writer) Close() (err error) {
 func (w *writer) Truncate(size int64) error {
 	if size != 0 {
 		return errors.New("Truncate: unsupported size")
+	}
+	if w.fp == nil {
+		return fmt.Errorf("truncate on closed or prepared writer: %w", errdefs.ErrFailedPrecondition)
 	}
 	w.offset = 0
 	w.digester.Hash().Reset()
