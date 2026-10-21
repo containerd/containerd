@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
@@ -73,22 +74,13 @@ type wcowSnapshotter struct {
 	*windowsBaseSnapshotter
 }
 
-func isSupportedSnapshotterFileSystem(fsType string) bool {
-	switch strings.ToLower(fsType) {
-	case "ntfs", "refs":
-		return true
-	default:
-		return false
-	}
-}
-
 // NewWindowsSnapshotter returns a new windows snapshotter
 func NewWindowsSnapshotter(root string) (snapshots.Snapshotter, error) {
 	fsType, err := winfs.GetFileSystemType(root)
 	if err != nil {
 		return nil, err
 	}
-	if !isSupportedSnapshotterFileSystem(fsType) {
+	if !snapshotters.IsSupportedWindowsFileSystem(fsType) {
 		return nil, fmt.Errorf("%s is on an unsupported file system %q - only NTFS and ReFS volumes are supported: %w", root, fsType, errdefs.ErrInvalidArgument)
 	}
 

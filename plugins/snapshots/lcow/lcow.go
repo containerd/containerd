@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
@@ -79,7 +80,7 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !isSupportedSnapshotterFileSystem(fsType) {
+	if !snapshotters.IsSupportedWindowsFileSystem(fsType) {
 		return nil, fmt.Errorf("%s is not on an NTFS or ReFS volume - only NTFS and ReFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
@@ -99,10 +100,6 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 		root: root,
 		ms:   ms,
 	}, nil
-}
-
-func isSupportedSnapshotterFileSystem(fsType string) bool {
-	return strings.EqualFold(fsType, "ntfs") || strings.EqualFold(fsType, "refs")
 }
 
 // Stat returns the info for an active or committed snapshot by name or
