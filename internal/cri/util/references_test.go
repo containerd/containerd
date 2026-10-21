@@ -41,6 +41,21 @@ func TestParseImageReferences(t *testing.T) {
 	assert.Equal(t, expectedDigests, digests)
 }
 
+func TestParseImageReferencesTagAndDigest(t *testing.T) {
+	refs := []string{
+		"docker.io/library/ubuntu:16.04@sha256:1f1a2d56de1d604801a9671f301190704c25d604a416f59e03c04f5c6ffee0d6",
+	}
+	expectedTags := []string{
+		"docker.io/library/ubuntu:16.04",
+	}
+	expectedDigests := []string{
+		"docker.io/library/ubuntu@sha256:1f1a2d56de1d604801a9671f301190704c25d604a416f59e03c04f5c6ffee0d6",
+	}
+	tags, digests := ParseImageReferences(refs)
+	assert.Equal(t, expectedTags, tags)
+	assert.Equal(t, expectedDigests, digests)
+}
+
 func TestGetRepoDigestAndTag(t *testing.T) {
 	digest := digest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
 	for _, test := range []struct {
