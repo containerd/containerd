@@ -56,7 +56,13 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 			}
 			switch v := i.(type) {
 			case *transferapi.WindowUpdate:
-				wbs.remaining.Add(v.Update)
+				// Window credit is a positive additive delta; zero or negative is malformed and would
+				// stall the stream or slice the outgoing [:max] out of range.
+				if v.Update <= 0 {
+					log.G(ctx).Errorf("ignoring non-positive window update: %d", v.Update)
+					continue
+				}
+				wbs.addWindow(v.Update)
 				select {
 				case <-ctx.Done():
 					return
@@ -76,8 +82,15 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 type writeByteStream struct {
 	ctx       context.Context
 	stream    streaming.Stream
-	remaining atomic.Int32
+	remaining atomic.Int64
 	updated   chan struct{}
+}
+
+// addWindow adds a positive credit to remaining. Accumulating in int64 keeps every
+// advertised credit; no realistic number of int32 updates can overflow it back to a
+// negative slice bound.
+func (wbs *writeByteStream) addWindow(update int32) {
+	wbs.remaining.Add(int64(update))
 }
 
 func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
@@ -95,14 +108,16 @@ func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 			}
 		}
 		var max int32 = maxRead
-		if max > int32(len(p)) {
+		// Compare widths in int so a len(p) above MaxInt32 does not narrow to a
+		// negative int32 and reintroduce a negative slice bound.
+		if int(max) > len(p) {
 			max = int32(len(p))
 		}
-		if max > remaining {
-			max = remaining
+		// remaining is int64; only this branch runs when it is below max, and then it
+		// is smaller than maxRead so it fits back into int32.
+		if int64(max) > remaining {
+			max = int32(remaining)
 		}
-		// TODO: continue
-		// remaining = remaining - int32(n)
 
 		data := &transferapi.Data{
 			Data: p[:max],
@@ -120,7 +135,7 @@ func (wbs *writeByteStream) Write(p []byte) (n int, err error) {
 		}
 		n += int(max)
 		p = p[max:]
-		wbs.remaining.Add(-1 * max)
+		wbs.remaining.Add(-int64(max))
 	}
 	return
 }
