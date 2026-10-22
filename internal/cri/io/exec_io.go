@@ -89,31 +89,34 @@ func (e *ExecIO) Config() cio.Config {
 }
 
 // Attach attaches exec stdio. The logic is similar with container io attach.
-func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
+func (e *ExecIO) Attach(opts AttachOptions, exited <-chan struct{}) <-chan struct{} {
 	var wg sync.WaitGroup
 	var stdinStreamRC io.ReadCloser
+	var enableStdin bool
 	if e.stdin != nil && opts.Stdin != nil {
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
+		enableStdin = opts.StdinOnce && !opts.Tty
 		wg.Go(func() {
 			if _, err := io.Copy(e.stdin, stdinStreamRC); err != nil {
 				log.L.WithError(err).Errorf("Failed to redirect stdin for container exec %q", e.id)
 			}
 			log.L.Infof("Container exec %q stdin closed", e.id)
-			if opts.StdinOnce && !opts.Tty {
+			if enableStdin {
 				e.stdin.Close()
 				if err := opts.CloseStdin(); err != nil {
 					log.L.WithError(err).Errorf("Failed to close stdin for container exec %q", e.id)
 				}
-			} else {
-				if e.stdout != nil {
-					e.stdout.Close()
-				}
-				if e.stderr != nil {
-					e.stderr.Close()
-				}
 			}
 		})
 	}
+
+	go func() {
+		// close stdinStreamRC after exec process exited.
+		<-exited
+		if stdinStreamRC != nil {
+			stdinStreamRC.Close()
+		}
+	}()
 
 	attachOutput := func(t StreamType, stream io.WriteCloser, out io.ReadCloser) {
 		if _, err := io.Copy(stream, out); err != nil {
@@ -121,9 +124,6 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 		}
 		out.Close()
 		stream.Close()
-		if stdinStreamRC != nil {
-			stdinStreamRC.Close()
-		}
 		e.closer.wg.Done()
 		wg.Done()
 		log.L.Debugf("Finish piping %q of container exec %q", t, e.id)
@@ -146,6 +146,14 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
+		if !enableStdin {
+			if e.stdout != nil {
+				e.stdout.Close()
+			}
+			if e.stderr != nil {
+				e.stderr.Close()
+			}
+		}
 		close(done)
 	}()
 	return done
