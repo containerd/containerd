@@ -100,6 +100,11 @@ func (c *criService) updateContainerResources(ctx context.Context,
 		return newStatus, fmt.Errorf("failed to update resource in spec: %w", err)
 	}
 
+	annotations := r.GetAnnotations()
+	for k, v := range annotations {
+		newSpec.Annotations[k] = v
+	}
+
 	if err := updateContainerSpec(ctx, cntr.Container, newSpec); err != nil {
 		return newStatus, err
 	}
@@ -132,7 +137,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 		return newStatus, fmt.Errorf("failed to get task: %w", err)
 	}
 	// newSpec.Linux / newSpec.Windows won't be nil
-	if err := task.Update(ctx, containerd.WithResources(getResources(newSpec))); err != nil {
+	if err := task.Update(ctx, containerd.WithResources(getResources(newSpec)), containerd.WithAnnotations(annotations)); err != nil {
 		if errdefs.IsNotFound(err) {
 			// Task exited already.
 			return newStatus, nil
