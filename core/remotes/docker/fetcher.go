@@ -274,47 +274,56 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 
 	return newHTTPReadSeeker(desc.Size, func(offset int64) (io.ReadCloser, error) {
 		// firstly try fetch via external urls
-		for _, us := range desc.URLs {
-			u, err := url.Parse(us)
-			if err != nil {
-				log.G(ctx).WithError(err).Debugf("failed to parse %q", us)
-				continue
-			}
-			if u.Scheme != "http" && u.Scheme != "https" {
-				log.G(ctx).Debug("non-http(s) alternative url is unsupported")
-				continue
-			}
-
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
-			log.G(ctx).Info("request")
-
-			// Try this first, parse it
-			host := RegistryHost{
-				Client:       http.DefaultClient,
-				Host:         u.Host,
-				Scheme:       u.Scheme,
-				Path:         u.Path,
-				Capabilities: HostCapabilityPull,
-			}
-			req := r.request(host, http.MethodGet)
-			if !isRegistryOrigin(u, hosts) {
-				stripSensitiveHeadersForExternalURLs(req.header)
-			}
-			req.path = u.Path
-			if u.RawQuery != "" {
-				req.path = req.path + "?" + u.RawQuery
-			}
-
-			rc, _, err := r.open(ctx, req, desc.MediaType, offset, false)
-			if err != nil {
-				if errdefs.IsNotFound(err) {
-					continue // try one of the other urls.
+		if len(desc.URLs) > 0 && r.ignoreDescriptorURLs {
+			log.G(ctx).Info("skipping alternative urls in descriptor")
+		} else {
+			for _, us := range desc.URLs {
+				u, err := url.Parse(us)
+				if err != nil {
+					log.G(ctx).WithError(err).Debugf("failed to parse %q", us)
+					continue
+				}
+				if u.Scheme != "http" && u.Scheme != "https" {
+					log.G(ctx).Debug("non-http(s) alternative url is unsupported")
+					continue
 				}
 
-				return nil, err
-			}
+				// Try this first, parse it
+				host := RegistryHost{
+					Client:       http.DefaultClient,
+					Host:         u.Host,
+					Scheme:       u.Scheme,
+					Path:         u.Path,
+					Capabilities: HostCapabilityPull,
+				}
+				req := r.request(host, http.MethodGet)
+				if !isRegistryOrigin(u, hosts) {
+					stripSensitiveHeadersForExternalURLs(req.header)
+				}
+				req.path = u.Path
+				if u.RawQuery != "" {
+					req.path = req.path + "?" + u.RawQuery
+				}
 
-			return rc, nil
+				descriptorURLRequests.Inc()
+				ctx := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
+					"ref":       r.refspec.String(),
+					"mediatype": desc.MediaType,
+					"url":       req.sanitizedURL(),
+				}))
+				log.G(ctx).Info("following url in descriptor")
+
+				rc, _, err := r.open(ctx, req, desc.MediaType, offset, false)
+				if err != nil {
+					if errdefs.IsNotFound(err) {
+						continue // try one of the other urls.
+					}
+
+					return nil, err
+				}
+
+				return rc, nil
+			}
 		}
 
 		// Try manifests endpoints for manifests types

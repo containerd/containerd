@@ -324,6 +324,9 @@ type ImageConfig struct {
 	// ConcurrentLayerFetchBuffer restricts the maximum concurrent chunks size in for each image during a download.
 	ConcurrentLayerFetchBuffer int `toml:"concurrent_layer_fetch_buffer" json:"concurrentLayerFetchBuffer"`
 
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool `toml:"ignore_descriptor_urls" json:"ignoreDescriptorURLs"`
+
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
 	// be reset whatever a new byte has been read. If timeout, the image
@@ -590,6 +593,11 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 		{
 			Name:      "MaxConcurrentDownloads",
 			IsPresent: func() bool { return c.MaxConcurrentDownloads != 3 },
+			Reason:    "must be configured in transfer service plugin: plugins.\"io.containerd.transfer.v1.local\"",
+		},
+		{
+			Name:      "IgnoreDescriptorURLs",
+			IsPresent: func() bool { return c.IgnoreDescriptorURLs },
 			Reason:    "must be configured in transfer service plugin: plugins.\"io.containerd.transfer.v1.local\"",
 		},
 		{

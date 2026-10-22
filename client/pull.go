@@ -52,14 +52,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
-	if resolver, ok := pullCtx.Resolver.(remotes.ResolverWithOptions); ok {
-		resolver.SetOptions(
-			transfer.WithConcurrentLayerFetchBuffer(pullCtx.ConcurrentLayerFetchBuffer),
-			transfer.WithMaxConcurrentDownloads(pullCtx.MaxConcurrentDownloads),
-			transfer.WithDownloadLimiter(pullCtx.DownloadLimiter),
-		)
-	}
-
 	if pullCtx.PlatformMatcher == nil {
 		if len(pullCtx.Platforms) > 1 {
 			return nil, errors.New("cannot pull multiplatform image locally, try Fetch")
@@ -196,6 +188,14 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, limit int) (images.Image, error) {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "fetch"))
 	defer span.End()
+	if resolver, ok := rCtx.Resolver.(remotes.ResolverWithOptions); ok {
+		resolver.SetOptions(
+			transfer.WithConcurrentLayerFetchBuffer(rCtx.ConcurrentLayerFetchBuffer),
+			transfer.WithMaxConcurrentDownloads(rCtx.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(rCtx.DownloadLimiter),
+			transfer.WithIgnoreDescriptorURLs(rCtx.IgnoreDescriptorURLs),
+		)
+	}
 	store := c.ContentStore()
 	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
