@@ -161,6 +161,12 @@ func (c *ContainerIO) Pipe() {
 // Attach attaches container stdio.
 // TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
 func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
+	// ctx is cancelled to end the attach session: by the caller when the
+	// client goes away, and below when the client's stdin ends and the
+	// container's stdin is to be left open.
+	ctx, endSession := context.WithCancel(ctx)
+	defer endSession()
+
 	var wg sync.WaitGroup
 	key := util.GenerateID()
 	stdinKey := streamKey(c.id, "attach-"+key, Stdin)
@@ -188,12 +194,12 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 					log.L.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
 				}
 			} else {
-				if opts.Stdout != nil {
-					c.stdoutGroup.Remove(stdoutKey)
-				}
-				if opts.Stderr != nil {
-					c.stderrGroup.Remove(stderrKey)
-				}
+				// The container's stdin stays open for later sessions, but
+				// this one is over. attachStream removes the writers. They
+				// may not be registered yet, which is why they are not
+				// removed here: Remove of a writer that was not added is a
+				// no-op, and nothing would remove it afterwards.
+				endSession()
 			}
 		})
 	}
@@ -203,7 +209,7 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		case <-close:
 			log.L.Infof("Attach stream %q closed", key)
 		case <-ctx.Done():
-			log.L.Infof("Attach client of %q cancelled", key)
+			log.L.Infof("Attach session of %q ended", key)
 			// Avoid writeGroup heap up
 			c.stdoutGroup.Remove(key)
 			c.stderrGroup.Remove(key)
