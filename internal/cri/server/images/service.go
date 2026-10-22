@@ -69,6 +69,15 @@ type CRIImageService struct {
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
+	// snapshotters is the map of snapshotter name to snapshotter used to
+	// verify that an image's snapshot still exists during ImageStatus, so that
+	// images whose content has been discarded (and is no longer usable for the
+	// configured snapshotter) are reported as absent and re-pulled.
+	snapshotters map[string]snapshots.Snapshotter
+	// content is the raw content store used by ImageStatus to verify that
+	// layer blobs are still present (relevant when discard_unpacked_layers is
+	// false and prior discard_unpacked_layers=true pulls left layers missing).
+	content content.Store
 	// transferrer is used to pull image with transfer service
 	transferrer transfer.Transferrer
 	// unpackDuplicationSuppressor is used to make sure that there is only
@@ -123,6 +132,8 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
+		snapshotters:                options.Snapshotters,
+		content:                     options.Content,
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
 		downloadLimiter:             downloadLimiter,
