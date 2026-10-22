@@ -215,7 +215,10 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 // clean up the associated resources.
 func (w *writer) Close() (err error) {
 	if w.fp != nil {
-		w.fp.Sync()
+		if err := w.fp.Sync(); err != nil {
+			w.fp.Close()
+			return fmt.Errorf("sync failed: %w", err)
+		}
 		err = w.fp.Close()
 		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
 		w.fp = nil
