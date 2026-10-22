@@ -279,9 +279,15 @@ func TestParseHostConfigCredentialDomainValidation(t *testing.T) {
 [host."https://mirror.registry"]
   credential_domain = "docker.io"
 `
-	_, err := parseHostsFile("", []byte(valid))
+	hosts, err := parseHostsFile("", []byte(valid))
 	if err != nil {
-		t.Errorf("unexpected error for valid credential_domain: %v", err)
+		t.Fatalf("unexpected error for valid credential_domain: %v", err)
+	}
+	if len(hosts) != 1 {
+		t.Fatalf("expected 1 host config, got %d", len(hosts))
+	}
+	if hosts[0].credentialDomain != "docker.io" {
+		t.Fatalf("unexpected credentialDomain %q, expected %q", hosts[0].credentialDomain, "docker.io")
 	}
 }
 
