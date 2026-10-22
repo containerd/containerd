@@ -143,7 +143,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	return shim, nil
 }
 
-func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[ShimInstance], events *exchange.Exchange, binaryCall *binary) {
+func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[ShimInstance], events *exchange.Exchange, binaryCall *binary) error {
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
@@ -153,17 +153,20 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
 	}
 
-	s, err := rt.Get(ctx, id)
-	if err != nil {
+	s, getErr := rt.Get(ctx, id)
+	if getErr != nil {
+		if !errdefs.IsNotFound(getErr) {
+			return getErr
+		}
 		// Task was never started, or its record has already been removed.
 		// No need to publish events.
-		return
+		return err
 	}
 
 	// If the task delete already succeeded, the shim itself has delivered the
 	// exit and delete events. No need to publish duplicates.
 	if s.(taskDeleteState).taskDeleteResult() != nil {
-		return
+		return err
 	}
 
 	var (
@@ -193,6 +196,8 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 		ExitStatus:  exitStatus,
 		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
+
+	return err
 }
 
 // cleanupShimTask reaps a shim task we have given up on, after a failed start or
@@ -543,6 +548,11 @@ func (s *shim) Close() error {
 }
 
 func (s *shim) Delete(ctx context.Context) error {
+	if err := s.bundle.Delete(); err != nil {
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
+		return fmt.Errorf("failed to delete bundle: %w", err)
+	}
+
 	var result []error
 
 	if ttrpcClient, ok := s.client.(*ttrpc.Client); ok {
@@ -563,11 +573,6 @@ func (s *shim) Delete(ctx context.Context) error {
 		if err := grpcClient.UserOnCloseWait(ctx); err != nil {
 			result = append(result, fmt.Errorf("close wait error: %w", err))
 		}
-	}
-
-	if err := s.bundle.Delete(); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
-		result = append(result, fmt.Errorf("failed to delete bundle: %w", err))
 	}
 
 	return errors.Join(result...)
@@ -691,11 +696,13 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 		return nil, fmt.Errorf("failed to invoke shutdown: %w", err)
 	}
 
-	if err := s.ShimInstance.Delete(ctx); err != nil {
+	err := s.ShimInstance.Delete(ctx)
+	if err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
+		return nil, err
 	}
-
-	// remove self from the runtime task list
+	
+	// remove self from the runtime task list ONLY IF successfully deleted
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	removeTask(ctx, s.ID())
 
