@@ -25,9 +25,11 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 	containerd "github.com/containerd/containerd/v2/client"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -61,8 +63,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err := setContainerStarting(cntr); err != nil {
 		return nil, fmt.Errorf("failed to set starting state for container %q: %w", id, err)
 	}
-	// Set by the task cleanup defer below when it cannot confirm the task was
-	// deleted (e.g. the delete timed out on a wedged shim).
+	// Set whenever a task record may survive a failed start: the cleanup after
+	// a failed NewTask or the task cleanup defer below could not confirm the
+	// delete (e.g. it timed out on a wedged shim).
 	var taskCleanupFailed bool
 	defer func() {
 		if retErr != nil {
@@ -145,6 +148,11 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
+		// The runtime task record can outlive a failed create when the
+		// task service's own cleanup fails. Delete it here, and when that
+		// cannot be confirmed keep the container unknown so RemoveContainer
+		// retries, instead of marking it exited with a record left behind.
+		taskCleanupFailed = c.deleteLeakedTask(ctx, container) != nil
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
@@ -215,6 +223,31 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	)
 
 	return &runtime.StartContainerResponse{}, nil
+}
+
+// deleteLeakedTask deletes the task record left behind by a failed task create.
+// A non-nil error means the record may still exist.
+func (c *criService) deleteLeakedTask(ctx context.Context, container containerd.Container) error {
+	deferCtx, cancel := ctrdutil.DeferContext()
+	defer cancel()
+	task, err := container.Task(deferCtx, nil)
+	if err == nil {
+		_, err = task.Delete(deferCtx, containerd.WithProcessKill)
+		if err == nil {
+			return nil
+		}
+	}
+	if errdefs.IsNotFound(err) {
+		// NotFound from the client does not mean the shim entry in the task
+		// service is gone (see handleContainerExit), so delete it there too.
+		_, err = c.client.TaskService().Delete(deferCtx, &apitasks.DeleteTaskRequest{ContainerID: container.ID()})
+		err = errgrpc.ToNative(err)
+	}
+	if err != nil && !errdefs.IsNotFound(err) {
+		log.G(ctx).WithError(err).Errorf("Failed to delete leaked containerd task %q", container.ID())
+		return err
+	}
+	return nil
 }
 
 // setContainerStarting sets the container into starting state. In starting state, the
