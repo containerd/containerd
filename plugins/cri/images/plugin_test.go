@@ -20,7 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -103,7 +102,10 @@ func TestRuntimePlatformsConfigMigration(t *testing.T) {
 	kata, ok := runtimePlatforms["kata"]
 	require.True(t, ok, "kata runtime must be present in runtime_platforms")
 	kataConf := kata.(map[string]any)
-	assert.Equal(t, platforms.DefaultString(), kataConf["platform"])
+	// An unset platform means the platform of the node. Writing the node
+	// platform out would carry its OS version on Windows, which
+	// runtime_platforms rejects.
+	assert.NotContains(t, kataConf, "platform")
 	assert.Equal(t, snapshotter, kataConf["snapshotter"])
 
 	_, ok = runtimePlatforms["runc"]

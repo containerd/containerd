@@ -36,7 +36,8 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
 func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+	runtimeHandler := r.GetImage().GetRuntimeHandler()
+	image, err := c.LocalResolve(r.GetImage().GetImage(), c.PlatformForImage(r.GetImage().GetImage(), runtimeHandler))
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			// return empty without error when image not found.
@@ -44,10 +45,31 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
-	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
-	// doesn't exist?
 
-	runtimeImage := toCRIImage(image)
+	// Asked about a runtime handler, the question is whether the image is
+	// usable by it, which needs it unpacked in the snapshotter of that
+	// handler. Reporting it as absent otherwise makes the caller pull it,
+	// which unpacks it in the right snapshotter.
+	//
+	// Without a handler the question is whether the image is known at all,
+	// which is what it has always meant. An image that exists but is not
+	// unpacked, as one pulled outside CRI, stays visible.
+	//
+	// A failure to determine that is not a reason to fail the request: a
+	// snapshotter that cannot be reached fails loudly on pull and on
+	// container creation.
+	if runtimeHandler != "" {
+		snapshotter := c.SnapshotterForRuntimeHandler(runtimeHandler)
+		switch unpacked, err := c.IsImageUnpacked(ctx, image, snapshotter); {
+		case err != nil:
+			log.G(ctx).WithError(err).Warnf("Failed to check whether image %q is unpacked in snapshotter %q", image.ID, snapshotter)
+		case !unpacked:
+			log.G(ctx).Debugf("Image %q is not unpacked in snapshotter %q, reporting it as absent", image.ID, snapshotter)
+			return &runtime.ImageStatusResponse{}, nil
+		}
+	}
+
+	runtimeImage := toCRIImage(image, runtimeHandler)
 	info, err := c.toCRIImageInfo(ctx, &image, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate image info: %w", err)
@@ -60,7 +82,7 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 }
 
 // toCRIImage converts internal image object to CRI runtime.Image.
-func toCRIImage(image imagestore.Image) *runtime.Image {
+func toCRIImage(image imagestore.Image, runtimeHandler string) *runtime.Image {
 	repoTags, repoDigests := util.ParseImageReferences(image.References)
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
@@ -68,6 +90,14 @@ func toCRIImage(image imagestore.Image) *runtime.Image {
 		RepoDigests: repoDigests,
 		Size:        uint64(image.Size),
 		Pinned:      image.Pinned,
+	}
+	if runtimeHandler != "" {
+		// Answer for the runtime handler that was asked about, so the caller
+		// can tell which one this status is for.
+		runtimeImage.Spec = &runtime.ImageSpec{
+			Image:          image.ID,
+			RuntimeHandler: runtimeHandler,
+		}
 	}
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {

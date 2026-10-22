@@ -20,12 +20,16 @@ import (
 	"context"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/snapshots"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -41,9 +45,13 @@ func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
 		config:           testImageConfig,
 		runtimePlatforms: map[string]*ImagePlatform{},
-		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
-		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
-		snapshotStore:    snapshotstore.NewStore(),
+		imagePlatforms:   []imagespec.Platform{util.NodePlatform()},
+		snapshotterProvider: func(string) snapshots.Snapshotter {
+			return nil
+		},
+		imageFSPaths:  map[string]string{"overlayfs": testImageFSPath},
+		imageStore:    imagestore.NewStore(nil, nil),
+		snapshotStore: snapshotstore.NewStore(),
 	}
 
 	return service, &GRPCCRIImageService{service}
@@ -85,11 +93,11 @@ func TestLocalResolve(t *testing.T) {
 		"docker.io/library/busybox:latest",
 		"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 	} {
-		img, err := c.LocalResolve(ref)
+		img, err := c.LocalResolve(ref, imagespec.Platform{})
 		assert.NoError(t, err)
 		assert.Equal(t, image, img)
 	}
-	img, err := c.LocalResolve("randomid")
+	img, err := c.LocalResolve("randomid", imagespec.Platform{})
 	assert.Equal(t, errdefs.IsNotFound(err), true)
 	assert.Equal(t, imagestore.Image{}, img)
 }
@@ -123,6 +131,62 @@ func TestRuntimeSnapshotter(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config = criconfig.DefaultImageConfig()
 			assert.Equal(t, test.expectSnapshotter, cri.RuntimeSnapshotter(context.Background(), test.runtime))
+		})
+	}
+}
+
+func TestUpdateRuntime(t *testing.T) {
+	const (
+		defaultSnapshotter = "overlayfs"
+		runtimeSnapshotter = "devmapper"
+	)
+	foreign := imagespec.Platform{OS: "linux", Architecture: "mips64le"}
+	runtime := &ImagePlatform{Snapshotter: runtimeSnapshotter, Platform: platforms.DefaultSpec()}
+
+	for _, tt := range []struct {
+		desc     string
+		existing *ImagePlatform
+		update   *ImagePlatform
+		expected *ImagePlatform
+	}{
+		{
+			desc:     "runtime without a runtime_platforms entry is registered",
+			update:   runtime,
+			expected: runtime,
+		},
+		{
+			desc:     "runtime without a snapshotter is registered as known",
+			update:   nil,
+			expected: nil,
+		},
+		{
+			desc:     "a runtime_platforms entry with only a platform takes the runtime snapshotter",
+			existing: &ImagePlatform{Platform: foreign},
+			update:   runtime,
+			expected: &ImagePlatform{Platform: foreign, Snapshotter: runtimeSnapshotter},
+		},
+		{
+			desc:     "a runtime_platforms entry with only a platform is kept when the runtime has no snapshotter",
+			existing: &ImagePlatform{Platform: foreign},
+			update:   nil,
+			expected: &ImagePlatform{Platform: foreign},
+		},
+		{
+			desc:     "an explicit snapshotter in runtime_platforms is not overridden",
+			existing: &ImagePlatform{Platform: foreign, Snapshotter: defaultSnapshotter},
+			update:   runtime,
+			expected: &ImagePlatform{Platform: foreign, Snapshotter: defaultSnapshotter},
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			c, _ := newTestCRIService()
+			if tt.existing != nil {
+				c.runtimePlatforms["runc-foreign"] = tt.existing
+			}
+			c.UpdateRuntime("runc-foreign", tt.update)
+			got, ok := c.runtimePlatforms["runc-foreign"]
+			require.True(t, ok, "the runtime handler must be known")
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }

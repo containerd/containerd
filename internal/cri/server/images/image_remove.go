@@ -44,7 +44,8 @@ func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.Remove
 func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.ImageSpec) error {
 	span := tracing.SpanFromContext(ctx)
 
-	image, err := c.LocalResolve(imageSpec.GetImage())
+	platform := c.PlatformForImage(imageSpec.GetImage(), imageSpec.GetRuntimeHandler())
+	image, err := c.LocalResolve(imageSpec.GetImage(), platform)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
@@ -66,7 +67,9 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		err = c.images.Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref); err != nil {
+			// The reference is gone for every platform it was stored for,
+			// not only for the platform of this request.
+			if err := c.updateImageStore(ctx, ref); err != nil {
 				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue

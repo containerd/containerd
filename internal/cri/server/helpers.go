@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -36,8 +37,10 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 // TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functional.
@@ -171,7 +174,29 @@ func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Ima
 	if len(image.References) == 0 {
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
-	return c.client.GetImage(ctx, image.References[0])
+	img, err := c.client.GetImage(ctx, image.References[0])
+	if err != nil {
+		return nil, err
+	}
+
+	if matcher := containerImagePlatform(image.Platform); matcher != nil {
+		return containerd.NewImageWithPlatform(c.client, img.Metadata(), matcher), nil
+	}
+	return img, nil
+}
+
+// containerImagePlatform returns the platform matcher to use for an image the
+// CRI image store resolved, or nil to keep the matcher of the client.
+//
+// The client matches the platform of the node, which on Windows also carries
+// the OS version handling that picks the right image out of an index. That is
+// only replaced when the image was resolved for a different platform, through
+// the runtime_platforms config, which the client cannot match at all.
+func containerImagePlatform(platform imagespec.Platform) platforms.MatchComparer {
+	if util.IsNodePlatform(platform) {
+		return nil
+	}
+	return util.PlatformMatcher(platform)
 }
 
 // getUserFromImage gets uid or user name of the image user.
@@ -618,4 +643,30 @@ func sameMapping(a, b []runtimespec.LinuxIDMapping) bool {
 		}
 	}
 	return true
+}
+
+// resolveImageForHandler resolves an image on the platform of a runtime
+// handler, which is the platform kubelet pulled it for, and returns that
+// platform along with it.
+//
+// kubelet only passes the runtime handler when pulling with the
+// RuntimeClassInImageCriApi feature gate enabled. Without it the image was
+// pulled for the platform of the node, so an image missing on a foreign
+// platform falls back to the platform of the node, as it did before images
+// were pulled per platform.
+func (c *criService) resolveImageForHandler(ctx context.Context, ref, runtimeHandler string) (imagestore.Image, imagespec.Platform, error) {
+	platform := c.ImageService.PlatformForImage(ref, runtimeHandler)
+	image, err := c.LocalResolve(ref, platform)
+	if err == nil || !errdefs.IsNotFound(err) || util.IsNodePlatform(platform) {
+		return image, platform, err
+	}
+	node := util.NodePlatform()
+	image, nodeErr := c.LocalResolve(ref, node)
+	if nodeErr != nil {
+		return imagestore.Image{}, platform, err
+	}
+	log.G(ctx).Warnf("Image %q is not pulled for platform %s of runtime handler %q, using the image of the node platform %s; "+
+		"kubelet only pulls for the runtime handler with the RuntimeClassInImageCriApi feature gate",
+		ref, platforms.FormatAll(platform), runtimeHandler, platforms.FormatAll(node))
+	return image, node, nil
 }
