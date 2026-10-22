@@ -174,6 +174,82 @@ containerd 1.7, and improves with every release.
 
 - [Minimal in-memory Runtime v2 shim that also implements the Sandbox API](../core/runtime/v2/example/sandbox/)
 
+## Pod checkpoint and restore
+
+Checkpoint and restore are optional sandbox-controller capabilities. The CRI
+`CheckpointPod` and `RestorePod` RPCs own the CRI lifecycle sequence: they
+validate CRI resources, select the runtime's sandbox controller, create the
+restored sandbox and containers, and roll those resources back on failure.
+
+Implementation-specific work stays behind `CheckpointController`. For the
+pause-container controller this includes cgroup freezing and thawing, recovery
+markers, checkpoint layout, checkpoint-image import and export, writable-layer
+recovery, and the runtime checkpoint operation. A VM-based controller can
+implement the same capability without inheriting any of those assumptions.
+
+The pause-container controller resumes the containers before exporting their
+checkpoint images. It retains a recovery marker until the temporary images are
+deleted. After containers have resumed, the marker records that restart recovery
+must only clean up images, without thawing or resuming the containers again.
+The marker also records the namespace and the output directory, so recovery
+runs in the request's namespace and removes partial output after a crash. A
+marker that cannot be recovered does not stop CRI from starting; it is retried
+in the background and before the next checkpoint of the same sandbox.
+Completed thaw and resume operations are retained in memory until marker
+cleanup finishes, so a failed marker write does not repeat them during retry.
+
+Independent clients must not pause these tasks or freeze their Pod cgroup
+while checkpoint recovery is pending. The task API does not identify the owner
+of a pause. After a daemon crash between resuming tasks and persisting that
+phase, or a runtime error after applying a resume, recovery cannot distinguish
+a remaining checkpoint pause from a pause requested by another client.
+
+The `enable_checkpoint_restore` setting applies to all controllers. The
+pause-container controller also applies it to callers of the sandbox controller
+API. It checks host CRIU availability and version; custom controllers are
+responsible for their own runtime requirements.
+
+`RestorePod` does not pull images. Every container image must be present,
+pulled by the kubelet with its image pull policy and credentials; otherwise
+`RestorePod` fails with `FailedPrecondition` before creating anything.
+
+The pause-container controller verifies the base image's resolved config digest,
+so a source image tag can be replaced by its immutable digest on restore. The
+new sandbox may have a different default hostname when the destination Pod has
+a new name. Its security context, sysctls and port mappings must still match;
+restored process credentials and working directory must match their captured
+values. The checkpoint retains the resumed process's command, arguments and
+environment. Those fields in the restore request may differ because the kubelet
+resolves Downward API values and command expansion for the destination Pod.
+They do not replace the captured process state. Kubernetes still requires the
+Pod spec to match the captured template, including environment declarations.
+
+The boundary is data-only. Sandbox and container configurations, selected
+container status, runtime options, paths, and restored container results are
+carried by `CheckpointOptions`, `RestoreOptions`, `RestoreResult`, and their RPC
+equivalents.
+
+For the pause-container controller, a successful restore can return a
+containerd task checkpoint image for each restored container. The controller
+owns these images until `Restore` succeeds. Ownership then transfers to CRI,
+which consumes each image when starting the container or deletes it if the
+restore is abandoned. Restore checkpoint image deletion waits for garbage
+collection; content still referenced by another image or lease is retained.
+A controller that restores through another mechanism can leave the task
+checkpoint image empty.
+
+Separate optional checkpoint services are available next to both the
+sandbox-controller service and the sandbox-shim service, so existing
+controllers remain compatible and implementations do not require CRI stores,
+lifecycle callbacks, or an in-process CRI service. Controllers that do not
+implement the capability return `Unimplemented`.
+
+Implementing `CheckpointController` is not a capability check. The clients for
+shim and remote controllers always implement it and return
+`errdefs.ErrNotImplemented` when the shim or remote controller does not serve
+the checkpoint service. For `RestorePod`, this is only detected after the
+sandbox and containers are created, and CRI then rolls them back.
+
 ## Status
 
 The Sandbox API was first introduced in containerd 1.7 as an experimental API and was promoted to stable in 2.0.
