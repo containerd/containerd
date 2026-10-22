@@ -136,7 +136,7 @@ func TestChownPreservesFileCapabilities(t *testing.T) {
 	setTestCapability(t, path)
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
-	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(path, info, nil))
+	require.NoError(t, chown(context.Background(), testCapabilityMap())(path, info, nil))
 	checkCaps := func() {
 		t.Helper()
 		caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
@@ -158,13 +158,13 @@ func TestChownPreservesFileCapabilities(t *testing.T) {
 	require.NoError(t, os.Symlink(path, link))
 	info, err = os.Lstat(link)
 	require.NoError(t, err)
-	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(link, info, nil))
+	require.NoError(t, chown(context.Background(), testCapabilityMap())(link, info, nil))
 	checkCaps()
 	plain := filepath.Join(root, "plain")
 	require.NoError(t, os.WriteFile(plain, nil, 0644))
 	info, err = os.Lstat(plain)
 	require.NoError(t, err)
-	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(plain, info, nil))
+	require.NoError(t, chown(context.Background(), testCapabilityMap())(plain, info, nil))
 	_, err = sysx.LGetxattr(plain, fileCapabilityXattr)
 	require.ErrorIs(t, err, unix.ENODATA)
 }
@@ -196,7 +196,7 @@ func TestRemappedFileCapabilitiesExec(t *testing.T) {
 	setTestCapability(t, path)
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
-	require.NoError(t, chown(context.Background(), root, testCapabilityMap())(path, info, nil))
+	require.NoError(t, chown(context.Background(), testCapabilityMap())(path, info, nil))
 	supported, err := kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
 	require.NoError(t, err)
 	var mappedCaps uint64
@@ -267,7 +267,7 @@ func TestChownDropsUnmappedFileCapabilities(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, caps, before)
 
-	require.NoError(t, filepath.Walk(root, chown(context.Background(), root, testCapabilityMap())))
+	require.NoError(t, filepath.Walk(root, chown(context.Background(), testCapabilityMap())))
 	info, err := os.Lstat(path)
 	require.NoError(t, err)
 	require.Equal(t, uint32(100000), info.Sys().(*syscall.Stat_t).Uid)
@@ -278,17 +278,25 @@ func TestChownDropsUnmappedFileCapabilities(t *testing.T) {
 
 func TestFileCapabilityRemapWarnings(t *testing.T) {
 	testutil.RequiresRoot(t)
+	supported, err := supportsNamespacedFileCapabilities()
+	require.NoError(t, err)
+	if !supported && os.Getenv("CONTAINERD_FILECAP_WARNING_HELPER") != "1" {
+		// Isolate the process-wide warning from other remap tests.
+		cmd := exec.Command(os.Args[0], "-test.run=^TestFileCapabilityRemapWarnings$", "-test.root")
+		cmd.Env = append(os.Environ(), "CONTAINERD_FILECAP_WARNING_HELPER=1")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		return
+	}
 	var output bytes.Buffer
 	logger := logrus.New()
 	logger.SetOutput(&output)
-	ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger))
-	supported, err := supportsNamespacedFileCapabilities()
-	require.NoError(t, err)
+	ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger).WithFields(log.Fields{"snapshot": "test-snapshot", "parent": "test-parent"}))
 	for remap := 0; remap < 2; remap++ {
 		t.Run(fmt.Sprint(remap), func(t *testing.T) {
 			output.Reset()
 			root := t.TempDir()
-			walk := chown(ctx, root, testCapabilityMap())
+			walk := chown(ctx, testCapabilityMap())
 			for _, name := range []string{"plain", "first", "second", "mapped"} {
 				path := filepath.Join(root, name)
 				require.NoError(t, os.WriteFile(path, nil, 0755))
@@ -312,12 +320,21 @@ func TestFileCapabilityRemapWarnings(t *testing.T) {
 					require.Empty(t, output.String())
 				}
 			}
-			require.Equal(t, 1, bytes.Count(output.Bytes(), []byte("level=warning")))
 			if supported {
+				require.Equal(t, 2, bytes.Count(output.Bytes(), []byte("level=warning")))
 				require.Contains(t, output.String(), "outside the UID mapping")
-			} else {
+				for _, name := range []string{"first", "second"} {
+					require.Contains(t, output.String(), "path="+filepath.Join(root, name))
+				}
+			} else if remap == 0 {
+				require.Equal(t, 1, bytes.Count(output.Bytes(), []byte("level=warning")))
 				require.Contains(t, output.String(), "require Linux 4.14")
+			} else {
+				require.Empty(t, output.String())
+				return
 			}
+			require.Contains(t, output.String(), "snapshot=test-snapshot")
+			require.Contains(t, output.String(), "parent=test-parent")
 		})
 	}
 }
@@ -327,9 +344,7 @@ func TestFileCapabilityIOErrors(t *testing.T) {
 	supported, err := supportsNamespacedFileCapabilities()
 	require.NoError(t, err)
 	if supported {
-		_, err = remappedFileCapabilities(missing, testCapabilityMap(), func(reason string) {
-			t.Fatalf("unexpected warning: %s", reason)
-		})
+		_, err = remappedFileCapabilities(context.Background(), missing, testCapabilityMap())
 		require.ErrorIs(t, err, unix.ENOENT)
 	}
 	require.ErrorIs(t, restoreFileCapabilities(missing, testCapability(capRevision3, 100000)), unix.ENOENT)

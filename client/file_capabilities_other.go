@@ -18,13 +18,17 @@
 
 package client
 
-import "github.com/containerd/containerd/v2/internal/userns"
+import (
+	"context"
+
+	"github.com/containerd/containerd/v2/internal/userns"
+)
 
 func supportsNamespacedFileCapabilities() (bool, error) {
 	return false, nil
 }
 
-func remappedFileCapabilities(string, userns.IDMap, func(string)) ([]byte, error) {
+func remappedFileCapabilities(context.Context, string, userns.IDMap) ([]byte, error) {
 	return nil, nil
 }
 

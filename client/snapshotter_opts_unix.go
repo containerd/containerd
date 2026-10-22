@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/userns"
+	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -116,6 +117,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	if err != nil {
 		return "", fmt.Errorf("failed to remap snapshot: %w", err)
 	}
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{"snapshot": usernsID, "parent": rsn.Parent}))
 
 	if _, err := snapshotter.Stat(ctx, usernsID); err == nil {
 		return usernsID, nil

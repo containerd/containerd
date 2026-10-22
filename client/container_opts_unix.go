@@ -76,6 +76,7 @@ func withRemappedSnapshotBase(id string, i Image, uidmaps, gidmaps []specs.Linux
 		if err != nil {
 			return fmt.Errorf("failed to remap snapshot: %w", err)
 		}
+		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{"snapshot": usernsID, "parent": rsn.Parent}))
 
 		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
 		if err != nil {
@@ -121,18 +122,11 @@ func withRemappedSnapshotBase(id string, i Image, uidmaps, gidmaps []specs.Linux
 
 func remapRootFS(ctx context.Context, mounts []mount.Mount, idMap userns.IDMap) error {
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
-		return filepath.Walk(root, chown(ctx, root, idMap))
+		return filepath.Walk(root, chown(ctx, idMap))
 	})
 }
 
-func chown(ctx context.Context, root string, idMap userns.IDMap) filepath.WalkFunc {
-	warned := false
-	warn := func(reason string) {
-		if !warned {
-			log.G(ctx).WithField("root", root).WithField("reason", reason).Warn("Cannot preserve file capabilities during snapshot remapping")
-			warned = true
-		}
-	}
+func chown(ctx context.Context, idMap userns.IDMap) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -146,7 +140,7 @@ func chown(ctx context.Context, root string, idMap userns.IDMap) filepath.WalkFu
 		// ownership, then restore them after all metadata changes.
 		var caps []byte
 		if info.Mode().IsRegular() {
-			caps, cerr = remappedFileCapabilities(path, idMap, warn)
+			caps, cerr = remappedFileCapabilities(ctx, path, idMap)
 			if cerr != nil {
 				return cerr
 			}

@@ -19,17 +19,22 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/pkg/cap"
 	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/sysx"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
 const fileCapabilityXattr = "security.capability"
+
+var unsupportedFileCapabilitiesWarning sync.Once
 
 func supportsNamespacedFileCapabilities() (bool, error) {
 	return kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 4, Major: 14})
@@ -37,7 +42,7 @@ func supportsNamespacedFileCapabilities() (bool, error) {
 
 // Missing/unsupported xattrs are tolerated on read. Older kernels and valid
 // unmapped roots retain stripping with a warning; all other failures are fatal.
-func remappedFileCapabilities(path string, idMap userns.IDMap, warn func(string)) ([]byte, error) {
+func remappedFileCapabilities(ctx context.Context, path string, idMap userns.IDMap) ([]byte, error) {
 	supported, err := supportsNamespacedFileCapabilities()
 	if err != nil {
 		return nil, fmt.Errorf("check namespaced file capability support: %w", err)
@@ -45,7 +50,9 @@ func remappedFileCapabilities(path string, idMap userns.IDMap, warn func(string)
 	if !supported {
 		// Older kernels can store revision 3 xattrs but fail to execute the
 		// file. Retain the previous behavior of letting Lchown clear them.
-		warn("namespaced file capabilities require Linux 4.14")
+		unsupportedFileCapabilitiesWarning.Do(func() {
+			log.G(ctx).Warn("Cannot preserve file capabilities during snapshot remapping: namespaced file capabilities require Linux 4.14")
+		})
 		return nil, nil
 	}
 	caps, err := sysx.LGetxattr(path, fileCapabilityXattr)
@@ -60,7 +67,7 @@ func remappedFileCapabilities(path string, idMap userns.IDMap, warn func(string)
 		return nil, fmt.Errorf("remap file capabilities for %q: %w", path, err)
 	}
 	if caps == nil {
-		warn("file capability root is outside the UID mapping")
+		log.G(ctx).WithField("path", path).Warn("Cannot preserve file capabilities: root is outside the UID mapping")
 	}
 	return caps, nil
 }
