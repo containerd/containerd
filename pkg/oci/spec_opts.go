@@ -218,6 +218,7 @@ func replaceOrAppendEnvValues(defaults, overrides []string) []string {
 		if i, exists := cache[k]; exists {
 			results[i] = value
 		} else {
+			cache[k] = len(results)
 			results = append(results, value)
 		}
 	}
