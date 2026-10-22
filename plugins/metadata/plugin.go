@@ -72,6 +72,11 @@ type BoltConfig struct {
 	//
 	// These settings can improve performance, but introduce a risk of data loss during crashes. Use with care!
 	NoSync bool `toml:"no_sync"`
+
+	// DisableSkipSnapshotPreparation lets the metadata snapshotter call
+	// the backend snapshotter's Prepare API without skipping even when an existing
+	// snapshot has a name matching the "containerd.io/snapshot.ref" label.
+	DisableSkipSnapshotPreparation bool `toml:"disable_skip_snapshot_preparation"`
 }
 
 const (
@@ -145,6 +150,7 @@ func init() {
 
 			shared := true
 			ic.Meta.Exports["policy"] = SharingPolicyShared
+			disableSkipSnapshotPreparation := false
 			if cfg, ok := ic.Config.(*BoltConfig); ok {
 				if cfg.ContentSharingPolicy != "" {
 					if err := cfg.Validate(); err != nil {
@@ -164,6 +170,7 @@ func init() {
 						log.G(ic.Context).Warn("using async mode for boltdb")
 					}
 				}
+				disableSkipSnapshotPreparation = cfg.DisableSkipSnapshotPreparation
 			}
 
 			path := filepath.Join(root, "meta.db")
@@ -193,6 +200,10 @@ func init() {
 
 			if !shared {
 				dbopts = append(dbopts, metadata.WithPolicyIsolated)
+			}
+
+			if disableSkipSnapshotPreparation {
+				dbopts = append(dbopts, metadata.WithDisableSkipSnapshotPreparation)
 			}
 
 			mdb := metadata.NewDB(db, cs.(content.Store), snapshotters, dbopts...)
