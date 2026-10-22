@@ -421,7 +421,7 @@ func TestGetUnprivilegedMountFlags(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
-		flag int
+		flag mntFlag
 		name string
 	}{
 		{unix.MS_NOEXEC, "MS_NOEXEC"},
@@ -435,7 +435,7 @@ func TestGetUnprivilegedMountFlags(t *testing.T) {
 
 	// MS_NOSUID and MS_NODEV should NOT be set since we didn't mount with them.
 	for _, tc := range []struct {
-		flag int
+		flag mntFlag
 		name string
 	}{
 		{unix.MS_NOSUID, "MS_NOSUID"},
