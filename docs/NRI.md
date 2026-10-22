@@ -44,6 +44,15 @@ The containerd CRI plugin registers itself as an above mentioned NRI
 Domain for the "k8s.io" namespace, to allow container configuration to be customized by external
 NRI plugins.
 
+CRI pod and container teardown continues when an NRI stop or removal
+notification fails; the failure is logged and the notification is not retried.
+Since NRI dispatches an event to plugins in order and stops dispatching when a
+plugin's `fail_request` policy makes the request fail, a timed-out plugin can
+prevent later plugins from receiving that teardown event even though the CRI
+teardown succeeds. Plugins that require teardown notifications should account
+for this behavior and should avoid `fail_request` on teardown events unless
+failing the NRI request is more important than notifying subsequent plugins.
+
 ### NRI Support for Other Container 'Domains'
 
 The main reason for this split of functionality is to allow
