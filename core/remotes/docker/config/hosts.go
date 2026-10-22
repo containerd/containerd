@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -184,11 +185,16 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					}
 
 					if host.dialAddr != "" {
-						timeout := 30 * time.Second
+						d := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
 						if host.dialTimeout != nil {
-							timeout = *host.dialTimeout
+							d.Timeout = *host.dialTimeout
 						}
-						applyDialAddr(tr, host.dialAddr, timeout)
+						// Always dial the socket, whatever address is requested,
+						// and ignore HTTP(S)_PROXY: the socket is the direct target.
+						tr.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
+							return d.DialContext(ctx, "unix", host.dialAddr)
+						}
+						tr.Proxy = nil
 					} else if host.dialTimeout != nil {
 						tr.DialContext = (&net.Dialer{
 							Timeout:       *host.dialTimeout,
@@ -381,10 +387,8 @@ type hostFileConfig struct {
 	// a connect to complete.
 	DialTimeout string `toml:"dial_timeout"`
 
-	// DialAddr, when non-empty, replaces the transport's dialer so
-	// that connections to this host are made to a Unix domain socket
-	// instead of over TCP. Only a pathname socket is accepted, of the
-	// form "unix:///absolute/path/to.sock". Not supported on Windows.
+	// DialAddr makes connections to this host go to a Unix domain socket
+	// instead of TCP, e.g. "unix:///run/registry.sock". Not supported on Windows.
 	DialAddr string `toml:"dial_addr"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
@@ -566,6 +570,23 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	}
 
 	return result, nil
+}
+
+// parseDialAddr returns the socket path from a "unix:///absolute/path" dial_addr.
+// Only pathname sockets are accepted: abstract sockets ("unix://@name") have no
+// filesystem permissions and are reachable from anywhere in the network
+// namespace (see CVE-2020-15257).
+func parseDialAddr(raw string) (string, error) {
+	// Windows is out of scope until there is a use case and design for it, see
+	// https://github.com/containerd/containerd/issues/14224.
+	if runtime.GOOS == "windows" {
+		return "", fmt.Errorf("dial_addr is not supported on Windows: %q", raw)
+	}
+	addr, ok := strings.CutPrefix(raw, "unix://")
+	if !ok || !filepath.IsAbs(addr) {
+		return "", fmt.Errorf("dial_addr %q must be \"unix://\" followed by an absolute socket path, e.g. \"unix:///run/registry.sock\" (abstract sockets are not supported)", raw)
+	}
+	return addr, nil
 }
 
 // getSortedHosts returns the list of hosts in the order are they defined in the file.

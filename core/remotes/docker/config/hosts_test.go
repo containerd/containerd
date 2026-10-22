@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -653,3 +655,39 @@ var (
 	-----END PRIVATE KEY-----
 	`)
 )
+
+func TestParseDialAddr(t *testing.T) {
+	for _, tc := range []struct {
+		description string
+		value       string
+		expected    string // socket path, or an error substring if expectErr
+		expectErr   bool
+	}{
+		{description: "pathname socket", value: "unix:///run/registry.sock", expected: "/run/registry.sock"},
+		{description: "nested pathname socket", value: "unix:///run/nginx/cache-oci.sock", expected: "/run/nginx/cache-oci.sock"},
+		{description: "bare path without scheme", value: "/run/registry.sock", expected: "absolute socket path", expectErr: true},
+		{description: "tcp scheme", value: "tcp://127.0.0.1:5000", expected: "absolute socket path", expectErr: true},
+		{description: "empty path", value: "unix://", expected: "absolute socket path", expectErr: true},
+		{description: "relative path (two slashes)", value: "unix://run/registry.sock", expected: "absolute socket path", expectErr: true},
+		{description: "abstract socket", value: "unix://@registry", expected: "abstract sockets are not supported", expectErr: true},
+	} {
+		t.Run(tc.description, func(t *testing.T) {
+			toml := fmt.Sprintf("[host.\"https://registry.example\"]\n  dial_addr = %q\n", tc.value)
+			hosts, err := parseHostsFile("", []byte(toml))
+			switch {
+			case runtime.GOOS == "windows":
+				if err == nil || !strings.Contains(err.Error(), "not supported on Windows") {
+					t.Fatalf("expected Windows rejection, got %v", err)
+				}
+			case tc.expectErr:
+				if err == nil || !strings.Contains(err.Error(), tc.expected) {
+					t.Fatalf("expected error containing %q, got %v", tc.expected, err)
+				}
+			case err != nil:
+				t.Fatalf("unexpected error: %v", err)
+			case hosts[0].dialAddr != tc.expected:
+				t.Fatalf("expected dial address %q, got %q", tc.expected, hosts[0].dialAddr)
+			}
+		})
+	}
+}
