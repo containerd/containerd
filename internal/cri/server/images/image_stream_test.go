@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -26,6 +27,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 )
 
@@ -33,6 +35,49 @@ import (
 type fakeStreamServer[Res any] struct {
 	ctx  context.Context
 	sent []*Res
+}
+
+func TestStreamImagesBatchSize(t *testing.T) {
+	service, _ := newTestCRIService()
+	var imagesInStore []imagestore.Image
+	var expectedIDs []string
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprintf("sha256:%064x", i)
+		expectedIDs = append(expectedIDs, id)
+		imagesInStore = append(imagesInStore, imagestore.Image{
+			ID:         id,
+			ChainID:    fmt.Sprintf("chain-%d", i),
+			References: []string{fmt.Sprintf("example.com/image-%d:latest", i)},
+		})
+	}
+	var err error
+	service.imageStore, err = imagestore.NewFakeStore(imagesInStore)
+	require.NoError(t, err)
+
+	for _, test := range []struct {
+		name       string
+		config     criconfig.ListStreamingConfig
+		batchSizes []int
+	}{
+		{name: "default", config: criconfig.DefaultServerConfig().ListStreaming, batchSizes: []int{5}},
+		{name: "override", config: criconfig.ListStreamingConfig{BatchSize: 2}, batchSizes: []int{2, 2, 1}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c := service.GRPCService(test.config)
+			stream := newFakeStreamServer[runtime.StreamImagesResponse](context.Background())
+			require.NoError(t, c.StreamImages(&runtime.StreamImagesRequest{}, stream))
+			var batchSizes []int
+			var ids []string
+			for _, response := range stream.sent {
+				batchSizes = append(batchSizes, len(response.Images))
+				for _, image := range response.Images {
+					ids = append(ids, image.Id)
+				}
+			}
+			assert.Equal(t, test.batchSizes, batchSizes)
+			assert.ElementsMatch(t, expectedIDs, ids)
+		})
+	}
 }
 
 func newFakeStreamServer[Res any](ctx context.Context) *fakeStreamServer[Res] {

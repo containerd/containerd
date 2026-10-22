@@ -41,7 +41,7 @@ func (c *criService) StreamPodSandboxes(r *runtime.StreamPodSandboxesRequest, s 
 
 	sandboxes = c.filterCRISandboxes(sandboxes, r.GetFilter())
 
-	err := criutil.SendInBatches(ctx, sandboxes, criutil.DefaultStreamBatchSize, func(batch []*runtime.PodSandbox) error {
+	err := criutil.SendInBatches(ctx, sandboxes, c.listStreaming.BatchSize, func(batch []*runtime.PodSandbox) error {
 		return s.Send(&runtime.StreamPodSandboxesResponse{PodSandboxes: batch})
 	})
 

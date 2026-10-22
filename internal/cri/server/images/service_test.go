@@ -46,7 +46,7 @@ func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 		snapshotStore:    snapshotstore.NewStore(),
 	}
 
-	return service, &GRPCCRIImageService{service}
+	return service, service.GRPCService(criconfig.DefaultServerConfig().ListStreaming).(*GRPCCRIImageService)
 }
 
 var testImageConfig = criconfig.ImageConfig{
