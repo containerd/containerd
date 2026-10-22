@@ -75,6 +75,7 @@ var (
 			Name: "hosts-dir",
 			// compatible with "/etc/docker/certs.d"
 			Usage: "Custom hosts configuration directory",
+			Value: "/etc/containerd/certs.d",
 		},
 		&cli.StringFlag{
 			Name:  "tlscacert",
