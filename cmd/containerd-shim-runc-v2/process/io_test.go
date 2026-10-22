@@ -20,14 +20,218 @@ package process
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/stdio"
+	"github.com/containerd/fifo"
+	runc "github.com/containerd/go-runc"
 )
+
+func TestProcessIOStdinClose(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		input           string
+		attach          bool
+		closeBeforeCopy bool
+		cancelSetup     bool
+	}{
+		{name: "no-client"},
+		{name: "empty-input", attach: true},
+		{name: "empty-client-before-copy", closeBeforeCopy: true},
+		{name: "input", input: "stdin before close", attach: true},
+		{name: "input-after-setup-cancel", input: "stdin after setup cancellation", attach: true, cancelSetup: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pio, processStdin := newStdinProcessIO(t)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+
+			p := &Init{}
+			if err := p.openStdin(pio.stdio.Stdin); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { p.Stdin().Close() })
+			if tc.closeBeforeCopy {
+				writer, err := fifo.OpenFifo(ctx, pio.stdio.Stdin, syscall.O_WRONLY|syscall.O_NONBLOCK, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := writer.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			setupCtx, cancelSetup := context.WithCancel(ctx)
+			defer cancelSetup()
+			var wg sync.WaitGroup
+			if err := pio.Copy(setupCtx, &wg); err != nil {
+				t.Fatal(err)
+			}
+			if tc.cancelSetup {
+				cancelSetup()
+			}
+			var writer io.WriteCloser
+			if tc.attach {
+				var err error
+				writer, err = fifo.OpenFifo(ctx, pio.stdio.Stdin, syscall.O_WRONLY, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { writer.Close() })
+			}
+			if err := p.Stdin().Close(); err != nil {
+				t.Fatal(err)
+			}
+			sent := make(chan error, 1)
+			go func() {
+				var err error
+				if writer != nil {
+					_, err = io.WriteString(writer, tc.input)
+					writer.Close()
+				}
+				sent <- err
+			}()
+			type result struct {
+				data []byte
+				err  error
+			}
+			received := make(chan result, 1)
+			go func() {
+				data, err := io.ReadAll(processStdin)
+				received <- result{data, err}
+			}()
+			select {
+			case res := <-received:
+				if res.err != nil {
+					t.Fatal(res.err)
+				}
+				if string(res.data) != tc.input {
+					t.Fatalf("stdin = %q, want %q", res.data, tc.input)
+				}
+			case <-ctx.Done():
+				t.Fatal("stdin did not reach EOF after closing both writers")
+			}
+			if err := <-sent; err != nil {
+				t.Fatal(err)
+			}
+			wg.Wait()
+		})
+	}
+}
+
+func TestProcessIOStdinOpenCanceled(t *testing.T) {
+	for _, phase := range []string{"before-open", "during-open"} {
+		t.Run(phase, func(t *testing.T) {
+			pio, _ := newStdinProcessIO(t)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			openCtx, cancelOpen := context.WithCancel(ctx)
+			defer cancelOpen()
+			observed := &stdinOpenContext{
+				Context:    openCtx,
+				doneCalled: make(chan struct{}),
+			}
+			if phase == "before-open" {
+				cancelOpen()
+			}
+			var wg sync.WaitGroup
+			copied := make(chan error, 1)
+			go func() { copied <- pio.Copy(observed, &wg) }()
+			if phase == "during-open" {
+				select {
+				case <-observed.doneCalled:
+					cancelOpen()
+				case <-ctx.Done():
+					t.Fatal("stdin open did not observe the setup context")
+				}
+			}
+			select {
+			case err := <-copied:
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("opening stdin without a writer = %v, want context.Canceled", err)
+				}
+			case <-ctx.Done():
+				t.Fatal("stdin open did not return after cancellation")
+			}
+			wg.Wait()
+		})
+	}
+}
+
+type stdinOpenContext struct {
+	context.Context
+	doneCalled chan struct{}
+	once       sync.Once
+}
+
+func (c *stdinOpenContext) Done() <-chan struct{} {
+	c.once.Do(func() { close(c.doneCalled) })
+	return c.Context.Done()
+}
+
+func newStdinProcessIO(t *testing.T) (*processIO, io.Reader) {
+	t.Helper()
+	dir := t.TempDir()
+	// FIFO cancellation and pipe copying release descriptors asynchronously.
+	// Wait after closing the I/O, but before removing its files.
+	t.Cleanup(func() {
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			fds, err := os.ReadDir("/proc/self/fd")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var pending []string
+			for _, fd := range fds {
+				target, err := os.Readlink(filepath.Join("/proc/self/fd", fd.Name()))
+				if err != nil && !os.IsNotExist(err) {
+					t.Fatal(err)
+				}
+				if strings.HasPrefix(target, dir+string(os.PathSeparator)) {
+					pending = append(pending, target)
+				}
+			}
+			if len(pending) == 0 {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("I/O descriptors were not released: %v", pending)
+			}
+			time.Sleep(time.Millisecond)
+		}
+	})
+	stdin := filepath.Join(dir, "stdin")
+	if err := syscall.Mkfifo(stdin, 0600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(dir, "output")
+	if err := os.WriteFile(output, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	pio, err := createIO(t.Context(), t.Name(), os.Getuid(), os.Getgid(), stdio.Stdio{
+		Stdin: stdin, Stdout: output, Stderr: output,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pio.Close() })
+	cmd := &exec.Cmd{}
+	pio.IO().Set(cmd)
+	if err := pio.IO().(runc.StartCloser).CloseAfterStart(); err != nil {
+		t.Fatal(err)
+	}
+	return pio, cmd.Stdin
+}
 
 func TestNewBinaryIO(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
