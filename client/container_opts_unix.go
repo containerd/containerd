@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/userns"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -75,6 +76,7 @@ func withRemappedSnapshotBase(id string, i Image, uidmaps, gidmaps []specs.Linux
 		if err != nil {
 			return fmt.Errorf("failed to remap snapshot: %w", err)
 		}
+		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{"snapshot": usernsID, "parent": rsn.Parent}))
 
 		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
 		if err != nil {
@@ -120,11 +122,11 @@ func withRemappedSnapshotBase(id string, i Image, uidmaps, gidmaps []specs.Linux
 
 func remapRootFS(ctx context.Context, mounts []mount.Mount, idMap userns.IDMap) error {
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
-		return filepath.Walk(root, chown(root, idMap))
+		return filepath.Walk(root, chown(ctx, idMap))
 	})
 }
 
-func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
+func chown(ctx context.Context, idMap userns.IDMap) filepath.WalkFunc {
 	return func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -134,14 +136,25 @@ func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
 		if cerr != nil {
 			return cerr
 		}
+		// chown clears file capabilities. Read and translate them before changing
+		// ownership, then restore them after all metadata changes.
+		var caps []byte
+		if info.Mode().IsRegular() {
+			caps, cerr = remappedFileCapabilities(ctx, path, idMap)
+			if cerr != nil {
+				return cerr
+			}
+		}
 		// be sure the lchown the path as to not de-reference the symlink to a host file
 		if cerr = os.Lchown(path, int(h.Uid), int(h.Gid)); cerr != nil {
 			return cerr
 		}
 		// we must retain special permissions such as setuid, setgid and sticky bits
 		if mode := info.Mode(); mode&os.ModeSymlink == 0 && mode&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
-			return os.Chmod(path, mode)
+			if err := os.Chmod(path, mode); err != nil {
+				return err
+			}
 		}
-		return nil
+		return restoreFileCapabilities(path, caps)
 	}
 }
