@@ -117,19 +117,19 @@ func (s *namespaceStore) List(ctx context.Context) ([]string, error) {
 		return nil, nil // no namespaces!
 	}
 
-	var namespaces []string
+	var out []string
 	if err := bkt.ForEach(func(k, v []byte) error {
 		if v != nil {
 			return nil // not a bucket
 		}
 
-		namespaces = append(namespaces, string(k))
+		out = append(out, string(k))
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	return namespaces, nil
+	return out, nil
 }
 
 func (s *namespaceStore) Delete(ctx context.Context, namespace string, opts ...namespaces.DeleteOpts) error {
