@@ -37,10 +37,12 @@ import (
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/labels"
+	diffmounts "github.com/containerd/containerd/v2/plugins/diff/internal/mounts"
 )
 
 type walkingDiff struct {
 	store content.Store
+	mount mount.Manager
 }
 
 var emptyDesc = ocispec.Descriptor{}
@@ -52,8 +54,15 @@ var emptyDesc = ocispec.Descriptor{}
 // NewWalkingDiff uses no special characteristics of the mount sets and is
 // expected to work with any filesystem.
 func NewWalkingDiff(store content.Store) diff.Comparer {
+	return NewWalkingDiffWithMountManager(store, nil)
+}
+
+// NewWalkingDiffWithMountManager is like NewWalkingDiff but uses the mount
+// manager, if provided, to activate mounts before comparing them.
+func NewWalkingDiffWithMountManager(store content.Store, mm mount.Manager) diff.Comparer {
 	return &walkingDiff{
 		store: store,
+		mount: mm,
 	}
 }
 
@@ -96,6 +105,17 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			return emptyDesc, fmt.Errorf("unsupported diff media type: %v: %w", config.MediaType, errdefs.ErrNotImplemented)
 		}
 	}
+
+	lower, deactivateLower, err := diffmounts.Activate(ctx, s.mount, "walking-diff-lower", lower)
+	if err != nil {
+		return emptyDesc, err
+	}
+	defer deactivateLower()
+	upper, deactivateUpper, err := diffmounts.Activate(ctx, s.mount, "walking-diff-upper", upper)
+	if err != nil {
+		return emptyDesc, err
+	}
+	defer deactivateUpper()
 
 	var ocidesc ocispec.Descriptor
 	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
