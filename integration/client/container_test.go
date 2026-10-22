@@ -344,6 +344,8 @@ func TestContainerOutput(t *testing.T) {
 	if code != 0 {
 		t.Errorf("expected status 0 but received %d: %v", code, err)
 	}
+	// Wait for output to finish copying before Delete cancels I/O.
+	task.IO().Wait()
 	if _, err := task.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
