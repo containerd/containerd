@@ -97,6 +97,14 @@ service Controller {
   rpc Update(ControllerUpdateRequest) returns (ControllerUpdateResponse);
 }
 
+// Checkpoint is an optional sandbox-controller capability. It is a separate
+// service so existing Controller implementations do not need to implement
+// checkpoint and restore methods.
+service Checkpoint {
+  rpc Checkpoint(ControllerCheckpointRequest) returns (ControllerCheckpointResponse);
+  rpc Restore(ControllerRestoreRequest) returns (ControllerRestoreResponse);
+}
+
 message ControllerCreateRequest {
   string sandbox_id = 1;
   repeated containerd.types.Mount rootfs = 2;
@@ -201,3 +209,76 @@ message ControllerUpdateRequest {
 }
 
 message ControllerUpdateResponse {}
+
+// ControllerCheckpointContainer describes one container selected for a sandbox
+// checkpoint.
+message ControllerCheckpointContainer {
+  // id is the containerd container ID.
+  string id = 1;
+  // name is the caller-assigned container name, unique within the sandbox.
+  string name = 2;
+  // config is caller-owned container configuration. CRI callers pass a
+  // runtime.v1.ContainerConfig.
+  google.protobuf.Any config = 3;
+  // status is caller-owned container status. CRI callers pass a
+  // runtime.v1.ContainerStatus.
+  google.protobuf.Any status = 4;
+}
+
+message ControllerCheckpointRequest {
+  string sandbox_id = 1;
+  // output_path is an absolute, existing and empty directory on the host that
+  // runs the controller. The controller writes the checkpoint into it.
+  string output_path = 2;
+  // sandbox_config is caller-owned sandbox configuration. CRI callers pass a
+  // runtime.v1.PodSandboxConfig.
+  google.protobuf.Any sandbox_config = 3;
+  repeated ControllerCheckpointContainer containers = 4;
+  // options are controller-specific checkpoint options. Controllers reject
+  // keys they do not support.
+  map<string, string> options = 5;
+  string sandboxer = 10;
+}
+
+message ControllerCheckpointResponse {}
+
+// ControllerRestoreContainer describes one container that the caller created before
+// calling Restore.
+message ControllerRestoreContainer {
+  // id is the containerd container ID.
+  string id = 1;
+  // name is the container name recorded in the checkpoint.
+  string name = 2;
+  // config is caller-owned container configuration. CRI callers pass a
+  // runtime.v1.ContainerConfig.
+  google.protobuf.Any config = 3;
+}
+
+message ControllerRestoreRequest {
+  string sandbox_id = 1;
+  // checkpoint_path is an absolute directory on the host that runs the
+  // controller and contains a checkpoint written by Checkpoint.
+  string checkpoint_path = 2;
+  // sandbox_config is caller-owned sandbox configuration for the new sandbox.
+  // CRI callers pass a runtime.v1.PodSandboxConfig.
+  google.protobuf.Any sandbox_config = 3;
+  repeated ControllerRestoreContainer containers = 4;
+  // options are controller-specific restore options. Controllers reject keys
+  // they do not support.
+  map<string, string> options = 5;
+  string sandboxer = 10;
+}
+
+message ControllerRestoredContainer {
+  // name is the container name from the matching ControllerRestoreContainer.
+  string name = 1;
+  // Ownership transfers from the controller to the caller when Restore
+  // succeeds. Empty when no containerd task checkpoint is required.
+  string task_checkpoint_image = 2;
+  // id is the containerd container ID from the matching ControllerRestoreContainer.
+  string id = 3;
+}
+
+message ControllerRestoreResponse {
+  repeated ControllerRestoredContainer containers = 1;
+}

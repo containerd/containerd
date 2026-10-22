@@ -42,6 +42,9 @@ func DefaultImageConfig() ImageConfig {
 	}
 }
 
+// Checkpoint/restore is not supported on Windows.
+const defaultCheckpointRestoreEnabled = false
+
 // DefaultRuntimeConfig returns default configurations of cri plugin.
 func DefaultRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{
@@ -97,6 +100,5 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 
 		DrainExecSyncIOTimeout: "0s",
-		EnableCRIU:             func() *bool { v := false; return &v }(),
 	}
 }
