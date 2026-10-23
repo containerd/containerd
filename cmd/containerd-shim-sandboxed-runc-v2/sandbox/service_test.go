@@ -20,6 +20,8 @@ package sandbox
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -72,6 +74,33 @@ func TestServiceWithoutSandbox(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("ShutdownSandbox must end the shim")
 	}
+}
+
+// TestStopRetriesRelease checks that a sandbox is stopped, and Wait returns,
+// even when releasing what it holds fails, and that the next stop retries the
+// release.
+func TestStopRetriesRelease(t *testing.T) {
+	ctx := context.Background()
+	bundle := t.TempDir()
+	// A file where the pin directory belongs makes Cleanup fail.
+	pins := filepath.Join(bundle, pinDir)
+	require.NoError(t, os.WriteFile(pins, nil, 0o600))
+	inst := &instance{cfg: &Config{ID: testID}, bundle: bundle, done: make(chan struct{})}
+	s := &Service{}
+
+	require.Error(t, s.stop(ctx, inst))
+	assert.True(t, inst.stopped)
+	assert.False(t, inst.released)
+	select {
+	case <-inst.done:
+	default:
+		t.Fatal("a stopped sandbox must end Wait even if its release failed")
+	}
+
+	require.NoError(t, os.Remove(pins))
+	require.NoError(t, s.stop(ctx, inst))
+	assert.True(t, inst.released)
+	require.NoError(t, s.stop(ctx, inst), "stopping a released sandbox is a no-op")
 }
 
 func TestSandboxStatusBeforeStart(t *testing.T) {

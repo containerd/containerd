@@ -46,7 +46,8 @@
 //
 // The shim is the sandbox. CreateSandbox receives the CRI PodSandboxConfig
 // (as the sandbox options) and the network namespace CRI created and
-// configured with CNI, and sets the pod up without a process:
+// configured with CNI, and sets the pod up, without a process unless the pod
+// shares its PID namespace:
 //
 //   - Namespaces (namespaces.go). A locked OS thread enters the CRI network
 //     namespace, unshares an IPC and a UTS namespace, sets the pod hostname,
@@ -62,6 +63,12 @@
 //     hosts file, writes resolv.conf from the pod DNS config (or copies the
 //     host one) and mounts the pod shm tmpfs, all under its bundle instead of
 //     the CRI state directory, and lists them as Mounts of the sandbox spec.
+//
+//   - Shared PID namespace (init.go). A pod that shares its PID namespace
+//     (shareProcessNamespace) needs a durable PID 1 for it, the role pause
+//     plays: the shim runs containerd-sandbox-init through runc, in the pod
+//     cgroup and the pod namespaces, and the spec names its PID namespace
+//     for the containers to join. Every other pod has no sandbox process.
 //
 //   - Spec (buildSpec in config.go). StartSandbox returns pid 0 and a
 //     synthesized OCI spec that carries the namespace paths, the sysctls, the
@@ -88,9 +95,7 @@
 //
 // # Not supported yet
 //
-// A shared pod PID namespace needs a durable PID 1 (sandbox-init); pods
-// asking for one get per-container PID namespaces, with a warning (see
-// buildSpec). User namespaced pods need their namespaces created inside the
+// User namespaced pods need their namespaces created inside the
 // pod user namespace, which a multithreaded shim cannot enter; they are
 // rejected, as are user.* sysctls. The shim requires cgroup v2 and does not
 // run rootless. SELinux labels are not applied yet: the pod label allocation

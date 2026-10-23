@@ -320,7 +320,7 @@ func TestBuildSpec(t *testing.T) {
 
 	t.Run("pod namespaces", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS, Sysctls: sysctls, Annotations: annots}
-		spec := buildSpec(cfg, pins, mounts)
+		spec := buildSpec(cfg, pins, mounts, "")
 		assert.Equal(t, specs.Version, spec.Version)
 		assert.Equal(t, "pod", spec.Hostname)
 		assert.Equal(t, annots, spec.Annotations)
@@ -335,15 +335,26 @@ func TestBuildSpec(t *testing.T) {
 		}, spec.Linux.Namespaces)
 	})
 
+	t.Run("shared PID namespace", func(t *testing.T) {
+		cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS, SharedPID: true}
+		spec := buildSpec(cfg, pins, nil, "/proc/42/ns/pid")
+		assert.Equal(t, []specs.LinuxNamespace{
+			{Type: specs.NetworkNamespace, Path: testNetNS},
+			{Type: specs.IPCNamespace, Path: pins.IPC},
+			{Type: specs.UTSNamespace, Path: pins.UTS},
+			{Type: specs.PIDNamespace, Path: "/proc/42/ns/pid"},
+		}, spec.Linux.Namespaces)
+	})
+
 	t.Run("host network keeps only the IPC namespace", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "node", HostNetwork: true}
-		spec := buildSpec(cfg, Pins{IPC: pins.IPC}, nil)
+		spec := buildSpec(cfg, Pins{IPC: pins.IPC}, nil, "")
 		assert.Equal(t, []specs.LinuxNamespace{{Type: specs.IPCNamespace, Path: pins.IPC}, {Type: specs.PIDNamespace}}, spec.Linux.Namespaces)
 	})
 
 	t.Run("host ipc keeps the network and UTS namespaces", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "pod", HostIPC: true, NetNSPath: testNetNS}
-		spec := buildSpec(cfg, Pins{UTS: pins.UTS}, nil)
+		spec := buildSpec(cfg, Pins{UTS: pins.UTS}, nil, "")
 		assert.Equal(t, []specs.LinuxNamespace{
 			{Type: specs.NetworkNamespace, Path: testNetNS},
 			{Type: specs.UTSNamespace, Path: pins.UTS},
@@ -353,7 +364,7 @@ func TestBuildSpec(t *testing.T) {
 
 	t.Run("all host namespaces still carry a Linux section", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "node", HostNetwork: true, HostIPC: true, HostPID: true}
-		spec := buildSpec(cfg, Pins{}, nil)
+		spec := buildSpec(cfg, Pins{}, nil, "")
 		require.NotNil(t, spec.Linux, "CRI tells a processless sandbox by the Linux section")
 		assert.Empty(t, spec.Linux.Namespaces, "no PID namespace declaration for a host PID pod")
 	})
