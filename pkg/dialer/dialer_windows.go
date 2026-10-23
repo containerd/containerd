@@ -18,29 +18,51 @@ package dialer
 
 import (
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	winio "github.com/Microsoft/go-winio"
+
+	"github.com/containerd/containerd/v2/internal/localaddr"
 )
 
 func isNoent(err error) bool {
 	return os.IsNotExist(err)
 }
 
+// dialer connects to a named pipe or an AF_UNIX socket, see localaddr.Parse.
 func dialer(address string, timeout time.Duration) (net.Conn, error) {
-	address = strings.TrimPrefix(filepath.ToSlash(address), "npipe://")
-	return winio.DialPipe(address, &timeout)
+	network, path, _ := localaddr.Parse(address)
+	if network == localaddr.NamedPipe {
+		return winio.DialPipe(path, &timeout)
+	}
+	return net.DialTimeout("unix", filepath.FromSlash(path), timeout)
 }
 
-// DialAddress returns the dial address with npipe:// prepended to the
-// provided address
+// DialAddress returns address as a gRPC target: "npipe://" for a named pipe,
+// "unix://" for an AF_UNIX socket. The socket path is URL escaped, as gRPC
+// unescapes it before ContextDialer, so apply this only once.
 func DialAddress(address string) string {
-	address = filepath.ToSlash(address)
-	if !strings.HasPrefix(address, "npipe://") {
-		address = "npipe://" + address
+	network, path, _ := localaddr.Parse(address)
+	if network == localaddr.NamedPipe {
+		return "npipe://" + path
 	}
-	return address
+	path = filepath.ToSlash(path)
+	// The opaque "unix:<path>" of a relative path cannot hold '#' or '?'.
+	if !strings.HasPrefix(path, "/") && !filepath.IsAbs(path) {
+		if abs, err := filepath.Abs(path); err == nil {
+			path = filepath.ToSlash(abs)
+		}
+	}
+	// gRPC rejects "unix://C:/..." for its authority.
+	if len(path) >= 2 && path[1] == ':' {
+		path = "/" + path
+	}
+	if !strings.HasPrefix(path, "/") {
+		return "unix:" + path
+	}
+	return (&url.URL{Scheme: "unix", Path: path}).String()
 }
