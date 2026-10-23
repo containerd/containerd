@@ -509,6 +509,8 @@ func TestCgroupMountMode(t *testing.T) {
 		hostMountOpts  string
 		containerPath  string
 		volumePath     string
+		hostNetwork    bool
+		userns         bool
 		expectErr      string
 		expectWritable bool
 	}{
@@ -595,6 +597,28 @@ func TestCgroupMountMode(t *testing.T) {
 			containerPath:  "/sys/fs/cgroup/foo",
 			expectWritable: true,
 		},
+		{
+			desc:           "read-write mount mode should be honored for a host-network container outside a user namespace",
+			mountMode:      runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE,
+			hostMountOpts:  withNsdelegate,
+			hostNetwork:    true,
+			expectWritable: true,
+		},
+		{
+			desc:          "read-write mount mode should be rejected for a host-network container in a user namespace",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE,
+			hostMountOpts: withNsdelegate,
+			hostNetwork:   true,
+			userns:        true,
+			expectErr:     "not supported for host-network containers in a user namespace",
+		},
+		{
+			desc:          "read-only mount mode should be accepted for a host-network container in a user namespace",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+			hostMountOpts: withNsdelegate,
+			hostNetwork:   true,
+			userns:        true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -603,6 +627,19 @@ func TestCgroupMountMode(t *testing.T) {
 			containerConfig.Linux.SecurityContext.CgroupMountMode = tt.mountMode
 			containerConfig.Linux.SecurityContext.Privileged = tt.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = tt.privileged
+			nsOpts := &runtime.NamespaceOption{}
+			if tt.hostNetwork {
+				nsOpts.Network = runtime.NamespaceMode_NODE
+			}
+			if tt.userns {
+				nsOpts.UsernsOptions = &runtime.UserNamespace{
+					Mode: runtime.NamespaceMode_POD,
+					Uids: []*runtime.IDMapping{{HostId: 100000, ContainerId: 0, Length: 65536}},
+					Gids: []*runtime.IDMapping{{HostId: 100000, ContainerId: 0, Length: 65536}},
+				}
+			}
+			containerConfig.Linux.SecurityContext.NamespaceOptions = nsOpts
+			sandboxConfig.Linux.SecurityContext.NamespaceOptions = nsOpts
 			if tt.containerPath != "" {
 				containerConfig.Mounts = append(containerConfig.Mounts, &runtime.Mount{
 					HostPath:      "/test-host-path",

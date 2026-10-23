@@ -771,6 +771,11 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
+	usernsOpts := securityContext.GetNamespaceOptions().GetUsernsOptions()
+	usernsEnabled := usernsOpts != nil && usernsOpts.GetMode() == runtime.NamespaceMode_POD
+	hostNetwork := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
+	bindMountHostSys := hostNetwork && usernsEnabled
+
 	mode := securityContext.GetCgroupMountMode()
 	var cgroupWritable bool
 	switch mode {
@@ -784,6 +789,9 @@ func (c *criService) buildLinuxSpec(
 	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE:
 		if err := c.checkWritableCgroupsSupported(); err != nil {
 			return nil, err
+		}
+		if bindMountHostSys {
+			return nil, errors.New("writable cgroups are not supported for host-network containers in a user namespace")
 		}
 		cgroupWritable = true
 	default:
@@ -923,16 +931,9 @@ func (c *criService) buildLinuxSpec(
 		return nil, fmt.Errorf("user namespace config for sandbox is different from container. Sandbox userns config: %v - Container userns config: %v", sandboxUsernsOpts, nsOpts.GetUsernsOptions())
 	}
 
-	// Determine if user namespace is enabled
-	var usernsEnabled bool
-	if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
-		usernsEnabled = true
-	}
-
 	// When using both host network and user namespace, we need to bind mount /sys
 	// instead of mounting sysfs, because mounting sysfs will fail with EPERM in this configuration.
-	sandboxNsOpts := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions()
-	if sandboxNsOpts.GetNetwork() == runtime.NamespaceMode_NODE && usernsEnabled {
+	if bindMountHostSys {
 		specOpts = append(specOpts, oci.WithoutMounts("/sys"))
 		// Add bind mount for /sys
 		specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
