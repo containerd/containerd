@@ -85,7 +85,7 @@ require (
 	google.golang.org/protobuf v1.36.12
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
-	k8s.io/cri-api v0.37.1
+	k8s.io/cri-api v0.38.0-alpha.2.0.20261022225146-006ac2a375b4
 	k8s.io/cri-client v0.37.1
 	k8s.io/cri-streaming v0.37.1
 	k8s.io/klog/v2 v2.140.0
