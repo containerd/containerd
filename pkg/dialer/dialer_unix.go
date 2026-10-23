@@ -27,12 +27,8 @@ import (
 )
 
 // DialAddress returns the address with unix:// prepended to the
-// provided address. An address that already carries the scheme is
-// returned unchanged.
+// provided address
 func DialAddress(address string) string {
-	if strings.HasPrefix(address, "unix://") {
-		return address
-	}
 	return "unix://" + address
 }
 

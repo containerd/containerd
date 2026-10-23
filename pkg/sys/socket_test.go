@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -73,7 +74,12 @@ func checkAccept(t *testing.T, l net.Listener, dial func() (net.Conn, error)) {
 }
 
 func TestGetLocalListenerUnixSocket(t *testing.T) {
-	for _, prefix := range []string{"", "unix://"} {
+	prefixes := []string{""}
+	if runtime.GOOS == "windows" {
+		// Only the Windows listener takes the scheme.
+		prefixes = append(prefixes, "unix://")
+	}
+	for _, prefix := range prefixes {
 		t.Run("prefix="+prefix, func(t *testing.T) {
 			sockPath := filepath.Join(shortTempDir(t), "test.sock")
 
