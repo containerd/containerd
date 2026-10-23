@@ -41,6 +41,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 
 	legacymanager "github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/manager"
+	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-sandboxed-runc-v2/sandbox"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -163,6 +164,12 @@ func (m *manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *
 		return nil, fmt.Errorf("%s requires cgroup v2 (the unified hierarchy) and this host runs cgroup v1: %w", sandbox.BinaryName, errdefs.ErrNotImplemented)
 	}
 
+	// The working directory is the sandbox bundle.
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
 	var params bootapi.BootstrapResult
 	params.Version = 3
 	params.Protocol = "ttrpc"
@@ -238,6 +245,16 @@ func (m *manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *
 	if found, err := opts.FindExtension(&runcOpts); err != nil {
 		return nil, fmt.Errorf("failed to fetch runc options: %w", err)
 	} else if found {
+		// Persisted in the bundle, where the sandbox service reads them to
+		// run containerd-sandbox-init through the same runc, root and
+		// cgroup driver as the containers of the pod, and where Stop reads
+		// them to delete that container once the shim is gone.
+		if err := runc.WriteOptions(cwd, &runcOpts); err != nil {
+			return nil, fmt.Errorf("failed to persist the runc options: %w", err)
+		}
+		if err := runc.WriteRuntime(cwd, runcOpts.GetBinaryName()); err != nil {
+			return nil, fmt.Errorf("failed to persist the runtime name: %w", err)
+		}
 		if shimCgroup := runcOpts.GetShimCgroup(); shimCgroup != "" {
 			cg, err := cgroupsv2.Load(shimCgroup)
 			if err != nil {
@@ -261,9 +278,10 @@ func (m *manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *
 // served the bundle is gone: in the sandbox bundle, and in the bundle of every
 // container task that joined the shim. Nothing needs telling apart: the runc
 // task cleanup of containerd-shim-runc-v2 (force-delete the runc container of
-// that id, detach its rootfs) does nothing in the sandbox bundle, and the
-// sandbox cleanup (detach every mount under the bundle, remove the pod files)
-// does nothing in a task bundle, so both run every time.
+// that id, detach its rootfs) deletes containerd-sandbox-init in the sandbox
+// bundle of a shared-PID pod and does nothing in any other sandbox bundle,
+// and the sandbox cleanup (detach every mount under the bundle, remove the pod
+// files) does nothing in a task bundle, so both run every time.
 func (m *manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	status, err := m.legacy.Stop(ctx, id)
 	cwd, cwdErr := os.Getwd()
