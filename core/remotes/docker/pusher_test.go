@@ -871,3 +871,53 @@ func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
 	assert.Equal(t, samplePusherHostname, gotNsParam,
 		"GET fallback on proxy must include ?ns= query parameter")
 }
+
+// If authorizing the upload request fails, the request is never sent and
+// nobody reads the body pipe. A pending Write must be unblocked with the
+// authorization error instead of staying stuck forever.
+func TestPusherAuthorizeFailureUnblocksWrite(t *testing.T) {
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	// Authorization of the upload PUT fails, like a bearer token refresh that
+	// fails or is cancelled after the upload was initiated.
+	authErr := errors.New("token fetch failed")
+	bodyCh := make(chan io.ReadCloser, 1)
+	p.hosts[0].Authorizer = &mockAuthorizer{
+		authorize: func(_ context.Context, r *http.Request) error {
+			if r.Method != http.MethodPut {
+				return nil
+			}
+			bodyCh <- r.Body
+			return authErr
+		},
+	}
+	reg.uploadable = true
+
+	ct := []byte("layer-content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(ct),
+		Size:      int64(len(ct)),
+	}
+
+	w, err := p.push(t.Context(), desc, remotes.MakeRefKey(t.Context(), desc), false)
+	require.NoError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := w.Write(ct)
+		errCh <- err
+	}()
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, authErr)
+	case <-time.After(5 * time.Second):
+		// Release the blocked Write so it does not outlive the test.
+		(<-bodyCh).Close()
+		<-errCh
+		t.Fatal("Write is blocked after the upload request failed to authorize")
+	}
+	require.NoError(t, w.Close())
+}
