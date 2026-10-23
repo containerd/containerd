@@ -47,7 +47,8 @@ type Config struct {
 	// HostPID means the containers of the pod use the host PID namespace.
 	HostPID bool
 	// SharedPID means the pod asked for one PID namespace shared by its
-	// containers, which this shim cannot provide yet (see buildSpec).
+	// containers (shareProcessNamespace); containerd-sandbox-init is then
+	// run as its PID 1 (see initProcess).
 	SharedPID bool
 	// NetNSPath is the network namespace CRI created for the pod.
 	NetNSPath string
@@ -236,40 +237,51 @@ func sysctlPath(key string) (path, dotted string, err error) {
 }
 
 // buildSpec synthesizes the sandbox spec CRI and NRI consume. It is not the
-// spec of a process (there is none): it describes the namespaces the sandbox
-// holds, from what was actually pinned, the sysctls applied to them, and the
-// pod shared files as mounts. A namespace the pod shares with the host has no
-// entry. Linux is always set, which is how CRI tells a sandbox without a
-// process from an older Sandbox API shim that returns no spec.
+// spec of a process: it describes the namespaces the sandbox holds, from what
+// was actually pinned, the sysctls applied to them, and the pod shared files
+// as mounts. A namespace the pod shares with the host has no entry. Linux is
+// always set, which is how CRI tells a sandbox without a process from an
+// older Sandbox API shim that returns no spec.
 //
-// The PID namespace entry has no path: the sandbox holds none. With a pause
-// container the pod PID namespace is the one pause is PID 1 of, and a pod
-// that asks to share it (NamespaceMode_POD, the CRI default and kubelet's
-// shareProcessNamespace) joins its containers to it. Holding a shared PID
-// namespace needs a durable PID 1 (sandbox-init, a follow-up); until then
-// the entry declares that each container gets a new PID namespace of its
-// own, and CRI honors that declaration instead of failing.
-func buildSpec(cfg *Config, pins Pins, mounts []specs.Mount) *specs.Spec {
+// The PID namespace entry has a path only for a pod that shares its PID
+// namespace (NamespaceMode_POD, the CRI default and kubelet's
+// shareProcessNamespace): pidNS, the pinned namespace containerd-sandbox-init
+// is PID 1 of. Otherwise the sandbox holds no PID namespace, and the entry, without a
+// path, declares that each container gets a new one of its own; CRI honors
+// the declaration. A host PID pod has no entry.
+func buildSpec(cfg *Config, pins Pins, mounts []specs.Mount, pidNS string) *specs.Spec {
 	s := &specs.Spec{
 		Version:     specs.Version,
 		Hostname:    cfg.Hostname,
 		Annotations: cfg.Annotations,
 		Mounts:      mounts,
 		Linux: &specs.Linux{
-			Sysctl: cfg.Sysctls,
+			Sysctl:     cfg.Sysctls,
+			Namespaces: podNamespaces(cfg, pins),
 		},
 	}
-	if cfg.NetNSPath != "" {
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: cfg.NetNSPath})
-	}
-	if pins.IPC != "" {
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.IPCNamespace, Path: pins.IPC})
-	}
-	if pins.UTS != "" {
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.UTSNamespace, Path: pins.UTS})
-	}
-	if !cfg.HostPID {
+	switch {
+	case cfg.HostPID:
+	case pidNS != "":
+		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.PIDNamespace, Path: pidNS})
+	default:
 		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.PIDNamespace})
 	}
 	return s
+}
+
+// podNamespaces are the network, IPC and UTS namespaces the sandbox holds,
+// which the sandbox spec lists and containerd-sandbox-init joins.
+func podNamespaces(cfg *Config, pins Pins) []specs.LinuxNamespace {
+	var ns []specs.LinuxNamespace
+	if cfg.NetNSPath != "" {
+		ns = append(ns, specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: cfg.NetNSPath})
+	}
+	if pins.IPC != "" {
+		ns = append(ns, specs.LinuxNamespace{Type: specs.IPCNamespace, Path: pins.IPC})
+	}
+	if pins.UTS != "" {
+		ns = append(ns, specs.LinuxNamespace{Type: specs.UTSNamespace, Path: pins.UTS})
+	}
+	return ns
 }
