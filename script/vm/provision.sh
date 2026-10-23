@@ -117,6 +117,12 @@ containerd-shim-runc-fp-v1 -v
 SELINUX="${SELINUX}" script/setup/config-selinux
 script/setup/config-containerd
 
+# container-selinux only lets container_t write to cgroupfs under this
+# boolean, which a read-write /sys/fs/cgroup mount needs.
+if [ "${SELINUX}" != Disabled ]; then
+	setsebool -P container_manage_cgroup on
+fi
+
 # systemd-tmpfiles-clean.timer runs 15 minutes after boot and removes empty
 # directories under /tmp with mtimes older than 10 days. Unpacking an image
 # layer under /tmp applies the layer's directory timestamps before finishing
