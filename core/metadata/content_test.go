@@ -277,11 +277,11 @@ func TestContentPrecommitAbort(t *testing.T) {
 	if _, err := old.Write(blob); err != nil {
 		t.Fatal(err)
 	}
-	// This wrapper intentionally leaves preparation to the instrumented hook:
-	// the aborted backend file no longer exists, but duplicate publication can
-	// still succeed if the metadata transaction fails to check the abort.
+	// Abort after real preparation has closed the file, but while the writer
+	// still owns the backend ref lock. Duplicate publication must not hide the
+	// abort when the metadata transaction checks the ingest identity.
 	nw := old.(*namespacedWriter)
-	nw.w = &abortPrecommitWriter{Writer: nw.w, prepare: cs.Store.(*precommitStore).prepare}
+	nw.w = &abortPrecommitWriter{Writer: nw.w.(*precommitWriter).Writer, prepare: cs.Store.(*precommitStore).prepare}
 	if err := old.Commit(ctx, int64(len(blob)), dgst); !errdefs.IsNotFound(err) {
 		t.Fatalf("stale ingest commit returned %v", err)
 	}
@@ -299,6 +299,9 @@ type abortPrecommitWriter struct {
 }
 
 func (w *abortPrecommitWriter) Precommit(ctx context.Context, size int64, expected digest.Digest) error {
+	if err := w.Writer.(content.Precommitter).Precommit(ctx, size, expected); err != nil {
+		return err
+	}
 	return w.prepare(ctx, size, expected)
 }
 
@@ -332,7 +335,7 @@ func TestContentPrecommitAbortAndRecreate(t *testing.T) {
 		t.Fatal(err)
 	}
 	nw := old.(*namespacedWriter)
-	nw.w = &abortPrecommitWriter{Writer: nw.w, prepare: cs.Store.(*precommitStore).prepare}
+	nw.w = &abortPrecommitWriter{Writer: nw.w.(*precommitWriter).Writer, prepare: cs.Store.(*precommitStore).prepare}
 	if err := old.Commit(ctx, desc.Size, dgst); !errdefs.IsNotFound(err) {
 		t.Fatalf("stale ingest commit returned %v", err)
 	}
@@ -381,7 +384,14 @@ func TestContentCommitClosesWithoutPrecommit(t *testing.T) {
 			}
 			nw := w.(*namespacedWriter)
 			nw.w = &nonPrecommitWriter{Writer: nw.w}
-			if err := cs.Abort(ctx, "closed"); err != nil {
+			// Remove only metadata so the unprepared backend writer stays open
+			// and locked. Windows cannot abort an ingest with an open data file.
+			if err := db.Update(func(tx *bolt.Tx) error {
+				if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("closed")); err != nil {
+					return err
+				}
+				return removeIngestLease(ctx, tx, "closed")
+			}); err != nil {
 				t.Fatal(err)
 			}
 			commit := func(ctx context.Context) error {
