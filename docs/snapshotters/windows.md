@@ -8,12 +8,15 @@ containers running in a utility VM (LCOW).
 |----------------|------------|-------------------------------|------------------------------------------------------------|
 | `windows`      | Windows    | Windows layer directories     | Snapshotter root on an NTFS volume                         |
 | `cimfs`        | Windows    | CimFS images (`.cim` files)   | Windows Server 2022 build 20348.2031 or later, or build 26100 or later (Windows Server 2025, Windows 11 24H2) |
-| `blockcim`     | Windows    | Block CIMs (one file per layer) | Block CIM support in the OS, or `cimwriter.dll` present on the host |
-| `windows-lcow` | Linux      | `layer.vhd` per layer         | Snapshotter root on an NTFS volume, `runhcs.exe` in `PATH` |
+| `blockcim`     | Windows    | Block CIMs (one file per layer) | Block CIM support in the OS, or `cimwriter.dll` on the host to write layers. Mounting merged layers on the host needs OS block CIM support |
+| `windows-lcow` | Linux      | `layer.vhd` per layer         | Snapshotter root on an NTFS volume, `runhcs.exe` in `PATH` or next to `containerd.exe` |
 
-`windows` is the default snapshotter on Windows. A snapshotter whose host
-requirement isn't met is skipped at startup, so it won't show as `ok` in the
-plugin list.
+`windows` is the default snapshotter on Windows. `cimfs` and `blockcim` are
+skipped at startup when the OS can't support them, so they won't show as `ok`
+in the plugin list. `windows` and `windows-lcow` fail to load with an error
+when their root isn't on an NTFS volume. `windows-lcow` doesn't look for
+`runhcs.exe` until it first creates a scratch disk, so a missing `runhcs.exe`
+shows up then and not at startup.
 
 To see which snapshotters and differs are loaded, run:
 
@@ -85,6 +88,10 @@ container's scratch snapshot sits on more than one layer, the snapshotter
 merges those layers into one merged CIM.
 It needs the `blockcim` differ, configured the same way as `cimfs` above with
 `blockcim` in place of `cimfs`.
+
+With only `cimwriter.dll` and no block CIM support in the OS, the snapshotter
+loads and can unpack images, but process-isolated containers on images with
+more than one layer fail to start, because the host can't mount the merged CIM.
 
 It accepts the following options:
 
