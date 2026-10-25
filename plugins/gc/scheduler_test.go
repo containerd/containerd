@@ -18,6 +18,7 @@ package scheduler
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -171,12 +172,58 @@ func TestStartupDelay(t *testing.T) {
 
 }
 
+func TestMutationDuringCollection(test *testing.T) {
+	for _, testCase := range []struct {
+		name              string
+		dirty             bool
+		deletionThreshold int
+		mutationThreshold int
+		failedCollection  int
+	}{
+		{name: "deletion", dirty: true, mutationThreshold: 100},
+		{name: "deletion threshold", dirty: true, deletionThreshold: 1, mutationThreshold: 100},
+		{name: "mutation threshold", mutationThreshold: 1},
+		{name: "first collection failure", dirty: true, mutationThreshold: 100, failedCollection: 1},
+		{name: "later collection failure", dirty: true, mutationThreshold: 100, failedCollection: 2},
+	} {
+		test.Run(testCase.name, func(subtest *testing.T) {
+			collector := &testCollector{d: time.Millisecond}
+			collector.onGC = func() error {
+				collection := collector.runCount()
+				if collection == 1 {
+					collector.trigger(testCase.dirty)
+				}
+				if collection == testCase.failedCollection {
+					return errors.New("test collection failure")
+				}
+				return nil
+			}
+			scheduler := newScheduler(collector, &config{
+				PauseThreshold:    0.5,
+				DeletionThreshold: testCase.deletionThreshold,
+				MutationThreshold: testCase.mutationThreshold,
+			})
+			go scheduler.run(subtest.Context())
+			collector.trigger(true)
+
+			expectedCollections := 2
+			if testCase.failedCollection == 2 {
+				expectedCollections++
+			}
+			assert.Eventually(subtest, func() bool {
+				return collector.runCount() == expectedCollections
+			}, 5*time.Second, time.Millisecond, "mutation during collection was not collected")
+		})
+	}
+}
+
 type testCollector struct {
 	d  time.Duration
 	gc int
 	m  sync.Mutex
 
 	callbacks []func(bool)
+	onGC      func() error
 }
 
 func (tc *testCollector) trigger(delete bool) {
@@ -200,6 +247,11 @@ func (tc *testCollector) GarbageCollect(context.Context) (gc.Stats, error) {
 	tc.m.Lock()
 	tc.gc++
 	tc.m.Unlock()
+	if tc.onGC != nil {
+		if err := tc.onGC(); err != nil {
+			return nil, err
+		}
+	}
 	return gcStats{elapsed: tc.d}, nil
 }
 

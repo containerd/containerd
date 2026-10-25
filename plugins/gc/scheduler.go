@@ -241,6 +241,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 
 		lastCollection *time.Time
 		nextCollection *time.Time
+		lastGCStart    time.Time
 
 		interval    = time.Second
 		gcTimeSum   time.Duration
@@ -265,7 +266,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 				continue
 			}
 		case e := <-s.eventC:
-			if lastCollection != nil && lastCollection.After(e.ts) {
+			if lastGCStart.After(e.ts) {
 				continue
 			}
 			if e.dirty {
@@ -296,6 +297,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 
 		s.waiterL.Lock()
 
+		lastGCStart = time.Now()
 		stats, err := s.c.GarbageCollect(ctx)
 		last := time.Now()
 		if err != nil {
