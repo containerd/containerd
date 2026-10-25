@@ -58,6 +58,8 @@ including the Balena project listed below.
 
 **_[Syself Autopilot](https://syself.com)** - Syself Autopilot is a simplified Kubernetes platform based on Cluster API that can run on various providers. Syself Autopilot uses containerd as the default CRI runtime.
 
+**_[Wordfully](https://wordfully.ai)_** - Wordfully uses containerd to run containers for its backend services.
+
 **_Other Projects_** - While the above list provides a cross-section of well known uses of containerd, the simplicity and clear API layer for containerd has inspired many smaller projects around providing simple container management platforms. Several examples of building higher layer functionality on top of the containerd base have come from various containerd community participants:
  - Michael Crosby's [boss](https://github.com/crosbymichael/boss) project,
  - Evan Hazlett's [stellar](https://github.com/ehazlett/stellar) project,
