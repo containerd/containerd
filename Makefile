@@ -91,7 +91,7 @@ ifdef BUILDTAGS
 	GO_BUILDTAGS = ${BUILDTAGS}
 endif
 GO_BUILDTAGS ?=
-GO_BUILDTAGS += urfave_cli_no_docs
+GO_BUILDTAGS += grpcnotrace urfave_cli_no_docs
 GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
