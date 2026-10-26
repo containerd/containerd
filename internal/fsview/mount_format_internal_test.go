@@ -57,6 +57,7 @@ func TestResolveOverlayValue(t *testing.T) {
 		value   string
 		want    []string
 		wantErr bool
+		expErr  error
 	}{
 		{
 			name:  "plain path",
@@ -133,6 +134,29 @@ func TestResolveOverlayValue(t *testing.T) {
 			value:   "{{ mount 0",
 			wantErr: true,
 		},
+		{
+			name:    "unsupported pipeline",
+			value:   `{{ mount 0 | printf "%s" }}`,
+			wantErr: true,
+			expErr:  errUnsupportedTemplate,
+		},
+		{
+			name:    "unsupported conditional",
+			value:   "{{ if true }}{{ mount 0 }}{{ end }}",
+			wantErr: true,
+			expErr:  errUnsupportedTemplate,
+		},
+		{
+			name:    "unsupported variable",
+			value:   "{{ $x := mount 0 }}",
+			wantErr: true,
+			expErr:  errUnsupportedTemplate,
+		},
+		{
+			name:  "empty-name template definition",
+			value: `{{define ""}}{{mount 0}}{{end}}`,
+			want:  []string{"first"},
+		},
 	}
 
 	for _, tc := range tests {
@@ -140,6 +164,9 @@ func TestResolveOverlayValue(t *testing.T) {
 			views, err := resolveOverlayValue(tc.value, mounts)
 			if tc.wantErr {
 				require.Error(t, err)
+				if tc.expErr != nil {
+					require.ErrorIs(t, err, tc.expErr)
+				}
 				return
 			}
 			require.NoError(t, err)
