@@ -19,16 +19,16 @@ package image
 import (
 	"fmt"
 
-	"github.com/containerd/platforms"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 // NewFakeStore returns an image store with predefined images.
 // Update is not allowed for this fake store.
 func NewFakeStore(images []Image) (*Store, error) {
-	s := NewStore(nil, nil, platforms.Default())
+	s := NewStore(nil, nil)
 	for _, i := range images {
 		for _, ref := range i.References {
-			s.refCache[ref] = i.ID
+			s.refCache[refKey{ref: ref, platform: util.PlatformKey(i.Platform)}] = i.ID
 		}
 		if err := s.store.add(i); err != nil {
 			return nil, fmt.Errorf("add image %+v: %w", i, err)

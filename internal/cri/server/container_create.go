@@ -128,7 +128,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.LocalResolve(config.GetImage().GetImage())
+	// Resolve the image on the platform of the runtime handler of the
+	// sandbox, which is the platform it was pulled for.
+	image, _, err := c.resolveImageForHandler(ctx, config.GetImage().GetImage(), sandbox.Metadata.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
 	}
@@ -237,7 +239,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	}
 
 	// mutate the extra CRI volume mounts from the runtime spec to properly specify the OCI image volume mount requests as bind mounts for this container
-	err = c.mutateMounts(r.ctx, r.containerConfig.GetMounts(), c.RuntimeSnapshotter(r.ctx, ociRuntime), r.sandboxID, platform)
+	err = c.mutateMounts(r.ctx, r.containerConfig.GetMounts(), c.RuntimeSnapshotter(r.ctx, ociRuntime), r.sandboxID, r.sandboxRuntimeHandler)
 	if err != nil {
 		return "", fmt.Errorf("failed to mount image volume: %w", err)
 	}

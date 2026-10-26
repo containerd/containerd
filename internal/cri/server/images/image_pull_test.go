@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -381,38 +382,50 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 	}
 }
 
-func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
+// testForeignPlatform is a platform that is never the platform of the machine
+// running the tests, so that a runtime handler configured with it always
+// exercises the non-default path.
+var testForeignPlatform = ocispec.Platform{OS: "linux", Architecture: "mips64le"}
+
+func TestImagePlatformFromPodSandboxConfig(t *testing.T) {
 	defaultSnapshotter := "native"
 	runtimeSnapshotter := "devmapper"
+	defaultPlatform := platforms.DefaultSpec()
 	tests := []struct {
 		desc                string
 		podSandboxConfig    *runtime.PodSandboxConfig
 		runtimeHandler      string
+		imageRef            string
 		expectedSnapshotter string
+		expectedPlatform    ocispec.Platform
 		expectedErr         bool
 	}{
 		{
 			desc:                "should return default snapshotter for nil podSandboxConfig",
 			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 		{
 			desc:                "should return default snapshotter for empty runtimeHandler",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
 			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 		{
 			desc:                "should return default snapshotter for runtime not found",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
 			runtimeHandler:      "runtime-not-exists",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 		{
 			desc:                "should return snapshotter for existing runtime",
 			podSandboxConfig:    &runtime.PodSandboxConfig{},
 			runtimeHandler:      "existing-runtime",
 			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 		{
 			desc: "should fall back to annotation when runtimeHandler is empty",
@@ -423,6 +436,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			},
 			runtimeHandler:      "",
 			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 		{
 			desc: "should prefer runtimeHandler parameter over annotation",
@@ -433,6 +447,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			},
 			runtimeHandler:      "existing-runtime",
 			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 		{
 			desc: "should return default when annotation has unknown runtime and runtimeHandler is empty",
@@ -443,6 +458,55 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			},
 			runtimeHandler:      "",
 			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    defaultPlatform,
+		},
+		{
+			desc:                "should return configured platform for existing runtime",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "foreign-runtime",
+			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    testForeignPlatform,
+		},
+		{
+			desc: "should return configured platform when falling back to annotation",
+			podSandboxConfig: &runtime.PodSandboxConfig{
+				Annotations: map[string]string{
+					annotations.RuntimeHandler: "foreign-runtime",
+				},
+			},
+			runtimeHandler:      "",
+			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    testForeignPlatform,
+		},
+		{
+			desc:                "should return default platform for runtime with unset platform",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "unset-platform-runtime",
+			expectedSnapshotter: runtimeSnapshotter,
+			expectedPlatform:    defaultPlatform,
+		},
+		{
+			// A runtime handler configured without a snapshotter is known
+			// to the image service but has no image platform.
+			desc:                "should return defaults for a known runtime without configuration",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "known-runtime",
+			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    defaultPlatform,
+		},
+		{
+			desc:                "should use the runtime handler without a podSandboxConfig",
+			runtimeHandler:      "foreign-runtime",
+			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    testForeignPlatform,
+		},
+		{
+			desc:                "should keep pinned images on the platform of the node",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			runtimeHandler:      "foreign-runtime",
+			imageRef:            testSandboxImage,
+			expectedSnapshotter: defaultSnapshotter,
+			expectedPlatform:    defaultPlatform,
 		},
 	}
 
@@ -454,8 +518,22 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig, tt.runtimeHandler)
-			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
+			cri.runtimePlatforms["foreign-runtime"] = &ImagePlatform{
+				Platform: testForeignPlatform,
+			}
+			// An unset platform in the config is materialized as the platform
+			// of the node by the plugin, but tolerate a zero value here too.
+			cri.runtimePlatforms["unset-platform-runtime"] = &ImagePlatform{
+				Snapshotter: runtimeSnapshotter,
+			}
+			cri.runtimePlatforms["known-runtime"] = nil
+			imageRef := tt.imageRef
+			if imageRef == "" {
+				imageRef = "test-image"
+			}
+			imagePlatform, err := cri.imagePlatformFromPodSandboxConfig(context.Background(), imageRef, tt.podSandboxConfig, tt.runtimeHandler)
+			assert.Equal(t, tt.expectedSnapshotter, imagePlatform.Snapshotter)
+			assert.Equal(t, tt.expectedPlatform, imagePlatform.Platform)
 			if tt.expectedErr {
 				assert.Error(t, err)
 			}
@@ -468,6 +546,36 @@ func TestPullImageRuntimeHandler(t *testing.T) {
 
 	_, err := cri.PullImage(context.Background(), "test-image", nil, nil, "runtime-not-exists")
 	assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+}
+
+func TestImagePlatforms(t *testing.T) {
+	t.Run("no runtime platforms is only the platform of the node", func(t *testing.T) {
+		got := imagePlatforms(nil)
+		require.Len(t, got, 1)
+		assert.True(t, util.IsNodePlatform(got[0]))
+	})
+
+	t.Run("a runtime platform equal to the platform of the node is not duplicated", func(t *testing.T) {
+		got := imagePlatforms(map[string]*ImagePlatform{
+			"runc":  {Platform: platforms.DefaultSpec()},
+			"empty": {},
+			// A known runtime handler without any configuration.
+			"crun": nil,
+		})
+		assert.Len(t, got, 1)
+	})
+
+	t.Run("a distinct runtime platform follows the platform of the node", func(t *testing.T) {
+		got := imagePlatforms(map[string]*ImagePlatform{
+			"runc":         {Platform: platforms.DefaultSpec()},
+			"runc-foreign": {Platform: testForeignPlatform},
+			// A second handler on the same platform must not add an entry.
+			"kata-foreign": {Platform: testForeignPlatform},
+		})
+		require.Len(t, got, 2)
+		assert.True(t, util.IsNodePlatform(got[0]))
+		assert.Equal(t, util.PlatformKey(testForeignPlatform), util.PlatformKey(got[1]))
+	})
 }
 
 func TestImageGetLabels(t *testing.T) {
