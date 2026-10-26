@@ -234,6 +234,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 // container will not be removed or started again.
 func setContainerStarting(container containerstore.Container) error {
 	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+		if status.RestorePending {
+			return status, fmt.Errorf("container restore preparation is incomplete: %w", errdefs.ErrFailedPrecondition)
+		}
 		// Return error if container is not in created state.
 		if status.State() != runtime.ContainerState_CONTAINER_CREATED {
 			return status, fmt.Errorf("container is in %s state", criContainerStateToString(status.State()))

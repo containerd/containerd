@@ -51,7 +51,17 @@ func init() {
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
-func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
+func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (*runtime.RunPodSandboxResponse, error) {
+	return c.runPodSandbox(ctx, r, false)
+}
+
+// runPodSandboxForRestore creates a sandbox with an uncommitted restore
+// transaction, which startup recovery removes unless RestorePod commits it.
+func (c *criService) runPodSandboxForRestore(ctx context.Context, r *runtime.RunPodSandboxRequest) (*runtime.RunPodSandboxResponse, error) {
+	return c.runPodSandbox(ctx, r, true)
+}
+
+func (c *criService) runPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest, restore bool) (_ *runtime.RunPodSandboxResponse, retErr error) {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name("cri", "sandbox", "run"),
 		tracing.WithNamespace(ctx),
 	)
@@ -90,22 +100,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// When cleanupErr != nil, the name will be cleaned in sandbox_remove.
 		if retErr != nil && cleanupErr == nil {
 			c.sandboxNameIndex.ReleaseByName(name)
-		}
-	}()
-
-	leaseSvc := c.client.LeasesService()
-	ls, lerr := leaseSvc.Create(ctx, leases.WithID(id))
-	if lerr != nil {
-		return nil, fmt.Errorf("failed to create lease for sandbox name %q: %w", name, lerr)
-	}
-	defer func() {
-		if retErr != nil {
-			deferCtx, deferCancel := util.DeferContext()
-			defer deferCancel()
-
-			if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
-				log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
-			}
 		}
 	}()
 
@@ -158,12 +152,39 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
 
+	// Store restore intent atomically with the sandbox, before allocating its
+	// network namespace or invoking the sandbox controller.
+	if restore {
+		if err := sandboxInfo.AddExtension(podRestoreTransactionKey, &podRestoreTransaction{Version: 1}); err != nil {
+			return nil, err
+		}
+	}
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
 	}
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
 			cleanupErr = c.client.SandboxStore().Delete(ctx, id)
+		}
+	}()
+
+	leaseSvc := c.client.LeasesService()
+	ls, lerr := leaseSvc.Create(ctx, leases.WithID(id))
+	if lerr != nil {
+		return nil, fmt.Errorf("failed to create lease for sandbox name %q: %w", name, lerr)
+	}
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+
+			if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
+				log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
+				if restore {
+					// Retain restore intent so startup can retry lease cleanup.
+					cleanupErr = errors.Join(cleanupErr, derr)
+				}
+			}
 		}
 	}()
 

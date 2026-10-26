@@ -114,8 +114,9 @@ func (c *criService) RestorePod(ctx context.Context, r *runtime.RestorePodReques
 // deliberately kept on this side of CheckpointController so no CRI lifecycle
 // callbacks or stores cross the controller boundary.
 type podRestoreOperations interface {
-	RunPodSandbox(context.Context, *runtime.RunPodSandboxRequest) (*runtime.RunPodSandboxResponse, error)
-	CreateContainer(context.Context, *runtime.CreateContainerRequest) (*runtime.CreateContainerResponse, error)
+	runPodSandboxForRestore(context.Context, *runtime.RunPodSandboxRequest) (*runtime.RunPodSandboxResponse, error)
+	commitPodRestore(context.Context, string) error
+	createContainerForRestore(context.Context, *runtime.CreateContainerRequest) (*runtime.CreateContainerResponse, error)
 	RemovePodSandbox(context.Context, *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error)
 	saveContainerTaskCheckpoint(string, string) error
 	deleteTaskCheckpoint(context.Context, string) error
@@ -131,7 +132,7 @@ func restorePodResources(
 	if len(request.GetContainerConfigs()) != len(opts.Containers) {
 		return nil, fmt.Errorf("restore options contain %d containers, but request contains %d", len(opts.Containers), len(request.GetContainerConfigs()))
 	}
-	runResponse, err := operations.RunPodSandbox(ctx, &runtime.RunPodSandboxRequest{
+	runResponse, err := operations.runPodSandboxForRestore(ctx, &runtime.RunPodSandboxRequest{
 		Config:         request.GetConfig(),
 		RuntimeHandler: request.GetRuntimeHandler(),
 	})
@@ -170,7 +171,7 @@ func restorePodResources(
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("pod restore aborted before creating container %q: %w", opts.Containers[i].Name, err)
 		}
-		createResponse, err := operations.CreateContainer(ctx, &runtime.CreateContainerRequest{
+		createResponse, err := operations.createContainerForRestore(ctx, &runtime.CreateContainerRequest{
 			PodSandboxId:  sandboxID,
 			Config:        config,
 			SandboxConfig: request.GetConfig(),
@@ -208,14 +209,14 @@ func restorePodResources(
 	}
 	for _, container := range opts.Containers {
 		image := prepared[container.Name]
-		if image == "" {
-			continue
-		}
 		if err := operations.saveContainerTaskCheckpoint(container.ID, image); err != nil {
 			return nil, fmt.Errorf("failed to save task checkpoint image for container %q: %w", container.ID, err)
 		}
 	}
 
+	if err := operations.commitPodRestore(ctx, sandboxID); err != nil {
+		return nil, fmt.Errorf("commit Pod restore: %w", err)
+	}
 	rollback = false
 	return response, nil
 }
@@ -226,7 +227,11 @@ func (c *criService) saveContainerTaskCheckpoint(containerID, image string) erro
 		return err
 	}
 	return cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+		if !status.RestorePending || status.State() != runtime.ContainerState_CONTAINER_CREATED || status.Removing || status.Starting {
+			return status, fmt.Errorf("container %q is no longer awaiting restore preparation: %w", containerID, errdefs.ErrFailedPrecondition)
+		}
 		status.TaskCheckpointImage = image
+		status.RestorePending = false
 		return status, nil
 	})
 }

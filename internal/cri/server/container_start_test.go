@@ -54,6 +54,14 @@ func TestSetContainerStarting(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			desc: "should return error while restore preparation is pending",
+			status: containerstore.Status{
+				CreatedAt:      time.Now().UnixNano(),
+				RestorePending: true,
+			},
+			expectErr: true,
+		},
+		{
 			desc: "should return error when container is in running state",
 			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),

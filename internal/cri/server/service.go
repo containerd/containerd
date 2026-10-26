@@ -361,6 +361,12 @@ func (c *criService) Run(ready func()) error {
 		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
 	}
 
+	// Restore rollback needs recovered stores, CNI and NRI, but must finish
+	// before CRI accepts requests. Run it even when checkpointing is disabled.
+	if err := c.recoverPodRestores(ctrdutil.NamespacedContext()); err != nil {
+		return fmt.Errorf("failed to recover Pod restores: %w", err)
+	}
+
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Store(true)
 	ready()

@@ -105,6 +105,7 @@ func TestStatusEncodeDecode(t *testing.T) {
 		Reason:              "test-reason",
 		Message:             "test-message",
 		TaskCheckpointImage: "localhost/checkpoint:test",
+		RestorePending:      true,
 		Removing:            true,
 		Starting:            true,
 		Unknown:             true,
