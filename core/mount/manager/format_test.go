@@ -242,6 +242,21 @@ func TestFormatString(t *testing.T) {
 			format:  "{{ mount 0",
 			wantErr: true,
 		},
+		{
+			name:    "unsupported pipeline",
+			format:  "{{ 0 | mount }}",
+			wantErr: true,
+		},
+		{
+			name:    "unsupported variable declaration",
+			format:  "{{ $i := 0 }}{{ mount $i }}",
+			wantErr: true,
+		},
+		{
+			name:    "unsupported conditional",
+			format:  "{{ if mount 0 }}{{ mount 0 }}{{ end }}",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

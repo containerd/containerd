@@ -93,12 +93,12 @@ parameters to be filled in at mount activation time using the previous
 mounts' results.
 
 Formatted mounts have a type that starts with `format/` followed by the
-intended mount type after filling in format values.
-Uses templating based on [go templates](https://pkg.go.dev/text/template) to
-fill in values.
+intended mount type after filling in format values. Formatting uses
+[Go template](https://pkg.go.dev/text/template) syntax, but only supports
+the mount-reference expressions listed below. Other Go template features,
+such as conditionals, variables, and pipelines, are not supported.
 
-Values are referenced by the index of the previous active mounts. The following
-is a list of supported values that can be provided in formatted mounts.
+Values are referenced by the index of the previous active mounts.
 
 | Value | Args | Example | Description |
 |-----|------|---------|-------------|
