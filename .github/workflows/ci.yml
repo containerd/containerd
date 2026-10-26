@@ -765,8 +765,9 @@ jobs:
           cfg=$(mktemp /tmp/containerd-config-runsc-XXXXXX.toml)
           trap 'rm -f "$cfg"' EXIT
           script/runsc/write-containerd-runsc-config.sh "$cfg" "$CGROUP_DRIVER"
-          sudo -E \
+          sudo \
             CGROUP_DRIVER="$CGROUP_DRIVER" \
+            TEST_RUNTIME="$TEST_RUNTIME" \
             CONTAINERD_CONFIG_FILE="$cfg" \
             GOMAXPROCS="$GOMAXPROCS" \
             GOMEMLIMIT="$GOMEMLIMIT" \
