@@ -98,6 +98,258 @@ func TestNriPluginSetup(t *testing.T) {
 	tc.setup()
 }
 
+// Test that NRI request timeouts follow the plugin's failure policy.
+func TestNriPluginFailurePolicy(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	for _, tc := range []struct {
+		name         string
+		policy       *api.FailurePolicy
+		wantRunError bool
+		wantKept     bool
+	}{
+		{
+			name: "default policy drops plugin and proceeds",
+		},
+		{
+			name:         "fail request and drop plugin",
+			policy:       &api.FailurePolicy{FailRequest: true},
+			wantRunError: true,
+		},
+		{
+			name:     "keep plugin and proceed",
+			policy:   &api.FailurePolicy{KeepConnected: true},
+			wantKept: true,
+		},
+		{
+			name:         "fail request and keep plugin connected",
+			policy:       &api.FailurePolicy{FailRequest: true, KeepConnected: true},
+			wantRunError: true,
+			wantKept:     true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				timedOut = make(chan struct{})
+				healthy  = make(chan struct{})
+				once     sync.Once
+				plugin   = &mockPlugin{
+					runPodSandbox: func(mp *mockPlugin, pod *api.PodSandbox) error {
+						switch pod.Name {
+						case "timeout-target":
+							once.Do(func() {
+								time.Sleep(mp.stub.RequestTimeout() + 250*time.Millisecond)
+								close(timedOut)
+							})
+						case "healthy-target":
+							close(healthy)
+						}
+						return nil
+					},
+				}
+				nt = &nriTest{t: t, plugins: []*mockPlugin{plugin}}
+			)
+
+			if tc.policy != nil {
+				plugin.opts = append(plugin.opts, stub.WithFailurePolicy(tc.policy))
+			}
+			nt.setup()
+			t.Cleanup(plugin.Stop)
+
+			runPod := func(name string) (string, error) {
+				return nt.runtime.RunPodSandbox(PodSandboxConfig(name, nt.namespace), *runtimeHandler)
+			}
+			cleanupPod := func(id string) {
+				t.Cleanup(func() {
+					assert.NoError(t, nt.runtime.StopPodSandbox(id))
+					assert.NoError(t, nt.runtime.RemovePodSandbox(id))
+				})
+			}
+
+			id, err := runPod("timeout-target")
+			if id != "" {
+				cleanupPod(id)
+			}
+			if tc.wantRunError {
+				require.Error(t, err, "timed-out NRI hook should fail the pod request")
+			} else {
+				require.NoError(t, err, "policy should allow the pod request")
+			}
+
+			select {
+			case <-timedOut:
+			case <-time.After(plugin.stub.RequestTimeout() + pluginSyncTimeout):
+				t.Fatal("timed-out plugin callback did not return")
+			}
+
+			if tc.wantKept {
+				id, err = runPod("healthy-target")
+				require.NoError(t, err, "kept-connected plugin should handle the next pod")
+				cleanupPod(id)
+				select {
+				case <-healthy:
+				case <-time.After(pluginSyncTimeout):
+					t.Fatal("kept-connected plugin did not receive the next request")
+				}
+			} else {
+				select {
+				case <-plugin.closedCh:
+				case <-time.After(pluginSyncTimeout):
+					t.Fatal("policy should disconnect a timed-out plugin")
+				}
+			}
+		})
+	}
+}
+
+// Test that an NRI plugin which disconnects while idle does not fail the next
+// CRI lifecycle request or prevent later plugins from receiving it.
+func TestNriPluginIdleDisconnect(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	var (
+		nextPodEvent = make(chan struct{}, 1)
+		failing      = &mockPlugin{
+			name: "idle-disconnect-plugin",
+			opts: []stub.Option{stub.WithFailurePolicy(&api.FailurePolicy{FailRequest: true, KeepConnected: true})},
+		}
+		observer = &mockPlugin{
+			name: "observer-plugin",
+			runPodSandbox: func(_ *mockPlugin, pod *api.PodSandbox) error {
+				if pod.Name == "after-disconnect" {
+					nextPodEvent <- struct{}{}
+				}
+				return nil
+			},
+		}
+		nt = &nriTest{t: t, plugins: []*mockPlugin{failing, observer}}
+	)
+
+	nt.setup()
+	t.Cleanup(failing.Stop)
+	t.Cleanup(observer.Stop)
+
+	nt.runPod("before-disconnect")
+
+	failing.Stop()
+	select {
+	case <-failing.closedCh:
+	case <-time.After(pluginSyncTimeout):
+		t.Fatal("disconnected plugin did not stop")
+	}
+
+	// Allow the runtime-side ttrpc connection watcher to observe the idle
+	// disconnect before sending the next request.
+	time.Sleep(250 * time.Millisecond)
+
+	nt.runPod("after-disconnect")
+	select {
+	case <-nextPodEvent:
+	case <-time.After(pluginSyncTimeout):
+		t.Fatal("later plugin did not receive the request after idle disconnect")
+	}
+}
+
+// Test that fail-request timeouts stop NRI fanout during pod teardown, while
+// CRI continues the teardown operation without retrying the notification.
+func TestNriPluginFailurePolicyPodTeardown(t *testing.T) {
+	skipNriTestIfNecessary(t)
+
+	for _, target := range []string{StopPodSandbox, RemovePodSandbox} {
+		t.Run(target, func(t *testing.T) {
+			var (
+				timedOut = make(chan struct{})
+				notified = make(chan string, 4)
+				once     sync.Once
+				failing  = &mockPlugin{
+					name: "timeout-plugin",
+					opts: []stub.Option{stub.WithFailurePolicy(&api.FailurePolicy{FailRequest: true, KeepConnected: true})},
+				}
+				observer = &mockPlugin{
+					name: "observer-plugin",
+					stopPodSandbox: func(_ *mockPlugin, pod *api.PodSandbox) error {
+						notified <- StopPodSandbox
+						return nil
+					},
+					removePodSandbox: func(_ *mockPlugin, pod *api.PodSandbox) error {
+						notified <- RemovePodSandbox
+						return nil
+					},
+				}
+				nt = &nriTest{t: t, plugins: []*mockPlugin{failing, observer}}
+			)
+
+			block := func(event string) {
+				if event != target {
+					return
+				}
+				once.Do(func() {
+					time.Sleep(failing.stub.RequestTimeout() + 250*time.Millisecond)
+					close(timedOut)
+				})
+			}
+			failing.stopPodSandbox = func(_ *mockPlugin, _ *api.PodSandbox) error {
+				block(StopPodSandbox)
+				return nil
+			}
+			failing.removePodSandbox = func(_ *mockPlugin, _ *api.PodSandbox) error {
+				block(RemovePodSandbox)
+				return nil
+			}
+
+			nt.setup()
+			t.Cleanup(failing.Stop)
+			t.Cleanup(observer.Stop)
+
+			id, err := nt.runtime.RunPodSandbox(PodSandboxConfig("pod0", nt.namespace), *runtimeHandler)
+			require.NoError(t, err, "run pod sandbox")
+			removed := false
+			t.Cleanup(func() {
+				if !removed {
+					assert.NoError(t, nt.runtime.StopPodSandbox(id))
+					assert.NoError(t, nt.runtime.RemovePodSandbox(id))
+				}
+			})
+
+			if target == RemovePodSandbox {
+				require.NoError(t, nt.runtime.StopPodSandbox(id), "stop pod sandbox before removal")
+				select {
+				case event := <-notified:
+					require.Equal(t, StopPodSandbox, event, "observer should receive successful stop notification")
+				case <-time.After(pluginSyncTimeout):
+					t.Fatal("observer did not receive stop notification")
+				}
+			}
+
+			switch target {
+			case StopPodSandbox:
+				require.NoError(t, nt.runtime.StopPodSandbox(id), "CRI should continue after NRI stop timeout")
+			case RemovePodSandbox:
+				err = nt.runtime.RemovePodSandbox(id)
+				require.NoError(t, err, "CRI should continue after NRI remove timeout")
+				removed = true
+			}
+
+			select {
+			case <-timedOut:
+			case <-time.After(failing.stub.RequestTimeout() + pluginSyncTimeout):
+				t.Fatal("timed-out plugin callback did not return")
+			}
+
+			select {
+			case event := <-notified:
+				t.Fatalf("later plugin unexpectedly received %s after %s failure", event, target)
+			case <-time.After(250 * time.Millisecond):
+			}
+
+			if target == StopPodSandbox {
+				require.NoError(t, nt.runtime.RemovePodSandbox(id), "remove stopped pod sandbox")
+				removed = true
+			}
+		})
+	}
+}
+
 // Test NRI runtime/plugin state synchronization.
 func TestNriPluginSynchronization(t *testing.T) {
 	skipNriTestIfNecessary(t)
@@ -802,12 +1054,15 @@ type mockPlugin struct {
 	idx  string
 	stub stub.Stub
 	mask stub.EventMask
+	opts []stub.Option
 
 	q    *eventQ
 	pods map[string]*api.PodSandbox
 	ctrs map[string]*api.Container
 
 	closed               bool
+	closedCh             chan struct{}
+	closedOnce           sync.Once
 	namespace            string
 	logf                 func(string, ...any)
 	synchronize          func(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
@@ -851,12 +1106,14 @@ func (m *mockPlugin) Start() error {
 		)
 	}
 
-	m.stub, err = stub.New(m,
+	opts := []stub.Option{
 		stub.WithPluginName(m.name),
 		stub.WithPluginIdx(m.idx),
 		stub.WithSocketPath(nriTestSocket),
 		stub.WithOnClose(m.onClose),
-	)
+	}
+	opts = append(opts, m.opts...)
+	m.stub, err = stub.New(m, opts...)
 	if err != nil {
 		return err
 	}
@@ -904,6 +1161,7 @@ func (m *mockPlugin) Start() error {
 	m.q = &eventQ{}
 	m.pods = make(map[string]*api.PodSandbox)
 	m.ctrs = make(map[string]*api.Container)
+	m.closedCh = make(chan struct{})
 
 	err = m.stub.Start(context.Background())
 	if err != nil {
@@ -922,6 +1180,7 @@ func (m *mockPlugin) Stop() {
 
 func (m *mockPlugin) onClose() {
 	m.closed = true
+	m.closedOnce.Do(func() { close(m.closedCh) })
 	if m.stub != nil {
 		m.stub.Stop()
 		m.stub.Wait()
