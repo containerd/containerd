@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sync"
 
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -42,7 +43,7 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	for _, i := range cImages {
 		wg.Go(func() {
 			// TODO: Check platform/snapshot combination. Snapshot check should come first
-			ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			ok, _, _, missing, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 				return
@@ -62,6 +63,18 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
 				// TODO(random-liu): Consider whether we should try unpack here.
 			}
+			// Layers are legitimately absent once discarded after unpack
+			// (discard_unpacked_layers) or when fetched lazily by a remote
+			// snapshotter, but only a snapshot makes such an image usable.
+			// A single snapshot is enough: runtimePlatforms holds every
+			// configured runtime rather than the ones the node runs, so
+			// requiring all of them would let a stale handler config drop
+			// images which are still usable.
+			// TODO: Filter by the requested runtime in ImageStatus instead.
+			if len(missing) > 0 && !unpacked && !c.isUnpackedForAnyRuntime(ctx, i) {
+				log.G(ctx).Warnf("The image content for %q is incomplete (missing %d required descriptors) and it is not unpacked for any configured snapshotter, skipping", i.Name(), len(missing))
+				return
+			}
 			if err := c.UpdateImage(ctx, i.Name()); err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
 				return
@@ -71,4 +84,25 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	}
 	wg.Wait()
 	return nil
+}
+
+// isUnpackedForAnyRuntime reports whether the image has a top-level snapshot in
+// any runtime-specific snapshotter. A snapshotter which cannot be queried is
+// skipped rather than counted as an answer, so that it cannot rule out an image
+// another snapshotter is able to serve.
+func (c *CRIImageService) isUnpackedForAnyRuntime(ctx context.Context, i containerd.Image) bool {
+	for _, p := range c.runtimePlatforms {
+		if p.Snapshotter == "" || p.Snapshotter == c.config.Snapshotter {
+			continue
+		}
+		unpacked, err := i.IsUnpacked(ctx, p.Snapshotter)
+		if err != nil {
+			log.G(ctx).WithError(err).Warnf("Failed to check whether image %q is unpacked for snapshotter %q", i.Name(), p.Snapshotter)
+			continue
+		}
+		if unpacked {
+			return true
+		}
+	}
+	return false
 }
