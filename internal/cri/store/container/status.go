@@ -102,6 +102,9 @@ type Status struct {
 	// owned by CRI until it is consumed to create the restored task or the
 	// container is removed. It is empty for ordinary containers.
 	TaskCheckpointImage string
+	// RestorePending prevents starting a container before its restore preparation
+	// has completed. It is persisted with the initial container status.
+	RestorePending bool
 }
 
 // State returns current state of the container based on the container status.

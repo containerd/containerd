@@ -222,16 +222,22 @@ type restoreOperationsStub struct {
 	createCalls  int
 	createErrAt  int
 	saveErr      error
+	commitErr    error
 	saved        map[string]string
 	deleted      []string
 }
 
-func (o *restoreOperationsStub) RunPodSandbox(_ context.Context, request *runtime.RunPodSandboxRequest) (*runtime.RunPodSandboxResponse, error) {
+func (o *restoreOperationsStub) runPodSandboxForRestore(_ context.Context, request *runtime.RunPodSandboxRequest) (*runtime.RunPodSandboxResponse, error) {
 	o.calls = append(o.calls, "run:"+request.GetRuntimeHandler())
 	return &runtime.RunPodSandboxResponse{PodSandboxId: "new-sandbox"}, nil
 }
 
-func (o *restoreOperationsStub) CreateContainer(_ context.Context, request *runtime.CreateContainerRequest) (*runtime.CreateContainerResponse, error) {
+func (o *restoreOperationsStub) commitPodRestore(_ context.Context, id string) error {
+	o.calls = append(o.calls, "commit:"+id)
+	return o.commitErr
+}
+
+func (o *restoreOperationsStub) createContainerForRestore(_ context.Context, request *runtime.CreateContainerRequest) (*runtime.CreateContainerResponse, error) {
 	o.createCalls++
 	name := request.GetConfig().GetMetadata().GetName()
 	o.calls = append(o.calls, "create:"+name)
@@ -288,13 +294,15 @@ func TestRestorePodResourcesKeepsSequencingInCRI(t *testing.T) {
 	assert.Equal(t, "new-sandbox", response.GetPodSandboxId())
 	require.Len(t, response.GetRestoredContainers(), 2)
 	assert.Equal(t, "new-app", response.GetRestoredContainers()[0].GetContainerId())
-	assert.Equal(t, map[string]string{"new-app": "localhost/checkpoint:app"}, operations.saved)
+	assert.Equal(t, map[string]string{"new-app": "localhost/checkpoint:app", "new-sidecar": ""}, operations.saved)
 	assert.Equal(t, []string{
 		"run:vm-runtime",
 		"create:app",
 		"create:sidecar",
 		"controller:new-sandbox",
 		"save:new-app",
+		"save:new-sidecar",
+		"commit:new-sandbox",
 	}, operations.calls)
 }
 
@@ -551,4 +559,21 @@ func TestRequireRestoreImages(t *testing.T) {
 			require.ErrorIs(t, err, test.wantErr)
 		})
 	}
+}
+
+func TestRestorePodResourcesRollsBackCommitFailure(t *testing.T) {
+	request := restoreTransactionRequest(t)
+	request.ContainerConfigs = request.ContainerConfigs[:1]
+	options, err := restoreOptionsFromCRI(request)
+	require.NoError(t, err)
+	operations := &restoreOperationsStub{containerIDs: []string{"new-app"}, commitErr: errors.New("injected commit failure")}
+	controller := &checkpointControllerStub{
+		restore: func(context.Context, string, sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+			return sandbox.RestoreResult{RestoredContainers: []sandbox.RestoredContainer{{ID: "new-app", Name: "app", TaskCheckpointImage: "prepared-image"}}}, nil
+		},
+	}
+	response, err := restorePodResources(t.Context(), request, options, controller, operations)
+	require.ErrorContains(t, err, "injected commit failure")
+	assert.Nil(t, response)
+	assert.Equal(t, []string{"run:vm-runtime", "create:app", "save:new-app", "commit:new-sandbox", "delete:prepared-image", "remove:new-sandbox"}, operations.calls)
 }
