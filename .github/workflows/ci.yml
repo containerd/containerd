@@ -408,11 +408,20 @@ jobs:
       matrix:
         runtime:
           - io.containerd.runc.v2
+          - io.containerd.runc.v2-rs
         runc: [runc]  # crun can be added here to debug crun issues
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
         cgroup_driver: [cgroupfs, systemd]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
+          - runtime: io.containerd.runc.v2-rs
+            os: ubuntu-22.04
+          - runtime: io.containerd.runc.v2-rs
+            os: ubuntu-24.04-arm
+        include:
+          # Not supported by the Rust shim yet.
+          - runtime: io.containerd.runc.v2-rs
+            extra_testflags: "-no-criu -test.skip='(TestContainerPTY|TestIssue10589|TestShimTraceContextPropagation)'"
 
     env:
       GOTEST: gotestsum --
@@ -483,6 +492,14 @@ jobs:
         run: |
           sudo modprobe dm_verity
 
+      - name: Install the Rust runc shim
+        if: matrix.runtime == 'io.containerd.runc.v2-rs'
+        run: |
+          git clone --depth=1 https://github.com/containerd/rust-extensions.git "$RUNNER_TEMP/rust-extensions"
+          cd "$RUNNER_TEMP/rust-extensions"
+          cargo build --release --bin containerd-shim-runc-v2-rs
+          sudo install -D target/release/containerd-shim-runc-v2-rs /usr/local/bin/
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1
@@ -510,6 +527,7 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          EXTRA_TESTFLAGS: ${{ matrix.extra_testflags }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: |
@@ -528,6 +546,7 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          EXTRA_TESTFLAGS: ${{ matrix.extra_testflags }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: |
