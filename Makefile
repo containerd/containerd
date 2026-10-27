@@ -91,7 +91,7 @@ ifdef BUILDTAGS
 	GO_BUILDTAGS = ${BUILDTAGS}
 endif
 GO_BUILDTAGS ?=
-GO_BUILDTAGS += urfave_cli_no_docs
+GO_BUILDTAGS += grpcnotrace
 GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
@@ -264,10 +264,9 @@ endef
 bin/%: cmd/% FORCE
 	$(call BUILD_BINARY)
 
-# gen-manpages must not have the urfave_cli_no_docs build-tag set
 bin/gen-manpages: cmd/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./cmd/gen-manpages
+	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS} ./cmd/gen-manpages
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
