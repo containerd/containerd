@@ -237,9 +237,15 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 			}
 		}
 
-		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-		if _, err = task.Delete(ctx, c.nri.WithContainerExit(&cntr, e), containerd.WithProcessKill); err != nil {
-			if !errdefs.IsNotFound(err) {
+		// Delete the task. When the container has already exited cleanly, deleting the task without
+		// WithProcessKill avoids an unnecessary runc kill --all command.
+		// If deletion fails because the task was not stopped, fall back to forceful deletion
+		// with WithProcessKill.
+		if _, err = task.Delete(ctx, c.nri.WithContainerExit(&cntr, e)); err != nil {
+			if errdefs.IsFailedPrecondition(err) {
+				_, err = task.Delete(ctx, containerd.WithProcessKill)
+			}
+			if err != nil && !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop container: %w", err)
 			}
 			// Move on to make sure container status is updated.
