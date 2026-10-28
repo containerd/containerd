@@ -22,10 +22,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
@@ -33,7 +37,10 @@ import (
 	"github.com/containerd/containerd/v2/internal/userns"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/opencontainers/go-digest"
+	bolt "go.etcd.io/bbolt"
 )
 
 // upperdirKey is a key of an optional label to each snapshot.
@@ -49,6 +56,12 @@ type SnapshotterConfig struct {
 	mountOptions  []string
 	remapIDs      bool
 	slowChown     bool
+	// layerContentCaches lists directories of pre-populated overlayfs snapshots.
+	// Each is checked one by one; the first hit is recorded as the snapshot's
+	// layer source and mounted from the cache. A directory that doesn't exist
+	// is treated as a cache miss. Layers missing from all of them are extracted
+	// normally.
+	layerContentCaches []string
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -106,14 +119,29 @@ func WithSlowChown(config *SnapshotterConfig) error {
 	return nil
 }
 
+// WithLayerContentCaches configures read-only directories of pre-populated
+// overlayfs snapshots that the snapshotter sources layers from on pull instead
+// of downloading and extracting them. See the layerContentCaches field for
+// details.
+func WithLayerContentCaches(paths ...string) Opt {
+	return func(config *SnapshotterConfig) error {
+		config.layerContentCaches = paths
+		return nil
+	}
+}
+
 type snapshotter struct {
-	root          string
-	ms            MetaStore
-	asyncRemove   bool
-	upperdirLabel bool
-	options       []string
-	remapIDs      bool
-	slowChown     bool
+	root               string
+	ms                 MetaStore
+	asyncRemove        bool
+	upperdirLabel      bool
+	options            []string
+	remapIDs           bool
+	slowChown          bool
+	layerContentCaches []string
+
+	cacheMu      sync.Mutex
+	cacheIndices []atomic.Pointer[dirCacheIndex]
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -137,6 +165,25 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	if !supportsDType {
 		return nil, fmt.Errorf("%s does not support d_type. If the backing filesystem is xfs, please reformat with ftype=1 to enable d_type support", root)
 	}
+
+	var layerContentCaches []string
+	if len(config.layerContentCaches) > 0 {
+		// A cache dir is recorded in a snapshot and mounted later. A relative
+		// path would resolve against the working directory of whichever
+		// process performs the mount. The check is only lexical:
+		// dirs are not required to exist, as a missing one just yields a cache
+		// miss and may well be provisioned after startup.
+		layerContentCaches = make([]string, len(config.layerContentCaches))
+		for i, dir := range config.layerContentCaches {
+			if !filepath.IsAbs(dir) {
+				return nil, fmt.Errorf("layer_content_caches %q must be an absolute path", dir)
+			}
+			layerContentCaches[i] = filepath.Clean(dir)
+		}
+
+		log.L.WithField("dirs", layerContentCaches).Info("overlayfs layer content cache enabled")
+	}
+
 	if config.ms == nil {
 		config.ms, err = storage.NewMetaStore(filepath.Join(root, "metadata.db"))
 		if err != nil {
@@ -166,13 +213,15 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		root:          root,
-		ms:            config.ms,
-		asyncRemove:   config.asyncRemove,
-		upperdirLabel: config.upperdirLabel,
-		options:       config.mountOptions,
-		remapIDs:      config.remapIDs,
-		slowChown:     config.slowChown,
+		root:               root,
+		ms:                 config.ms,
+		asyncRemove:        config.asyncRemove,
+		upperdirLabel:      config.upperdirLabel,
+		options:            config.mountOptions,
+		remapIDs:           config.remapIDs,
+		slowChown:          config.slowChown,
+		layerContentCaches: layerContentCaches,
+		cacheIndices:       make([]atomic.Pointer[dirCacheIndex], len(layerContentCaches)),
 	}, nil
 }
 
@@ -208,27 +257,38 @@ func (o *snapshotter) Stat(ctx context.Context, key string) (info snapshots.Info
 		if info.Labels == nil {
 			info.Labels = make(map[string]string)
 		}
-		info.Labels[upperdirKey] = o.upperPath(id)
+		info.Labels[upperdirKey] = o.upperdirPath(id, info)
 	}
 	return info, nil
 }
 
 func (o *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (newInfo snapshots.Info, err error) {
 	err = o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		// A backend snapshotter only receives inherited labels. A caller cannot
+		// send the snapshotter's own labels back. An Update that replaces the
+		// label set would drop them and leave a snapshot that cannot find its
+		// layer directory. They are merged back in here.
+		id, cur, _, err := storage.GetInfo(ctx, info.Name)
+		if err != nil {
+			return err
+		}
+		if private := privateLabels(cur.Labels); len(private) > 0 {
+			if info.Labels == nil {
+				info.Labels = make(map[string]string, len(private))
+			}
+			maps.Copy(info.Labels, private)
+		}
+
 		newInfo, err = storage.UpdateInfo(ctx, info, fieldpaths...)
 		if err != nil {
 			return err
 		}
 
 		if o.upperdirLabel {
-			id, _, _, err := storage.GetInfo(ctx, newInfo.Name)
-			if err != nil {
-				return err
-			}
 			if newInfo.Labels == nil {
 				newInfo.Labels = make(map[string]string)
 			}
-			newInfo.Labels[upperdirKey] = o.upperPath(id)
+			newInfo.Labels[upperdirKey] = o.upperdirPath(id, newInfo)
 		}
 		return nil
 	})
@@ -255,7 +315,13 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (_ snapshots.Usage,
 	}
 
 	if info.Kind == snapshots.KindActive {
-		upperPath := o.upperPath(id)
+		upperPath, src, err := o.resolveLayerDir(id, info)
+		if err != nil {
+			return snapshots.Usage{}, err
+		}
+		if src.populated() {
+			return src.Usage, nil
+		}
 		du, err := fs.DiskUsage(ctx, upperPath)
 		if err != nil {
 			// TODO(stevvooe): Consider not reporting an error in this case.
@@ -279,8 +345,11 @@ func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 //
 // This can be used to recover mounts after calling View or Prepare.
 func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, err error) {
-	var s storage.Snapshot
-	var info snapshots.Info
+	var (
+		s       storage.Snapshot
+		info    snapshots.Info
+		parents []snapshots.Info
+	)
 	if err := o.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
 		s, err = storage.GetSnapshot(ctx, key)
 		if err != nil {
@@ -291,27 +360,48 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot info: %w", err)
 		}
-		return nil
+
+		// Read inside the transaction (see parentInfos).
+		parents, err = parentInfos(ctx, info)
+		return err
 	}); err != nil {
 		return nil, err
 	}
-	return o.mounts(s, info), nil
+	return o.mounts(s, info, parents)
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
-		// grab the existing id
-		id, _, _, err := storage.GetInfo(ctx, key)
+		// grab the existing id and info
+		id, info, _, err := storage.GetInfo(ctx, key)
 		if err != nil {
 			return err
 		}
 
-		usage, err := fs.DiskUsage(ctx, o.upperPath(id))
+		layerDir, src, err := o.resolveLayerDir(id, info)
 		if err != nil {
 			return err
 		}
 
-		if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
+		var usage snapshots.Usage
+		if src.populated() {
+			usage = src.Usage
+		} else {
+			du, err := fs.DiskUsage(ctx, layerDir)
+			if err != nil {
+				return err
+			}
+			usage = snapshots.Usage(du)
+		}
+
+		// storage.CommitActive replaces the snapshot's labels with the ones
+		// passed here. The snapshotter's own labels are added back. The
+		// committed layer keeps the record of where its directory is.
+		if private := privateLabels(info.Labels); len(private) > 0 {
+			opts = append(opts, snapshots.WithLabels(private))
+		}
+
+		if _, err = storage.CommitActive(ctx, key, name, usage, opts...); err != nil {
 			return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 		}
 		return nil
@@ -363,7 +453,7 @@ func (o *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...str
 				if info.Labels == nil {
 					info.Labels = make(map[string]string)
 				}
-				info.Labels[upperdirKey] = o.upperPath(id)
+				info.Labels[upperdirKey] = o.upperdirPath(id, info)
 				return fn(ctx, info)
 			}, fs...)
 		}
@@ -429,12 +519,314 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, erro
 	return cleanup, nil
 }
 
+// parentInfos returns the info of every ancestor of the snapshot described by
+// info, nearest first, in the same order as ParentIDs on the corresponding
+// storage.Snapshot. Callers read this inside the transaction that read the
+// snapshot.
+func parentInfos(ctx context.Context, info snapshots.Info) ([]snapshots.Info, error) {
+	var parents []snapshots.Info
+	for name := info.Parent; name != ""; {
+		_, pi, _, err := storage.GetInfo(ctx, name)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get parent snapshot %q info: %w", name, err)
+		}
+		parents = append(parents, pi)
+		name = pi.Parent
+	}
+	return parents, nil
+}
+
+type cachedLayer struct {
+	id     string
+	diffID string
+	usage  snapshots.Usage
+	err    error
+}
+
+type dirCacheIndex struct {
+	dbPath       string
+	snapshotsDir string
+	byTarget     map[string][]cachedLayer
+}
+
+type cacheHit struct {
+	dir   string
+	usage snapshots.Usage
+}
+
+// resolveCacheLocations locates the metadata.db file and snapshots directory
+// for a configured layer_content_caches path. An operator may point the setting
+// at an overlayfs snapshotter root (<dir>/metadata.db + <dir>/snapshots), its
+// snapshots subdirectory (<dir>/../metadata.db + <dir>), or a containerd root
+// directory (<dir>/io.containerd.snapshotter.v1.overlayfs/metadata.db).
+func resolveCacheLocations(dir string) (overlayRoot, dbPath, snapshotsDir string, ok bool, err error) {
+	dir = filepath.Clean(dir)
+	type layout struct {
+		root      string
+		db        string
+		snapshots string
+	}
+	candidates := []layout{
+		{
+			root:      dir,
+			db:        filepath.Join(dir, "metadata.db"),
+			snapshots: filepath.Join(dir, "snapshots"),
+		},
+	}
+	if filepath.Base(dir) == "snapshots" {
+		parent := filepath.Dir(dir)
+		candidates = append(candidates, layout{
+			root:      parent,
+			db:        filepath.Join(parent, "metadata.db"),
+			snapshots: dir,
+		})
+	}
+	pluginRoot := filepath.Join(dir, "io.containerd.snapshotter.v1.overlayfs")
+	candidates = append(candidates, layout{
+		root:      pluginRoot,
+		db:        filepath.Join(pluginRoot, "metadata.db"),
+		snapshots: filepath.Join(pluginRoot, "snapshots"),
+	})
+
+	var firstErr error
+	for _, c := range candidates {
+		fi, statErr := os.Stat(c.db)
+		if statErr != nil {
+			if !os.IsNotExist(statErr) && firstErr == nil {
+				firstErr = statErr
+			}
+			continue
+		}
+		if !fi.Mode().IsRegular() {
+			continue
+		}
+		sfi, statErr := os.Stat(c.snapshots)
+		if statErr != nil {
+			if !os.IsNotExist(statErr) && firstErr == nil {
+				firstErr = statErr
+			}
+			continue
+		}
+		if sfi.IsDir() {
+			return c.root, c.db, c.snapshots, true, nil
+		}
+	}
+	return "", "", "", false, firstErr
+}
+
+// getOrBuildCacheIndex returns the in-memory index for a cache directory,
+// building and caching it on first successful read. Configured caches are
+// immutable once provisioned; directories that do not exist yet or fail to open
+// are not cached so a cache mounted after startup is picked up on a later pull.
+func (o *snapshotter) getOrBuildCacheIndex(ctx context.Context, i int, dbPath, snapshotsDir string) (*dirCacheIndex, error) {
+	o.cacheMu.Lock()
+	defer o.cacheMu.Unlock()
+	if idx := o.cacheIndices[i].Load(); idx != nil {
+		return idx, nil
+	}
+
+	idx, err := buildCacheIndex(ctx, dbPath, snapshotsDir)
+	if err != nil {
+		return nil, err
+	}
+	o.cacheIndices[i].Store(idx)
+	return idx, nil
+}
+
+func buildCacheIndex(ctx context.Context, dbPath, snapshotsDir string) (*dirCacheIndex, error) {
+	ms, err := storage.NewMetaStore(dbPath, func(bopts *bolt.Options) error {
+		bopts.ReadOnly = true
+		bopts.Timeout = time.Second
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer ms.Close()
+
+	idx := &dirCacheIndex{
+		dbPath:       dbPath,
+		snapshotsDir: snapshotsDir,
+		byTarget:     make(map[string][]cachedLayer),
+	}
+
+	err = ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		return storage.WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
+			if info.Kind != snapshots.KindCommitted {
+				return nil
+			}
+			src, srcErr := layerSourceFromInfo(info)
+			if srcErr == nil && !src.owned() {
+				// Do not re-export layers that a cache snapshotter itself
+				// sourced from an external path.
+				return nil
+			}
+			id, _, usage, err := storage.GetInfo(ctx, info.Name)
+			if err != nil {
+				return err
+			}
+			entry := cachedLayer{
+				id:     id,
+				diffID: info.Labels[snapshots.LabelSnapshotDiffID],
+				usage:  usage,
+				err:    srcErr,
+			}
+			if ref, ok := info.Labels[snapshots.LabelSnapshotRef]; ok {
+				if ref != "" {
+					idx.byTarget[ref] = append(idx.byTarget[ref], entry)
+				}
+				return nil
+			}
+			idx.byTarget[info.Name] = append(idx.byTarget[info.Name], entry)
+			for s := info.Name; ; {
+				_, after, ok := strings.Cut(s, "/")
+				if !ok {
+					break
+				}
+				if after != "" {
+					idx.byTarget[after] = append(idx.byTarget[after], entry)
+				}
+				s = after
+			}
+			return nil
+		})
+	})
+	if err != nil && !errdefs.IsNotFound(err) {
+		// Note: errdefs.IsNotFound means a freshly initialized metadata.db has
+		// no "v1" bucket yet; treat that as an empty cache rather than an error.
+		return nil, err
+	}
+	return idx, nil
+}
+
+// lookupCache returns the cached overlayfs layer directory and precomputed usage
+// that can serve the layer being prepared, or false on a miss. It gates on: at
+// least one cache being configured, the Prepare being an image-layer extraction
+// (carries the snapshot.ref and diff-id labels), and the committed snapshot's
+// fs directory being present in the cache. Caches are checked one by one and
+// the first hit wins. Every miss returns false so pulls keep working.
+func (o *snapshotter) lookupCache(ctx context.Context, opts ...snapshots.Opt) (cacheHit, bool) {
+	if len(o.layerContentCaches) == 0 {
+		return cacheHit{}, false
+	}
+
+	var base snapshots.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return cacheHit{}, false
+		}
+	}
+
+	target := base.Labels[snapshots.LabelSnapshotRef]
+	diffIDStr := base.Labels[snapshots.LabelSnapshotDiffID]
+	if target == "" || diffIDStr == "" {
+		// Not an image-layer extraction, or no diffID/ref to key on.
+		return cacheHit{}, false
+	}
+	diffID, err := digest.Parse(diffIDStr)
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("diffID", diffIDStr).
+			Warn("overlayfs layer cache: invalid diff-id label, treating as cache miss")
+		return cacheHit{}, false
+	}
+
+	for i, dir := range o.layerContentCaches {
+		if hit, ok := o.lookupCacheInDir(ctx, i, dir, target, diffID.String()); ok {
+			return hit, true
+		}
+	}
+
+	log.G(ctx).WithFields(log.Fields{
+		"chainID": target,
+		"diffID":  diffID.String(),
+	}).Trace("overlayfs layer cache miss")
+	return cacheHit{}, false
+}
+
+func (o *snapshotter) lookupCacheInDir(ctx context.Context, i int, dir, target, diffIDStr string) (cacheHit, bool) {
+	idx := o.cacheIndices[i].Load()
+	if idx == nil {
+		dir = filepath.Clean(dir)
+		overlayRoot, dbPath, snapshotsDir, ok, err := resolveCacheLocations(dir)
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("dir", dir).
+				Warn("overlayfs layer cache: failed to stat cache directory, skipping this cache")
+			return cacheHit{}, false
+		}
+		if !ok {
+			return cacheHit{}, false
+		}
+		if filepath.Clean(overlayRoot) == filepath.Clean(o.root) {
+			return cacheHit{}, false
+		}
+
+		idx, err = o.getOrBuildCacheIndex(ctx, i, dbPath, snapshotsDir)
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("db", dbPath).
+				Warn("overlayfs layer cache: failed to open or query cache metadata.db, skipping this cache")
+			return cacheHit{}, false
+		}
+	}
+
+	return matchCacheEntries(ctx, idx.dbPath, idx.snapshotsDir, diffIDStr, idx.byTarget[target])
+}
+
+func matchCacheEntries(ctx context.Context, dbPath, snapshotsDir, diffIDStr string, entries []cachedLayer) (cacheHit, bool) {
+	for _, entry := range entries {
+		if entry.diffID != "" && entry.diffID != diffIDStr {
+			continue
+		}
+		if entry.err != nil {
+			log.G(ctx).WithError(entry.err).WithField("db", dbPath).
+				Warn("overlayfs layer cache: invalid layer source metadata in cache, skipping entry")
+			continue
+		}
+
+		candidate := filepath.Join(snapshotsDir, entry.id, "fs")
+		fi, err := os.Lstat(candidate)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				log.G(ctx).WithError(err).WithField("dir", candidate).
+					Warn("overlayfs layer cache: failed to stat cached layer directory, skipping entry")
+			}
+			continue
+		}
+		if !fi.IsDir() {
+			log.G(ctx).WithField("dir", candidate).
+				Warn("overlayfs layer cache: cached layer path is not a directory, skipping entry")
+			continue
+		}
+		return cacheHit{dir: candidate, usage: entry.usage}, true
+	}
+	return cacheHit{}, false
+}
+
+// createSnapshot creates an active (or view) snapshot and returns its mounts.
+// On an image-layer extraction whose committed layer is in the layer content
+// cache, it records the cache entry as the snapshot's layer source and returns
+// it as a read-only mount. The unpacker reads that as a staged layer, skips the
+// layer extraction, and commits the snapshot normally. The parent is applied
+// either at Prepare (sequential unpacking) or at Commit via WithParent
+// (parallel unpacking).
 func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
 	var (
 		s        storage.Snapshot
 		td, path string
 		info     snapshots.Info
+		parents  []snapshots.Info
+		mounts   []mount.Mount
 	)
+
+	if kind == snapshots.KindActive {
+		if hit, ok := o.lookupCache(ctx, opts...); ok {
+			log.G(ctx).WithFields(log.Fields{
+				"key": key,
+				"dir": hit.dir,
+			}).Debug("layer content cache hit, serving the cached overlayfs layer")
+			opts = append(opts, snapshots.WithLabels(
+				layerSource{Kind: layerSourceCache, Ref: hit.dir, Usage: hit.usage}.labels()))
+		}
+	}
 
 	defer func() {
 		if err != nil {
@@ -452,7 +844,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 	}()
 
-	if err := o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {
+	if err = o.ms.WithTransaction(ctx, true, func(ctx context.Context) (err error) {
 		snapshotDir := filepath.Join(o.root, "snapshots")
 		td, err = o.prepareDirectory(ctx, snapshotDir, kind)
 		if err != nil {
@@ -467,6 +859,12 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		_, info, _, err = storage.GetInfo(ctx, key)
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot info: %w", err)
+		}
+
+		// Read inside the transaction (see parentInfos).
+		parents, err = parentInfos(ctx, info)
+		if err != nil {
+			return err
 		}
 
 		var (
@@ -502,7 +900,11 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 		if mappedUID == -1 || mappedGID == -1 {
 			if len(s.ParentIDs) > 0 {
-				st, err := os.Stat(o.upperPath(s.ParentIDs[0]))
+				parentDir, _, err := o.resolveLayerDir(s.ParentIDs[0], parents[0])
+				if err != nil {
+					return fmt.Errorf("failed to resolve parent layer directory: %w", err)
+				}
+				st, err := os.Stat(parentDir)
 				if err != nil {
 					return fmt.Errorf("failed to stat parent: %w", err)
 				}
@@ -521,17 +923,23 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			}
 		}
 
-		path = filepath.Join(snapshotDir, s.ID)
-		if err = os.Rename(td, path); err != nil {
+		targetPath := filepath.Join(snapshotDir, s.ID)
+		if err = os.Rename(td, targetPath); err != nil {
 			return fmt.Errorf("failed to rename: %w", err)
 		}
 		td = ""
+		path = targetPath
+
+		mounts, err = o.mounts(s, info, parents)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	return o.mounts(s, info), nil
+	return mounts, nil
 }
 
 func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, kind snapshots.Kind) (string, error) {
@@ -553,7 +961,7 @@ func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, 
 	return td, nil
 }
 
-func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mount {
+func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info, parents []snapshots.Info) ([]mount.Mount, error) {
 	var options []string
 
 	if o.remapIDs {
@@ -566,46 +974,75 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 	}
 
 	if len(s.ParentIDs) == 0 {
+		// A recorded layer source that does not resolve is an error here too
+		// (see resolveLayerDir): falling through would hand out a writable
+		// mount for a layer the snapshotter has already reported complete.
+		topDir, src, err := o.resolveLayerDir(s.ID, info)
+		if err != nil {
+			return nil, err
+		}
 		// if we only have one layer/no parents then just return a bind mount as overlay
 		// will not work
 		roFlag := "rw"
-		if s.Kind == snapshots.KindView {
+		if s.Kind == snapshots.KindView || src.populated() {
 			roFlag = "ro"
 		}
 		return []mount.Mount{
 			{
-				Source: o.upperPath(s.ID),
+				Source: topDir,
 				Type:   "bind",
 				Options: append(options,
 					roFlag,
 					"rbind",
 				),
 			},
+		}, nil
+	}
+
+	if len(parents) != len(s.ParentIDs) {
+		return nil, fmt.Errorf("got %d parent infos for %d parents of snapshot %s: %w",
+			len(parents), len(s.ParentIDs), s.ID, errdefs.ErrInvalidArgument)
+	}
+
+	parentPaths := make([]string, len(s.ParentIDs))
+	for i := range s.ParentIDs {
+		parentDir, _, err := o.resolveLayerDir(s.ParentIDs[i], parents[i])
+		if err != nil {
+			return nil, err
 		}
+		parentPaths[i] = parentDir
 	}
 
 	if s.Kind == snapshots.KindActive {
-		options = append(options,
-			"workdir="+o.workPath(s.ID),
-			"upperdir="+o.upperPath(s.ID),
-		)
+		topDir, src, err := o.resolveLayerDir(s.ID, info)
+		if err != nil {
+			return nil, err
+		}
+		if src.populated() {
+			// Nothing in this overlay is writable. The cached layer is stacked
+			// as the top lower above its parents with no upperdir, and "ro"
+			// states that explicitly so the unpacker treats it as staged.
+			parentPaths = append([]string{topDir}, parentPaths...)
+			options = append(options, "ro")
+		} else {
+			options = append(options,
+				"workdir="+o.workPath(s.ID),
+				"upperdir="+topDir,
+			)
+		}
 	} else if len(s.ParentIDs) == 1 {
 		return []mount.Mount{
 			{
-				Source: o.upperPath(s.ParentIDs[0]),
+				Source: parentPaths[0],
 				Type:   "bind",
 				Options: append(options,
 					"ro",
 					"rbind",
 				),
 			},
-		}
+		}, nil
 	}
 
-	parentPaths := make([]string, len(s.ParentIDs))
-	for i := range s.ParentIDs {
-		parentPaths[i] = o.upperPath(s.ParentIDs[i])
-	}
 	options = append(options, "lowerdir="+strings.Join(parentPaths, ":"))
 	options = append(options, o.options...)
 
@@ -615,11 +1052,18 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 			Source:  "overlay",
 			Options: options,
 		},
-	}
+	}, nil
 }
 
 func (o *snapshotter) upperPath(id string) string {
 	return filepath.Join(o.root, "snapshots", id, "fs")
+}
+
+func (o *snapshotter) upperdirPath(id string, info snapshots.Info) string {
+	if src, err := layerSourceFromInfo(info); err == nil && src.populated() {
+		return src.Ref
+	}
+	return o.upperPath(id)
 }
 
 func (o *snapshotter) workPath(id string) string {
