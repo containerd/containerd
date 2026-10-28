@@ -43,18 +43,19 @@ type execProcess struct {
 
 	execState execState
 
-	mu      sync.Mutex
-	id      string
-	console console.Console
-	io      *processIO
-	status  int
-	exited  time.Time
-	pid     safePid
-	closers []io.Closer
-	stdin   io.Closer
-	stdio   stdio.Stdio
-	path    string
-	spec    specs.Process
+	mu        sync.Mutex
+	id        string
+	console   console.Console
+	io        *processIO
+	status    int
+	exited    time.Time
+	pid       safePid
+	closers   []io.Closer
+	closeOnce sync.Once
+	stdin     io.Closer
+	stdio     stdio.Stdio
+	path      string
+	spec      specs.Process
 
 	parent    *Init
 	waitBlock chan struct{}
@@ -101,6 +102,17 @@ func (e *execProcess) setExited(status int) {
 	e.exited = time.Now()
 	e.parent.Platform.ShutdownConsole(context.Background(), e.console)
 	close(e.waitBlock)
+	// CRI forgets exec ids across a containerd restart, so Delete may never
+	// come. Free the handles once the copiers finish; only delete forces it.
+	// A logging binary has no copiers and reads the pipes until delete closes
+	// them, so its I/O stays with delete.
+	go func() {
+		e.wg.Wait()
+		if e.io != nil && !e.io.copy {
+			return
+		}
+		e.release()
+	}()
 }
 
 func (e *execProcess) Delete(ctx context.Context) error {
@@ -110,9 +122,15 @@ func (e *execProcess) Delete(ctx context.Context) error {
 	return e.execState.Delete(ctx)
 }
 
+// release closes the process I/O once, for whichever of delete and the exit
+// path gets there first.
+func (e *execProcess) release() {
+	e.closeOnce.Do(func() { closeIO(e.closers, e.console, e.io) })
+}
+
 func (e *execProcess) delete(ctx context.Context) error {
 	shutdownAndDrain(ctx, e.parent.Platform, e.console, &e.wg, "exec process "+e.id)
-	closeIO(e.closers, e.console, e.io)
+	e.release()
 	pidfile := filepath.Join(e.path, e.id+".pid")
 	// silently ignore error
 	os.Remove(pidfile)
