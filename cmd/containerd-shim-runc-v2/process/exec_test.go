@@ -61,7 +61,10 @@ func TestExecDeleteReleasesTerminalIO(t *testing.T) {
 		closers: []io.Closer{stdin},
 		console: cons,
 	}
-	if err := e.delete(context.Background()); err != nil {
+	e.mu.Lock()
+	err := e.delete(context.Background())
+	e.mu.Unlock()
+	if err != nil {
 		t.Fatal(err)
 	}
 	if stdin.closed != 1 {
@@ -103,7 +106,10 @@ func TestExecDeleteShutsConsoleDownBeforeClosing(t *testing.T) {
 		parent:  &Init{Platform: recordingPlatform{events: &events}},
 		console: orderedConsole{events: &events},
 	}
-	if err := e.delete(context.Background()); err != nil {
+	e.mu.Lock()
+	err := e.delete(context.Background())
+	e.mu.Unlock()
+	if err != nil {
 		t.Fatal(err)
 	}
 	if got := strings.Join(events, ","); got != "shutdown,close" {
