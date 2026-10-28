@@ -638,7 +638,8 @@ version = 2
         # CriuImagePath is the criu image path
         CriuImagePath = ""
 
-        # CriuWorkPath is the criu work path.
+        # CriuWorkPath is the CRIU work directory. SELinux restores use a private
+        # subdirectory with the container's SELinux mount label.
         CriuWorkPath = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".cni' contains config related to cni
