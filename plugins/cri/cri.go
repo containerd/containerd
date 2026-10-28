@@ -185,7 +185,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	service := &criGRPCServer{
 		RuntimeServiceServer: rs,
 		ImageServiceServer:   is,
-		Closer:               s, // TODO: Where is close run?
+		Closer:               s, // closed by Server.Stop in cmd/containerd/server
 		initializer:          s,
 	}
 
