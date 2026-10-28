@@ -319,12 +319,18 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 
 	type testCase struct {
 		name              string
+		mixedRoots        bool
 		injectUmountFault bool
 	}
 
 	tcases := []testCase{
 		{
 			name:              "normal",
+			injectUmountFault: false,
+		},
+		{
+			name:              "mixed-roots",
+			mixedRoots:        true,
 			injectUmountFault: false,
 		},
 		{
@@ -340,10 +346,24 @@ func TestDoPrepareIDMappedOverlay(t *testing.T) {
 				t.Skip("IDmapped mounts not supported on filesystem selected by t.TempDir()")
 			}
 
-			lowerDirs := []string{filepath.Join(fakeLowerDirsDir, "lower1"), filepath.Join(fakeLowerDirsDir, "lower2")}
-			for _, dir := range lowerDirs {
-				require.NoError(t, os.Mkdir(dir, 0755))
-				require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(dir)), []byte("foo"), 0644))
+			var lowerDirs []string
+			if tc.mixedRoots {
+				cacheSnapDir := filepath.Join(t.TempDir(), "snapshots")
+				localSnapDir := filepath.Join(fakeLowerDirsDir, "snapshots")
+				lowerDirs = []string{
+					filepath.Join(localSnapDir, "2", "fs"),
+					filepath.Join(cacheSnapDir, "1", "fs"),
+				}
+				for i, dir := range lowerDirs {
+					require.NoError(t, os.MkdirAll(dir, 0755))
+					require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(dir)), fmt.Appendf(nil, "layer-%d", i), 0644))
+				}
+			} else {
+				lowerDirs = []string{filepath.Join(fakeLowerDirsDir, "lower1"), filepath.Join(fakeLowerDirsDir, "lower2")}
+				for _, dir := range lowerDirs {
+					require.NoError(t, os.Mkdir(dir, 0755))
+					require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(dir)), []byte("foo"), 0644))
+				}
 			}
 
 			remountsLocation := t.TempDir()
@@ -620,11 +640,11 @@ func TestBuildIDMappedPaths(t *testing.T) {
 	}
 }
 
-func TestGetCommonDirectory(t *testing.T) {
+func TestGroupLowerDirs(t *testing.T) {
 	testCases := []struct {
 		name        string
 		lowerDirs   []string
-		expected    string
+		expected    []lowerDirGroup
 		expectError bool
 		errorMsg    string
 	}{
@@ -632,32 +652,101 @@ func TestGetCommonDirectory(t *testing.T) {
 			name:        "no lowerdirs",
 			lowerDirs:   []string{},
 			expectError: true,
-			errorMsg:    "no common prefix found",
+			errorMsg:    "no lower directories provided",
 		},
 		{
-			name: "normal snapshots",
+			name:        "relative lowerdir rejected",
+			lowerDirs:   []string{"relative/snapshots/1/fs"},
+			expectError: true,
+			errorMsg:    "invalid lower directory",
+		},
+		{
+			name: "normal snapshots share a single root",
 			lowerDirs: []string{
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/37712/fs",
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16590/fs",
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
 			},
-			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+			expected: []lowerDirGroup{
+				{
+					root:    "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{0, 1, 2},
+				},
+			},
 		},
 		{
-			name: "no common prefix at all",
+			name: "mixed local and cache roots preserve layer indices",
+			lowerDirs: []string{
+				"/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/12/fs",
+				"/mnt/image-cache/io.containerd.snapshotter.v1.overlayfs/snapshots/5/fs",
+				"/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/11/fs",
+				"/mnt/image-cache/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+			},
+			expected: []lowerDirGroup{
+				{
+					root:    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{0, 2},
+				},
+				{
+					root:    "/mnt/image-cache/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{1, 3},
+				},
+			},
+		},
+		{
+			name: "sibling roots under /var/lib do not collapse into /var/lib",
+			lowerDirs: []string{
+				"/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs",
+				"/var/lib/containerd-cache/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
+			},
+			expected: []lowerDirGroup{
+				{
+					root:    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{0},
+				},
+				{
+					root:    "/var/lib/containerd-cache/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{1},
+				},
+			},
+		},
+		{
+			name: "unrelated non-snapshotter directories",
 			lowerDirs: []string{
 				"/completely/different/path/1",
 				"/totally/unrelated/path/2",
 			},
-			expectError: true,
-			errorMsg:    "invalid common directory:",
+			expected: []lowerDirGroup{
+				{root: "/completely/different/path", indices: []int{0}},
+				{root: "/totally/unrelated/path", indices: []int{1}},
+			},
 		},
 		{
-			name: "single dir",
+			name: "shallow non-snapshotter directories under /mnt and /var/lib stay separate",
+			lowerDirs: []string{
+				"/mnt/cache-a",
+				"/mnt/cache-b",
+				"/var/lib/layer-a",
+				"/var/lib/layer-b",
+			},
+			expected: []lowerDirGroup{
+				{root: "/mnt/cache-a", indices: []int{0}},
+				{root: "/mnt/cache-b", indices: []int{1}},
+				{root: "/var/lib/layer-a", indices: []int{2}},
+				{root: "/var/lib/layer-b", indices: []int{3}},
+			},
+		},
+		{
+			name: "single snapshot dir",
 			lowerDirs: []string{
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
 			},
-			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585",
+			expected: []lowerDirGroup{
+				{
+					root:    "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{0},
+				},
+			},
 		},
 		{
 			name: "snapshots with common prefix in snapshot id",
@@ -669,13 +758,18 @@ func TestGetCommonDirectory(t *testing.T) {
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/75/fs",
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/73/fs",
 			},
-			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+			expected: []lowerDirGroup{
+				{
+					root:    "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots",
+					indices: []int{0, 1, 2, 3, 4, 5},
+				},
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := getCommonDirectory(tc.lowerDirs)
+			result, err := groupLowerDirs(tc.lowerDirs)
 
 			if tc.expectError {
 				if err == nil {
@@ -687,13 +781,8 @@ func TestGetCommonDirectory(t *testing.T) {
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if result != tc.expected {
-				t.Errorf("expected %q, got %q", tc.expected, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
