@@ -21,6 +21,7 @@ package process
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,12 +33,14 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/sys/unix"
 )
 
@@ -84,6 +87,9 @@ type Init struct {
 	NoPivotRoot  bool
 	NoNewKeyring bool
 	CriuWorkPath string
+
+	// restoreWorkPath is private to this restore. Remove it only while empty.
+	restoreWorkPath string
 }
 
 // NewRunc returns a new runc instance for a process
@@ -198,6 +204,11 @@ func (p *Init) openStdin(path string) error {
 }
 
 func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error {
+	spec, err := oci.ReadSpec(filepath.Join(p.Bundle, oci.ConfigFilename))
+	if err != nil {
+		return fmt.Errorf("failed to read OCI spec for restore: %w", err)
+	}
+
 	opts := &runc.RestoreOpts{
 		CheckpointOpts: runc.CheckpointOpts{
 			ImagePath:  r.Checkpoint,
@@ -211,6 +222,12 @@ func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error 
 		Detach:      true,
 		NoSubreaper: true,
 	}
+	if err := prepareCheckpointRestore(opts, spec, label.Relabel); err != nil {
+		return err
+	}
+	if opts.WorkDir != p.CriuWorkPath {
+		p.restoreWorkPath = opts.WorkDir
+	}
 
 	if p.io != nil {
 		opts.IO = p.io.IO()
@@ -220,6 +237,32 @@ func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error 
 		p:    p,
 		opts: opts,
 	}
+	return nil
+}
+
+func prepareCheckpointRestore(opts *runc.RestoreOpts, spec *specs.Spec, relabel func(string, string, bool) error) error {
+	if spec.Process != nil && spec.Process.SelinuxLabel != "" {
+		opts.ExtraArgs = append(opts.ExtraArgs, "--lsm-profile=selinux:"+spec.Process.SelinuxLabel)
+	}
+	if spec.Linux == nil || spec.Linux.MountLabel == "" {
+		return nil
+	}
+
+	mountLabel := spec.Linux.MountLabel
+	opts.ExtraArgs = append(opts.ExtraArgs, "--lsm-mount-context="+mountLabel)
+	if err := os.Mkdir(opts.WorkDir, 0o700); err != nil && !errors.Is(err, os.ErrExist) {
+		return fmt.Errorf("failed to create CRIU work directory: %w", err)
+	}
+	workDir, err := os.MkdirTemp(opts.WorkDir, "criu-restore-")
+	if err != nil {
+		return fmt.Errorf("failed to create private CRIU restore work directory: %w", err)
+	}
+	// Restored processes write through CRIU's inherited log fd after changing
+	// their label. Do not relabel a configured work path shared by other tasks.
+	if err := relabel(workDir, mountLabel, false); err != nil {
+		return errors.Join(fmt.Errorf("failed to relabel CRIU restore work directory: %w", err), os.Remove(workDir))
+	}
+	opts.WorkDir = workDir
 	return nil
 }
 
@@ -391,6 +434,13 @@ func (p *Init) delete(ctx context.Context) error {
 		log.G(ctx).WithError(err2).Warn("failed to cleanup rootfs mount")
 		if err == nil {
 			err = fmt.Errorf("failed rootfs umount: %w", err2)
+		}
+	}
+	if err == nil && p.restoreWorkPath != "" {
+		// A task removed before restore has no log to retain. Never remove logs
+		// from a restore attempt or files in the configured parent directory.
+		if err2 := os.Remove(p.restoreWorkPath); err2 != nil && !errors.Is(err2, os.ErrNotExist) && !errors.Is(err2, unix.ENOTEMPTY) {
+			err = fmt.Errorf("failed to remove empty CRIU restore work directory: %w", err2)
 		}
 	}
 	return err
