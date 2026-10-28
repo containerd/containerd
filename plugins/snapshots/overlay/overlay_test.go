@@ -53,6 +53,7 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
@@ -1480,8 +1481,125 @@ func TestCacheDirMustBeAbsolute(t *testing.T) {
 	}
 }
 
+func TestCacheID(t *testing.T) {
+	for _, tc := range []struct {
+		idx  int
+		dir  string
+		want string
+	}{
+		{0, "/mnt/image-cache/io.containerd.snapshotter.v1.overlayfs/snapshots", "0:image-cache"},
+		{1, "/var/lib/containerd-cache/io.containerd.snapshotter.v1.overlayfs", "1:containerd-cache"},
+		{0, "/mnt/image-cache/snapshots", "0:image-cache"},
+		{2, "/mnt/image-cache", "2:image-cache"},
+		{0, "/mnt/image-cache/io.containerd.snapshotter.v1.overlayfs/snapshots/", "0:image-cache"},
+		{0, "/mnt/image-cache/snapshots/.", "0:image-cache"},
+		{0, "/snapshots", "0:snapshots"},
+		{0, "/io.containerd.snapshotter.v1.overlayfs", "0:io.containerd.snapshotter.v1.overlayfs"},
+		{0, "/io.containerd.snapshotter.v1.overlayfs/snapshots", "0:io.containerd.snapshotter.v1.overlayfs"},
+	} {
+		assert.Equal(t, tc.want, cacheID(tc.idx, tc.dir), "cacheID(%d, %q)", tc.idx, tc.dir)
+	}
+}
+
+func prometheusCounterVal(t *testing.T, name string, labels map[string]string) float64 {
+	t.Helper()
+	mfs, err := prometheus.DefaultGatherer.Gather()
+	require.NoError(t, err)
+	for _, mf := range mfs {
+		if mf.GetName() != name {
+			continue
+		}
+	metricLoop:
+		for _, m := range mf.GetMetric() {
+			for k, v := range labels {
+				found := false
+				for _, lp := range m.GetLabel() {
+					if lp.GetName() == k && lp.GetValue() == v {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue metricLoop
+				}
+			}
+			return m.GetCounter().GetValue()
+		}
+	}
+	return 0
+}
+
+// TestCacheMetrics verifies that layer content cache hits, hit bytes, misses,
+// and unreadable cache errors increment the containerd_overlayfs_* Prometheus
+// counters with the expected label values, while non-extraction snapshot
+// operations are ignored.
+func TestCacheMetrics(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	diffID := digest.Digest(cacheTestDiffID)
+	target := cacheTestChainID
+
+	brokenCache := filepath.Join(t.TempDir(), "broken-cache")
+	require.NoError(t, os.MkdirAll(filepath.Join(brokenCache, "snapshots"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(brokenCache, "metadata.db"), []byte("not-a-valid-bolt-db"), 0600))
+
+	// Configure goodCache via its ".../io.containerd.snapshotter.v1.overlayfs/snapshots"
+	// subdirectory to verify cacheID strips layout suffixes down to "1:good-cache".
+	goodCacheRoot := filepath.Join(t.TempDir(), "good-cache")
+	goodPluginRoot := filepath.Join(goodCacheRoot, "io.containerd.snapshotter.v1.overlayfs")
+	goodSnapshotsDir := filepath.Join(goodPluginRoot, "snapshots")
+	writeCacheLayer(t, goodPluginRoot, "", target, diffID, "hello.txt", []byte("world"))
+
+	var wantHitBytes float64
+	func() {
+		cacheSn, err := NewSnapshotter(goodPluginRoot)
+		require.NoError(t, err)
+		defer cacheSn.Close()
+		usage, err := cacheSn.Usage(ctx, target)
+		require.NoError(t, err)
+		require.Greater(t, usage.Size, int64(0))
+		wantHitBytes = float64(usage.Size)
+	}()
+
+	o := newCacheSnapshotter(t, WithLayerContentCaches(brokenCache, goodSnapshotsDir))
+
+	hitsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_lookups_total", map[string]string{"result": "hit"})
+	missesBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_lookups_total", map[string]string{"result": "miss"})
+	cacheHitsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_hits_total", map[string]string{"cache": "1:good-cache"})
+	hitBytesBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_hit_bytes_total", nil)
+	errsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{"reason": "unreadable", "cache": "0:broken-cache"})
+
+	// 1. Non-extraction Prepare and View must not record cache lookups or errors.
+	_, err := o.Prepare(ctx, "container-rootfs", "")
+	require.NoError(t, err)
+	_, err = o.View(ctx, "view-1", "", extractionOpt(target, diffID))
+	require.NoError(t, err)
+	assert.Equal(t, hitsBefore, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_lookups_total", map[string]string{"result": "hit"}))
+	assert.Equal(t, missesBefore, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_lookups_total", map[string]string{"result": "miss"}))
+	assert.Equal(t, errsBefore, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{"reason": "unreadable", "cache": "0:broken-cache"}))
+
+	// 2. Prepare a cached layer: brokenCache (index 0) logs an unreadable error
+	// and falls through to goodSnapshotsDir (index 1, labeled "1:good-cache"),
+	// which serves the hit and adds its disk usage to layer_cache_hit_bytes_total.
+	_ = stageCacheHit(t, ctx, o, target, diffID)
+
+	assert.Equal(t, hitsBefore+1, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_lookups_total", map[string]string{"result": "hit"}))
+	assert.Equal(t, cacheHitsBefore+1, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_hits_total", map[string]string{"cache": "1:good-cache"}))
+	assert.Equal(t, hitBytesBefore+wantHitBytes, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_hit_bytes_total", nil))
+	assert.Equal(t, errsBefore+1, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{"reason": "unreadable", "cache": "0:broken-cache"}))
+
+	// 3. Prepare an uncached layer: both caches miss, hit bytes stay unchanged.
+	absentDiffID := digest.Digest("sha256:9999999999999999999999999999999999999999999999999999999999999999")
+	_, err = o.Prepare(ctx, "extract-miss "+target, "", extractionOpt(target, absentDiffID))
+	require.NoError(t, err)
+
+	assert.Equal(t, missesBefore+1, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_lookups_total", map[string]string{"result": "miss"}))
+	assert.Equal(t, hitBytesBefore+wantHitBytes, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_hit_bytes_total", nil))
+	assert.Equal(t, errsBefore+2, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{"reason": "unreadable", "cache": "0:broken-cache"}))
+}
+
 // TestCacheEmptyMetadataDB verifies that an initialized BoltDB file without a
-// "v1" snapshots bucket yet is treated as a clean miss.
+// "v1" snapshots bucket yet is treated as a clean miss rather than an
+// unreadable cache error.
 func TestCacheEmptyMetadataDB(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 	diffID := digest.Digest(cacheTestDiffID)
@@ -1493,11 +1611,20 @@ func TestCacheEmptyMetadataDB(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, bdb.Close())
 
+	errsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+		"reason": "unreadable",
+		"cache":  "0:empty-bolt-cache",
+	})
+
 	o := newCacheSnapshotter(t, WithLayerContentCaches(emptyCache))
 	mounts, err := o.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 	require.NoError(t, err)
 	require.NotEmpty(t, mounts)
 	assert.False(t, mounts[0].ReadOnly(), "empty cache must fall back to a writable snapshot")
+	assert.Equal(t, errsBefore, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+		"reason": "unreadable",
+		"cache":  "0:empty-bolt-cache",
+	}))
 }
 
 // TestCacheMalformedAndTransitiveEntries verifies that malformed layerSource
@@ -1541,12 +1668,30 @@ func TestCacheMalformedAndTransitiveEntries(t *testing.T) {
 		emptyCacheFS := filepath.Join(cacheDir, "snapshots", committedID, "fs")
 		require.NoError(t, os.MkdirAll(emptyCacheFS, 0755))
 
+		errsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:malformed-cache",
+		})
+
 		o := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 		mounts, err := o.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 		require.NoError(t, err)
 		require.Len(t, mounts, 1)
 		assert.False(t, mounts[0].ReadOnly(), "malformed cache entry must fall back to writable extraction")
 		assert.NotEqual(t, emptyCacheFS, mounts[0].Source, "must never mount empty cache fs directory")
+		assert.Equal(t, errsBefore+1, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:malformed-cache",
+		}))
+
+		// A second Prepare reuses the cached in-memory index and records one
+		// unreadable error for the malformed entry.
+		_, err = o.Prepare(ctx, "extract-2 "+target, "", extractionOpt(target, diffID))
+		require.NoError(t, err)
+		assert.Equal(t, errsBefore+2, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:malformed-cache",
+		}))
 	})
 
 	t.Run("transitive cache entry is skipped", func(t *testing.T) {
@@ -1563,11 +1708,20 @@ func TestCacheMalformedAndTransitiveEntries(t *testing.T) {
 			require.NoError(t, mid.Commit(ctx, target, key, extractionOpt(target, diffID)))
 		}()
 
+		errsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:middle-cache",
+		})
+
 		primary := newCacheSnapshotter(t, WithLayerContentCaches(middleCache))
 		mounts, err := primary.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 		require.NoError(t, err)
 		require.Len(t, mounts, 1)
 		assert.False(t, mounts[0].ReadOnly(), "transitive cache entry must not be re-exported")
+		assert.Equal(t, errsBefore, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:middle-cache",
+		}))
 	})
 
 	t.Run("symlinked fs directory in cache is rejected", func(t *testing.T) {
@@ -1579,11 +1733,20 @@ func TestCacheMalformedAndTransitiveEntries(t *testing.T) {
 		require.NoError(t, os.RemoveAll(cachedDir))
 		require.NoError(t, os.Symlink(outsideDir, cachedDir))
 
+		errsBefore := prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:symlink-cache",
+		})
+
 		o := newCacheSnapshotter(t, WithLayerContentCaches(cacheDir))
 		mounts, err := o.Prepare(ctx, "extract-1 "+target, "", extractionOpt(target, diffID))
 		require.NoError(t, err)
 		require.Len(t, mounts, 1)
 		assert.False(t, mounts[0].ReadOnly(), "symlinked cache fs must not be mounted as a cache hit")
+		assert.Equal(t, errsBefore+1, prometheusCounterVal(t, "containerd_overlayfs_layer_cache_errors_total", map[string]string{
+			"reason": "unreadable",
+			"cache":  "0:symlink-cache",
+		}))
 	})
 }
 

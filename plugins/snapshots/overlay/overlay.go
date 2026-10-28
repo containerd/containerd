@@ -25,6 +25,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -614,6 +615,26 @@ func resolveCacheLocations(dir string) (overlayRoot, dbPath, snapshotsDir string
 	return "", "", "", false, firstErr
 }
 
+// cacheID identifies a layer content cache in metrics by its position in the
+// configured list and the cache root's directory name. Trailing "snapshots" and
+// "io.containerd.snapshotter.v1.overlayfs" components are stripped (when a
+// parent directory exists) so all supported layouts aggregate under a meaningful
+// name rather than "0:snapshots".
+func cacheID(i int, dir string) string {
+	p := filepath.Clean(dir)
+	if filepath.Base(p) == "snapshots" {
+		if parent := filepath.Dir(p); parent != "/" && parent != "." {
+			p = parent
+		}
+	}
+	if filepath.Base(p) == "io.containerd.snapshotter.v1.overlayfs" {
+		if parent := filepath.Dir(p); parent != "/" && parent != "." {
+			p = parent
+		}
+	}
+	return strconv.Itoa(i) + ":" + filepath.Base(p)
+}
+
 // getOrBuildCacheIndex returns the in-memory index for a cache directory,
 // building and caching it on first successful read. Configured caches are
 // immutable once provisioned; directories that do not exist yet or fail to open
@@ -732,9 +753,16 @@ func (o *snapshotter) lookupCache(ctx context.Context, opts ...snapshots.Opt) (c
 
 	for i, dir := range o.layerContentCaches {
 		if hit, ok := o.lookupCacheInDir(ctx, i, dir, target, diffID.String()); ok {
+			cacheLookups.WithValues("hit").Inc()
+			cacheHits.WithValues(cacheID(i, dir)).Inc()
+			if hit.usage.Size > 0 {
+				cacheHitBytes.Inc(float64(hit.usage.Size))
+			}
 			return hit, true
 		}
 	}
+
+	cacheLookups.WithValues("miss").Inc()
 
 	log.G(ctx).WithFields(log.Fields{
 		"chainID": target,
@@ -744,11 +772,13 @@ func (o *snapshotter) lookupCache(ctx context.Context, opts ...snapshots.Opt) (c
 }
 
 func (o *snapshotter) lookupCacheInDir(ctx context.Context, i int, dir, target, diffIDStr string) (cacheHit, bool) {
+	id := cacheID(i, dir)
 	idx := o.cacheIndices[i].Load()
 	if idx == nil {
 		dir = filepath.Clean(dir)
 		overlayRoot, dbPath, snapshotsDir, ok, err := resolveCacheLocations(dir)
 		if err != nil {
+			cacheErrors.WithValues("unreadable", id).Inc()
 			log.G(ctx).WithError(err).WithField("dir", dir).
 				Warn("overlayfs layer cache: failed to stat cache directory, skipping this cache")
 			return cacheHit{}, false
@@ -762,21 +792,23 @@ func (o *snapshotter) lookupCacheInDir(ctx context.Context, i int, dir, target, 
 
 		idx, err = o.getOrBuildCacheIndex(ctx, i, dbPath, snapshotsDir)
 		if err != nil {
+			cacheErrors.WithValues("unreadable", id).Inc()
 			log.G(ctx).WithError(err).WithField("db", dbPath).
 				Warn("overlayfs layer cache: failed to open or query cache metadata.db, skipping this cache")
 			return cacheHit{}, false
 		}
 	}
 
-	return matchCacheEntries(ctx, idx.dbPath, idx.snapshotsDir, diffIDStr, idx.byTarget[target])
+	return matchCacheEntries(ctx, id, idx.dbPath, idx.snapshotsDir, diffIDStr, idx.byTarget[target])
 }
 
-func matchCacheEntries(ctx context.Context, dbPath, snapshotsDir, diffIDStr string, entries []cachedLayer) (cacheHit, bool) {
+func matchCacheEntries(ctx context.Context, cacheLabel, dbPath, snapshotsDir, diffIDStr string, entries []cachedLayer) (cacheHit, bool) {
 	for _, entry := range entries {
 		if entry.diffID != "" && entry.diffID != diffIDStr {
 			continue
 		}
 		if entry.err != nil {
+			cacheErrors.WithValues("unreadable", cacheLabel).Inc()
 			log.G(ctx).WithError(entry.err).WithField("db", dbPath).
 				Warn("overlayfs layer cache: invalid layer source metadata in cache, skipping entry")
 			continue
@@ -786,12 +818,14 @@ func matchCacheEntries(ctx context.Context, dbPath, snapshotsDir, diffIDStr stri
 		fi, err := os.Lstat(candidate)
 		if err != nil {
 			if !os.IsNotExist(err) {
+				cacheErrors.WithValues("unreadable", cacheLabel).Inc()
 				log.G(ctx).WithError(err).WithField("dir", candidate).
 					Warn("overlayfs layer cache: failed to stat cached layer directory, skipping entry")
 			}
 			continue
 		}
 		if !fi.IsDir() {
+			cacheErrors.WithValues("unreadable", cacheLabel).Inc()
 			log.G(ctx).WithField("dir", candidate).
 				Warn("overlayfs layer cache: cached layer path is not a directory, skipping entry")
 			continue

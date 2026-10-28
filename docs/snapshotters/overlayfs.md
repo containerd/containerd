@@ -125,3 +125,15 @@ $ ctr --address /run/containerd-cache/containerd.sock images pull $IMG
 Stop the seed `containerd` process before mounting or serving `/mnt/image-cache`
 as a `layer_content_caches` directory so its BoltDB `metadata.db` is cleanly
 flushed and no longer held open for writing.
+
+### Metrics
+
+When `layer_content_caches` is configured, the snapshotter exports Prometheus
+counters under the `containerd_overlayfs` namespace:
+
+| Metric | Labels | Description |
+| --- | --- | --- |
+| `containerd_overlayfs_layer_cache_lookups_total` | `result` (`hit`, `miss`) | Layer content cache lookups during image-layer extraction. |
+| `containerd_overlayfs_layer_cache_hits_total` | `cache` (`<index>:<name>`) | Cache hits broken down by the configured cache directory that served the layer (trailing `io.containerd.snapshotter.v1.overlayfs` and `snapshots` path components are stripped). |
+| `containerd_overlayfs_layer_cache_hit_bytes_total` | _(none)_ | Bytes of unpacked layer content served from a layer content cache (from cached snapshot disk usage). |
+| `containerd_overlayfs_layer_cache_errors_total` | `reason` (`unreadable`), `cache` (`<index>:<name>`) | Cache lookup errors (such as an unreadable `metadata.db` or invalid entry) that caused a cache entry or directory to be skipped. |
