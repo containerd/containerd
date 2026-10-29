@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -462,15 +463,15 @@ func TestDNSDialUsesServersInOrder(t *testing.T) {
 	defer listener.Close()
 
 	var order []string
-	first := func(context.Context, string) ([]string, error) {
+	first := func(context.Context, string, string) (net.Conn, error) {
 		order = append(order, "first")
-		return nil, &net.DNSError{Err: "i/o timeout", IsTimeout: true, IsTemporary: true}
+		return nil, &net.OpError{Op: "dial", Net: "tcp", Err: &net.DNSError{Err: "i/o timeout", IsTimeout: true, IsTemporary: true}}
 	}
-	second := func(context.Context, string) ([]string, error) {
+	second := func(ctx context.Context, network, addr string) (net.Conn, error) {
 		order = append(order, "second")
-		return []string{"127.0.0.1"}, nil
+		return (&net.Dialer{}).DialContext(ctx, network, listener.Addr().String())
 	}
-	dialFn := newDNSDialContextWithLookups([]hostLookup{first, second}, time.Second)
+	dialFn := newDNSDialContextWithDialers([]dnsDialContext{first, second}, (&net.Dialer{}).DialContext, time.Second)
 
 	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("registry.example.com", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
 	if err != nil {
@@ -491,12 +492,12 @@ func TestDNSDialFallsBackToSystemResolver(t *testing.T) {
 	}
 	defer listener.Close()
 
-	lookupCalls := 0
-	lookup := func(context.Context, string) ([]string, error) {
-		lookupCalls++
-		return nil, &net.DNSError{Err: "i/o timeout", IsTimeout: true, IsTemporary: true}
+	dialCalls := 0
+	dial := func(context.Context, string, string) (net.Conn, error) {
+		dialCalls++
+		return nil, &net.OpError{Op: "dial", Net: "tcp", Err: &net.DNSError{Err: "i/o timeout", IsTimeout: true, IsTemporary: true}}
 	}
-	dialFn := newDNSDialContextWithLookups([]hostLookup{lookup}, time.Second)
+	dialFn := newDNSDialContextWithDialers([]dnsDialContext{dial}, (&net.Dialer{}).DialContext, time.Second)
 
 	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("localhost", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
 	if err != nil {
@@ -504,8 +505,8 @@ func TestDNSDialFallsBackToSystemResolver(t *testing.T) {
 	}
 	conn.Close()
 
-	if lookupCalls != 1 {
-		t.Fatalf("custom DNS lookup called %d times, want 1", lookupCalls)
+	if dialCalls != 1 {
+		t.Fatalf("custom DNS dial called %d times, want 1", dialCalls)
 	}
 }
 
@@ -515,6 +516,7 @@ func TestDNSDialFallbackScope(t *testing.T) {
 		servfail = &net.DNSError{Err: "server misbehaving", IsTemporary: true}
 		refused  = &net.DNSError{Err: "server misbehaving"}
 		timeout  = &net.DNSError{Err: "i/o timeout", IsTimeout: true, IsTemporary: true}
+		connErr  = errors.New("network unreachable")
 	)
 
 	for _, tc := range []struct {
@@ -541,6 +543,12 @@ func TestDNSDialFallbackScope(t *testing.T) {
 			errs:        []error{servfail, nil},
 			wantQueried: 2,
 			wantDial:    true,
+		},
+		{
+			name:        "connection failure does not change DNS answers",
+			errs:        []error{connErr, nil},
+			wantQueried: 1,
+			wantErr:     connErr,
 		},
 		{
 			name:        "all servers failing temporarily reaches the system resolver",
@@ -576,17 +584,17 @@ func TestDNSDialFallbackScope(t *testing.T) {
 			port := fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)
 
 			queried := 0
-			lookups := make([]hostLookup, len(tc.errs))
-			for i, lookupErr := range tc.errs {
-				lookups[i] = func(context.Context, string) ([]string, error) {
+			dialers := make([]dnsDialContext, len(tc.errs))
+			for i, dialErr := range tc.errs {
+				dialers[i] = func(ctx context.Context, network, addr string) (net.Conn, error) {
 					queried++
-					if lookupErr != nil {
-						return nil, lookupErr
+					if dialErr != nil {
+						return nil, &net.OpError{Op: "dial", Net: network, Err: dialErr}
 					}
-					return []string{"127.0.0.1"}, nil
+					return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort("127.0.0.1", port))
 				}
 			}
-			dialFn := newDNSDialContextWithLookups(lookups, time.Second)
+			dialFn := newDNSDialContextWithDialers(dialers, (&net.Dialer{}).DialContext, time.Second)
 
 			conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("localhost", port))
 			if conn != nil {
@@ -650,9 +658,87 @@ func newFakeDNSServer(t *testing.T, rcode int) (string, func() int) {
 	return pc.LocalAddr().String(), func() int { return int(queries.Load()) }
 }
 
+// newDualStackDNSServer starts a UDP DNS server that returns ::1 for AAAA
+// queries and 127.0.0.1 for A queries.
+func newDualStackDNSServer(t *testing.T) string {
+	t.Helper()
+	pc, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { pc.Close() })
+
+	go func() {
+		buf := make([]byte, 512)
+		for {
+			n, addr, err := pc.ReadFromUDP(buf)
+			if err != nil {
+				return
+			}
+			questionEnd, qtype, ok := dnsQuestion(buf[:n])
+			if !ok {
+				continue
+			}
+
+			resp := append([]byte(nil), buf[:questionEnd]...)
+			flags := binary.BigEndian.Uint16(resp[2:4])
+			flags |= 0x8000 // response
+			flags |= 0x0080 // recursion available
+			binary.BigEndian.PutUint16(resp[2:4], flags)
+			binary.BigEndian.PutUint16(resp[6:8], 1)
+
+			// Point the answer name at the question name, then append type,
+			// class, TTL, and the family-specific address.
+			resp = append(resp, 0xc0, 0x0c)
+			resp = binary.BigEndian.AppendUint16(resp, qtype)
+			resp = binary.BigEndian.AppendUint16(resp, 1)
+			resp = binary.BigEndian.AppendUint32(resp, 0)
+			switch qtype {
+			case 1: // A
+				resp = binary.BigEndian.AppendUint16(resp, net.IPv4len)
+				resp = append(resp, net.IPv4(127, 0, 0, 1).To4()...)
+			case 28: // AAAA
+				resp = binary.BigEndian.AppendUint16(resp, net.IPv6len)
+				resp = append(resp, net.IPv6loopback...)
+			default:
+				continue
+			}
+			_, _ = pc.WriteToUDP(resp, addr)
+		}
+	}()
+
+	return pc.LocalAddr().String()
+}
+
+// dnsQuestion returns the end and type of a single uncompressed DNS question.
+func dnsQuestion(msg []byte) (end int, qtype uint16, ok bool) {
+	if len(msg) < 12 || binary.BigEndian.Uint16(msg[4:6]) != 1 {
+		return 0, 0, false
+	}
+	for end = 12; ; {
+		if end >= len(msg) {
+			return 0, 0, false
+		}
+		labelLen := int(msg[end])
+		end++
+		if labelLen == 0 {
+			break
+		}
+		if labelLen&0xc0 != 0 || end+labelLen > len(msg) {
+			return 0, 0, false
+		}
+		end += labelLen
+	}
+	if end+4 > len(msg) {
+		return 0, 0, false
+	}
+	qtype = binary.BigEndian.Uint16(msg[end : end+2])
+	return end + 4, qtype, true
+}
+
 // TestDNSHostLookupClassification runs the real net.Resolver against a DNS
 // server to pin down both the query encoding and the net.DNSError fields that
-// newDNSDialContextWithLookups keys its fallback decisions off of.
+// newDNSDialContextWithDialers keys its fallback decisions off of.
 func TestDNSHostLookupClassification(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
@@ -669,13 +755,13 @@ func TestDNSHostLookupClassification(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			addr, queries := newFakeDNSServer(t, tc.rcode)
-			lookup := newDNSHostLookupWithDial("192.0.2.53", func(ctx context.Context, network, _ string) (net.Conn, error) {
+			resolver := newDNSResolverWithDial("192.0.2.53", func(ctx context.Context, network, _ string) (net.Conn, error) {
 				return (&net.Dialer{}).DialContext(ctx, network, addr)
 			})
 
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
-			_, err := lookup(ctx, "registry.example.test.")
+			_, err := resolver.LookupHost(ctx, "registry.example.test.")
 			if err == nil {
 				t.Fatal("expected lookup to fail")
 			}
@@ -705,11 +791,11 @@ func TestDNSHostLookupClassification(t *testing.T) {
 
 func TestDNSDialTimeoutIncludesResolution(t *testing.T) {
 	const timeout = 50 * time.Millisecond
-	lookup := func(ctx context.Context, host string) ([]string, error) {
+	dial := func(ctx context.Context, _, _ string) (net.Conn, error) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
-	dialFn := newDNSDialContextWithLookups([]hostLookup{lookup}, timeout)
+	dialFn := newDNSDialContextWithDialers([]dnsDialContext{dial}, (&net.Dialer{}).DialContext, timeout)
 
 	started := time.Now()
 	_, err := dialFn(context.Background(), "tcp", "registry.example.com:443")
@@ -724,23 +810,109 @@ func TestDNSDialTimeoutIncludesResolution(t *testing.T) {
 	}
 }
 
-func TestDNSDialTriesAllResolvedAddresses(t *testing.T) {
+func TestDNSDialUsesNativeDualStackDialing(t *testing.T) {
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer listener.Close()
 
-	lookup := func(context.Context, string) ([]string, error) {
-		return []string{"127.0.0.2", "127.0.0.1"}, nil
+	dnsAddr := newDualStackDNSServer(t)
+	resolver := newDNSResolverWithDial("192.0.2.53", func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, dnsAddr)
+	})
+	configuredDial := newRegistryDialer(time.Second, resolver).DialContext
+	systemDialCalled := false
+	systemDial := func(context.Context, string, string) (net.Conn, error) {
+		systemDialCalled = true
+		return nil, errors.New("unexpected system DNS fallback")
 	}
-	dialFn := newDNSDialContextWithLookups([]hostLookup{lookup}, 250*time.Millisecond)
+	dialFn := newDNSDialContextWithDialers([]dnsDialContext{configuredDial}, systemDial, time.Second)
 
-	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("registry.example.com", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
+	conn, err := dialFn(context.Background(), "tcp", net.JoinHostPort("registry.example.test.", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	conn.Close()
+	if systemDialCalled {
+		t.Fatal("dual-stack custom DNS answer unexpectedly reached system DNS")
+	}
+}
+
+// TestDNSDialRacesAddressFamilies verifies IPv4 starts while IPv6 is still blocked.
+func TestDNSDialRacesAddressFamilies(t *testing.T) {
+	ipv6, err := net.Listen("tcp6", "[::1]:0")
+	if err != nil {
+		t.Skipf("IPv6 loopback unavailable: %v", err)
+	}
+	defer ipv6.Close()
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	dnsAddr := newDualStackDNSServer(t)
+	resolver := newDNSResolverWithDial("192.0.2.53", func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, dnsAddr)
+	})
+	dialer := newRegistryDialer(2*time.Second, resolver)
+	ipv6Started := make(chan struct{})
+	ipv4Started := make(chan struct{})
+	dialer.ControlContext = func(ctx context.Context, network, _ string, _ syscall.RawConn) error {
+		if network == "tcp6" {
+			close(ipv6Started)
+			// Hold the primary family until the fallback family starts. A
+			// sequential IP loop would consume the entire deadline here.
+			select {
+			case <-ipv4Started:
+				return errors.New("simulated stalled IPv6 connection")
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		close(ipv4Started)
+		return nil
+	}
+	systemDial := func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("unexpected system DNS fallback")
+	}
+	dial := newDNSDialContextWithDialers([]dnsDialContext{dialer.DialContext}, systemDial, 2*time.Second)
+	conn, err := dial(t.Context(), "tcp", net.JoinHostPort("registry.example.test.", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	select {
+	case <-ipv6Started:
+	default:
+		t.Skip("platform preferred IPv4; no stalled IPv6 primary to exercise")
+	}
+}
+
+func TestDNSDialPreservesHostnameForHappyEyeballs(t *testing.T) {
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	wantAddr := net.JoinHostPort("registry.example.com", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port))
+	var gotAddr string
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		gotAddr = addr
+		return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort("127.0.0.1", fmt.Sprint(listener.Addr().(*net.TCPAddr).Port)))
+	}
+	dialFn := newDNSDialContextWithDialers([]dnsDialContext{dial}, (&net.Dialer{}).DialContext, 250*time.Millisecond)
+
+	conn, err := dialFn(context.Background(), "tcp", wantAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	if gotAddr != wantAddr {
+		t.Fatalf("configured dial address = %q, want hostname address %q", gotAddr, wantAddr)
+	}
 }
 
 func TestHTTPFallback(t *testing.T) {
