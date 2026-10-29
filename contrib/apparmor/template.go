@@ -69,6 +69,10 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   signal (receive) peer={{.DaemonProfile}},
   # Container processes may send signals amongst themselves.
   signal (send,receive) peer={{.Name}},
+  # AppArmor 5 stacks an extra label when an unprivileged change_profile
+  # is rewritten (peer becomes "{{.Name}}//&unconfined"). The literal name
+  # above does not match that peer, so signals inside the container are denied.
+  signal (send,receive) peer={{.Name}}//&*,
 {{if .RootlessKit}}
   # https://github.com/containerd/nerdctl/issues/2730
   signal (receive) peer={{.RootlessKit}},
@@ -96,6 +100,8 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   # allow processes within the container to trace each other,
   # provided all other LSM and yama setting allow it.
   ptrace (trace,tracedby,read,readby) peer={{.Name}},
+  # Same stacked-label peer as the signal rule above.
+  ptrace (trace,tracedby,read,readby) peer={{.Name}}//&*,
 }
 `
 
