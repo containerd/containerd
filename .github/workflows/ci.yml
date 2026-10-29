@@ -419,9 +419,11 @@ jobs:
           - runtime: io.containerd.runc.v2-rs
             os: ubuntu-24.04-arm
         include:
-          # Not supported by the Rust shim yet.
+          # Not supported by the Rust shim yet: checkpoints, trace propagation,
+          # State during an exec(TestIssue10589), and the idmapped mounts user namespaces need.
           - runtime: io.containerd.runc.v2-rs
-            extra_testflags: "-no-criu -test.skip='(TestContainerPTY|TestIssue10589|TestShimTraceContextPropagation)'"
+            extra_testflags: "-no-criu -test.skip='(TestIssue10589|TestShimTraceContextPropagation)'"
+            cri_skip: "(TestPodUserNS|TestUsernsVolumeCopyUp|TestImageVolumeWithUserNamespace|TestIssue10598)"
 
     env:
       GOTEST: gotestsum --
@@ -565,6 +567,7 @@ jobs:
           TEST_RUNTIME: ${{ matrix.runtime }}
           CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          SKIP: ${{ matrix.cri_skip }}
         run: |
           cat /sys/fs/cgroup/cgroup.controllers
           systemctl status
@@ -582,7 +585,8 @@ jobs:
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
-      - if: matrix.os != 'ubuntu-24.04-arm'
+      # The Rust shim does not implement checkpoint yet.
+      - if: matrix.os != 'ubuntu-24.04-arm' && matrix.runtime != 'io.containerd.runc.v2-rs'
         name: Checkpoint/Restore Disable via CRI
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
