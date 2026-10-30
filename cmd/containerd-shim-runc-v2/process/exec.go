@@ -44,7 +44,13 @@ type execProcess struct {
 
 	execState execState
 
-	mu      sync.Mutex
+	// mu is released for most of delete; see Init.mu. Methods other than
+	// read-only accessors MUST take it through lock().
+	mu sync.Mutex
+	// deleting is non-nil while delete runs with mu released, and is closed
+	// when delete ends. It is only accessed with mu held.
+	deleting chan struct{}
+
 	id      string
 	console console.Console
 	io      *processIO
@@ -91,7 +97,7 @@ func (e *execProcess) ExitedAt() time.Time {
 }
 
 func (e *execProcess) SetExited(status int) {
-	e.mu.Lock()
+	e.lock()
 	defer e.mu.Unlock()
 
 	e.execState.SetExited(status)
@@ -105,13 +111,36 @@ func (e *execProcess) setExited(status int) {
 }
 
 func (e *execProcess) Delete(ctx context.Context) error {
-	e.mu.Lock()
+	e.lock()
 	defer e.mu.Unlock()
 
 	return e.execState.Delete(ctx)
 }
 
+// lock acquires mu, waiting first for a delete that has released it.
+// It returns with mu held and deleting nil. Release with e.mu.Unlock.
+func (e *execProcess) lock() {
+	e.mu.Lock()
+	for e.deleting != nil {
+		d := e.deleting
+		e.mu.Unlock()
+		<-d
+		e.mu.Lock()
+	}
+}
+
+// delete is called with mu held, through lock, and returns with mu held and
+// deleting cleared. It releases mu for the rest of its body, which can take
+// up to 10s draining stdio.
 func (e *execProcess) delete(ctx context.Context) error {
+	done := make(chan struct{})
+	e.deleting = done
+	e.mu.Unlock()
+	defer func() {
+		e.mu.Lock()
+		e.deleting = nil
+		close(done)
+	}()
 	if err := waitTimeout(ctx, &e.wg, 10*time.Second); err != nil {
 		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
 	}
@@ -128,7 +157,7 @@ func (e *execProcess) delete(ctx context.Context) error {
 }
 
 func (e *execProcess) Resize(ws console.WinSize) error {
-	e.mu.Lock()
+	e.lock()
 	defer e.mu.Unlock()
 
 	return e.execState.Resize(ws)
@@ -142,7 +171,7 @@ func (e *execProcess) resize(ws console.WinSize) error {
 }
 
 func (e *execProcess) Kill(ctx context.Context, sig uint32, _ bool) error {
-	e.mu.Lock()
+	e.lock()
 	defer e.mu.Unlock()
 
 	return e.execState.Kill(ctx, sig, false)
@@ -172,7 +201,7 @@ func (e *execProcess) Stdio() stdio.Stdio {
 }
 
 func (e *execProcess) Start(ctx context.Context) error {
-	e.mu.Lock()
+	e.lock()
 	defer e.mu.Unlock()
 
 	return e.execState.Start(ctx)
