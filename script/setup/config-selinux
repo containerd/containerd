@@ -24,6 +24,9 @@ if ! type -p getenforce setenforce &>/dev/null; then
   exit 0
 fi
 
+# container-selinux only lets container_t write to cgroupfs under the
+# container_manage_cgroup boolean, which a read-write /sys/fs/cgroup mount
+# needs.
 case "${SELINUX}" in
   Disabled)
     if mountpoint -q /sys/fs/selinux; then
@@ -34,10 +37,12 @@ case "${SELINUX}" in
   Enforcing)
     mountpoint -q /sys/fs/selinux || mount -o rw,relatime -t selinuxfs selinuxfs /sys/fs/selinux
     setenforce 1
+    setsebool -P container_manage_cgroup on
     ;;
   Permissive)
     mountpoint -q /sys/fs/selinux || mount -o rw,relatime -t selinuxfs selinuxfs /sys/fs/selinux
     setenforce 0
+    setsebool -P container_manage_cgroup on
     ;;
   *)
     echo "SELinux mode not supported: ${SELINUX}" >&2
