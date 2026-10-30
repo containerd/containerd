@@ -56,6 +56,7 @@ if [[ -z "${CONTAINERD_CONFIG_FILE:-}" ]]; then
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
 runtime_type = "${TEST_RUNTIME}"
+runtime_path = "${TEST_RUNTIME_PATH:-}"
 [plugins."io.containerd.snapshotter.v1.overlayfs"]
 # slow_chown is needed to avoid an error with kernel < 5.19:
 # > "snapshotter \"overlayfs\" doesn't support idmap mounts on this host,

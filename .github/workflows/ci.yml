@@ -422,6 +422,10 @@ jobs:
           # Not supported by the Rust shim yet: checkpoints, trace propagation,
           # State during an exec(TestIssue10589), and the idmapped mounts user namespaces need.
           - runtime: io.containerd.runc.v2-rs
+            # CRI only types the options of the runc runtime, so it gets the
+            # Rust shim as that runtime's binary, the way a drop-in shim is configured.
+            cri_runtime: io.containerd.runc.v2
+            cri_runtime_path: /usr/local/bin/containerd-shim-runc-v2-rs
             extra_testflags: "-no-criu -test.skip='(TestIssue10589|TestShimTraceContextPropagation)'"
             cri_skip: "(TestPodUserNS|TestUsernsVolumeCopyUp|TestImageVolumeWithUserNamespace|TestIssue10598)"
 
@@ -430,6 +434,8 @@ jobs:
       # Build the shim with tracing enabled, so that the integration suite
       # covers trace context propagation to runc and the OCI hooks.
       BUILDTAGS: shim_tracing
+      RUST_SHIM_VERSION: "0.2.0"
+      RUST_TOOLCHAIN: "1.91"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -494,13 +500,27 @@ jobs:
         run: |
           sudo modprobe dm_verity
 
+      - name: Cache the Rust runc shim
+        if: matrix.runtime == 'io.containerd.runc.v2-rs'
+        id: rust-shim
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/rust-shim/bin
+          key: rust-shim-${{ matrix.os }}-${{ env.RUST_SHIM_VERSION }}-rust-${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install the Rust toolchain
+        if: matrix.runtime == 'io.containerd.runc.v2-rs' && steps.rust-shim.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
       - name: Install the Rust runc shim
         if: matrix.runtime == 'io.containerd.runc.v2-rs'
         run: |
-          git clone --depth=1 https://github.com/containerd/rust-extensions.git "$RUNNER_TEMP/rust-extensions"
-          cd "$RUNNER_TEMP/rust-extensions"
-          cargo build --release --bin containerd-shim-runc-v2-rs
-          sudo install -D target/release/containerd-shim-runc-v2-rs /usr/local/bin/
+          if [ "${{ steps.rust-shim.outputs.cache-hit }}" != "true" ]; then
+            cargo install containerd-runc-shim --version "$RUST_SHIM_VERSION" --locked --root "$RUNNER_TEMP/rust-shim"
+          fi
+          sudo install -D "$RUNNER_TEMP/rust-shim/bin/containerd-shim-runc-v2-rs" /usr/local/bin/
 
       - name: Install containerd
         env:
@@ -564,7 +584,8 @@ jobs:
 
       - name: CRI Integration Test
         env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.cri_runtime || matrix.runtime }}
+          CONTAINERD_RUNTIME_PATH: ${{ matrix.cri_runtime_path }}
           CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
           RUNC_FLAVOR: ${{ matrix.runc }}
           SKIP: ${{ matrix.cri_skip }}
@@ -579,7 +600,8 @@ jobs:
 
       - name: cri-tools critest
         env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.cri_runtime || matrix.runtime }}
+          TEST_RUNTIME_PATH: ${{ matrix.cri_runtime_path }}
           CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
           env
