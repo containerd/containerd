@@ -693,6 +693,13 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", r.sanitizedURL()))
 	log.G(ctx).WithFields(requestFields(req)).Debug("do request")
 	if err := r.authorize(ctx, req); err != nil {
+		// Authorization failed before the request was handed to the HTTP
+		// client, which would otherwise own and close the body. Close it
+		// here, otherwise the producer of a streaming body (e.g. the
+		// pusher's pipe) is never unblocked.
+		if req.Body != nil {
+			req.Body.Close()
+		}
 		return nil, fmt.Errorf("failed to authorize: %w", err)
 	}
 
