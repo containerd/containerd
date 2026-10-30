@@ -22,6 +22,7 @@ import (
 	cstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/nri/pkg/api"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -137,4 +138,16 @@ func TestCRIContainerGetImage(t *testing.T) {
 			assert.Equal(t, tc.expected, tc.ctr.GetImage())
 		})
 	}
+}
+
+func TestCRIContainerGetRlimitsNilProcess(t *testing.T) {
+	assert.Nil(t, (&criContainer{}).GetRlimits())
+	assert.Nil(t, (&criContainer{spec: &runtimespec.Spec{}}).GetRlimits())
+
+	got := (&criContainer{spec: &runtimespec.Spec{
+		Process: &runtimespec.Process{
+			Rlimits: []runtimespec.POSIXRlimit{{Type: "RLIMIT_NOFILE", Hard: 1024, Soft: 512}},
+		},
+	}}).GetRlimits()
+	assert.Equal(t, []*api.POSIXRlimit{{Type: "RLIMIT_NOFILE", Hard: 1024, Soft: 512}}, got)
 }
