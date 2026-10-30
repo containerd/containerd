@@ -574,6 +574,7 @@ version = 2
       privileged_without_host_devices_all_devices_allowed = false
 
       # cgroup_writable field enables the support for writable cgroups in unprivileged containers with cgroup v2 enabled. When disabled, the cgroup interface (/sys/fs/cgroup) is mounted as read-only, preventing containers from managing their own cgroup hierarchies.
+      # This setting applies only when the CRI cgroup_mount_mode is CGROUP_MOUNT_MODE_UNSPECIFIED.
       cgroup_writable = false
 
       # base_runtime_spec is a file path to a JSON file with the OCI spec that will be used as the base spec that all
