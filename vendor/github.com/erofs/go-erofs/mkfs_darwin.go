@@ -19,6 +19,8 @@ func entryFromSys(info fs.FileInfo) *builder.Entry {
 			MtimeNs: uint32(sys.Mtimespec.Nsec),
 			Nlink:   uint32(sys.Nlink),
 			Rdev:    uint32(sys.Rdev),
+			Dev:     uint64(sys.Dev),
+			Ino:     sys.Ino,
 		}
 	default:
 		return nil
