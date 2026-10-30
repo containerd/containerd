@@ -36,6 +36,8 @@ fi
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
 # The runtime to use (ignored when CONTAINERD_CONFIG_FILE is set)
 CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
+# The snapshotter to use (ignored when CONTAINERD_CONFIG_FILE is set).
+CONTAINERD_SNAPSHOTTER=${CONTAINERD_SNAPSHOTTER:-"overlayfs"}
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="${CONTAINERD_CONFIG_DIR}/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
@@ -56,6 +58,13 @@ EOF
   if command -v sestatus >/dev/null 2>&1; then
     cat >>${config_file} <<EOF
   enable_selinux = true
+EOF
+  fi
+
+  if [ $IS_WINDOWS -eq 0 ]; then
+    cat >>${config_file} <<EOF
+[plugins."io.containerd.cri.v1.images"]
+  snapshotter = "${CONTAINERD_SNAPSHOTTER}"
 EOF
   fi
 
