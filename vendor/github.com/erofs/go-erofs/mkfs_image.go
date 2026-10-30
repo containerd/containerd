@@ -66,7 +66,9 @@ type imgQEntry struct {
 // syscalls), it reads the entire metadata area into memory and parses
 // inodes, directory entries, xattrs, and chunk indexes directly from the
 // buffer. This reduces thousands of syscalls to a single ReadAt.
-func (fsys *Writer) copyFromImage(img *image) error {
+// hardlinks is the current CopyFrom call's (Dev, Ino) → fsInode map, used to
+// detect additional names that refer to a source inode already seen.
+func (fsys *Writer) copyFromImage(img *image, hardlinks map[hardlinkKey]*fsInode) error {
 	metaStart := img.metaStartPos()
 	totalBytes := int64(img.sb.Blocks) << img.sb.BlkSizeBits
 	if totalBytes <= 0 {
@@ -198,113 +200,129 @@ func (fsys *Writer) copyFromImage(img *image) error {
 		trailingAddr := inodeAddr + int64(icSize) + int64(xattrSize)
 		typ := mode & disk.StatTypeMask
 
-		// Build fsEntry directly, bypassing builder.Entry + add() overhead.
-		fe := &fsEntry{
-			path:    cur.path,
-			mode:    mode,
-			uid:     uid,
-			gid:     gid,
-			mtime:   mtime,
-			mtimeNs: mtimeNs,
-			size:    size,
-			xattrs:  xattrs,
+		// Build fsInode directly, bypassing builder.Entry + add() overhead.
+		ino := &fsInode{
+			mode:       mode,
+			uid:        uid,
+			gid:        gid,
+			mtime:      mtime,
+			mtimeNs:    mtimeNs,
+			size:       size,
+			xattrs:     xattrs,
+			fileClosed: true,
 		}
 		if nlink > 0 {
-			fe.nlink = nlink
-			fe.nlinkSet = true
+			ino.nlink = nlink
+			ino.nlinkSet = true
 		}
-		fe.fileClosed = true
 		if fsys.copyMetadataOnly {
-			fe.metadataOnly = true
+			ino.metadataOnly = true
 		}
 
-		switch typ {
-		case disk.StatTypeDir:
-			dirSize := int(size)
-			if dirSize > 0 {
-				var dirData []byte
-				switch layout {
-				case disk.LayoutFlatPlain:
-					dataAddr := int64(idata) << blkBits
-					d := at(dataAddr)
-					if d != nil && len(d) >= dirSize {
-						dirData = d[:dirSize]
-					} else {
-						dirData = make([]byte, dirSize)
-						if _, err := img.meta.ReadAt(dirData, dataAddr); err != nil {
-							return fmt.Errorf("read dir data for nid %d: %w", cur.nid, err)
+		// Detect hard links: if this nid was already registered under an
+		// earlier directory entry in this CopyFrom call, share that fsInode
+		// instead of duplicating its data. Directories are excluded — a
+		// directory's nlink reflects its child-directory count, not a real
+		// hard link, and BFS only ever visits a given directory nid once.
+		// nid is only unique within this source image, but hardlinks is
+		// created fresh for each CopyFrom call, so keying on nid alone
+		// (dev 0) is safe here.
+		secondaryHardlink := false
+		if nlink > 1 && typ != disk.StatTypeDir {
+			key := hardlinkKey{0, cur.nid}
+			if prior, ok := hardlinks[key]; ok {
+				ino = prior
+				secondaryHardlink = true
+			} else {
+				hardlinks[key] = ino
+			}
+		}
+
+		fe := &fsEntry{path: cur.path, ino: ino}
+
+		if !secondaryHardlink {
+			switch typ {
+			case disk.StatTypeDir:
+				dirSize := int(size)
+				if dirSize > 0 {
+					var dirData []byte
+					switch layout {
+					case disk.LayoutFlatPlain:
+						dataAddr := int64(idata) << blkBits
+						d := at(dataAddr)
+						if d != nil && len(d) >= dirSize {
+							dirData = d[:dirSize]
+						} else {
+							dirData = make([]byte, dirSize)
+							if _, err := img.meta.ReadAt(dirData, dataAddr); err != nil {
+								return fmt.Errorf("read dir data for nid %d: %w", cur.nid, err)
+							}
+						}
+					case disk.LayoutFlatInline:
+						d := at(trailingAddr)
+						if d != nil && len(d) >= dirSize {
+							dirData = d[:dirSize]
 						}
 					}
-				case disk.LayoutFlatInline:
-					d := at(trailingAddr)
-					if d != nil && len(d) >= dirSize {
-						dirData = d[:dirSize]
+					if dirData != nil {
+						fsys.parseDirBlock(dirData, dirSize, blockSize, cur.path, &queue)
 					}
 				}
-				if dirData != nil {
-					fsys.parseDirBlock(dirData, dirSize, blockSize, cur.path, &queue)
-				}
-			}
 
-		case disk.StatTypeSymlink:
-			if size > 0 {
-				var linkData []byte
-				if layout == disk.LayoutFlatPlain {
-					linkData = make([]byte, size)
-					if _, err := img.meta.ReadAt(linkData, int64(idata)<<blkBits); err != nil {
-						return fmt.Errorf("read symlink data for nid %d: %w", cur.nid, err)
+			case disk.StatTypeSymlink:
+				if size > 0 {
+					var linkData []byte
+					if layout == disk.LayoutFlatPlain {
+						linkData = make([]byte, size)
+						if _, err := img.meta.ReadAt(linkData, int64(idata)<<blkBits); err != nil {
+							return fmt.Errorf("read symlink data for nid %d: %w", cur.nid, err)
+						}
+					} else {
+						linkData = at(trailingAddr)
 					}
-				} else {
-					linkData = at(trailingAddr)
-				}
-				if linkData != nil && int(size) <= len(linkData) {
-					fe.linkTarget = string(linkData[:size])
-				}
-			}
-
-		case disk.StatTypeReg:
-			if layout == disk.LayoutChunkBased && size > 0 {
-				chunkFmt := uint16(idata)
-				if chunkFmt&disk.LayoutChunkFormatIndexes != 0 {
-					chunkAddr := trailingAddr
-					if chunkAddr%8 != 0 {
-						chunkAddr = (chunkAddr + 7) & ^int64(7)
+					if linkData != nil && int(size) <= len(linkData) {
+						ino.linkTarget = string(linkData[:size])
 					}
-					fe.chunks = fsys.parseChunks(at(chunkAddr), chunkFmt, size, blkBits, img.deviceIDMask)
-					fe.contiguous = true
 				}
+
+			case disk.StatTypeReg:
+				if layout == disk.LayoutChunkBased && size > 0 {
+					chunkFmt := uint16(idata)
+					if chunkFmt&disk.LayoutChunkFormatIndexes != 0 {
+						chunkAddr := trailingAddr
+						if chunkAddr%8 != 0 {
+							chunkAddr = (chunkAddr + 7) & ^int64(7)
+						}
+						ino.chunks = fsys.parseChunks(at(chunkAddr), chunkFmt, size, blkBits, img.deviceIDMask)
+						ino.contiguous = true
+					}
+				}
+
+			case disk.StatTypeChrdev, disk.StatTypeBlkdev:
+				ino.rdev = disk.RdevFromMode(mode, idata)
 			}
 
-		case disk.StatTypeChrdev, disk.StatTypeBlkdev:
-			fe.rdev = disk.RdevFromMode(mode, idata)
-		}
-
-		// Remap chunk DeviceIDs for metadata-only sources.
-		if fsys.copyMetadataOnly && fsys.copyDeviceID > 0 {
-			offset := fsys.copyDeviceID - 1
-			for i := range fe.chunks {
-				fe.chunks[i].DeviceID += offset
+			// Remap chunk DeviceIDs for metadata-only sources.
+			if fsys.copyMetadataOnly && fsys.copyDeviceID > 0 {
+				offset := fsys.copyDeviceID - 1
+				for i := range ino.chunks {
+					ino.chunks[i].DeviceID += offset
+				}
 			}
 		}
 
 		// Register in the tree.
 		if cur.path == "/" {
-			// Update root metadata.
-			fsys.root.mode = fe.mode
-			fsys.root.uid = fe.uid
-			fsys.root.gid = fe.gid
-			fsys.root.mtime = fe.mtime
-			fsys.root.mtimeNs = fe.mtimeNs
-			fsys.root.nlink = fe.nlink
-			fsys.root.nlinkSet = fe.nlinkSet
-			fsys.root.xattrs = fe.xattrs
+			// Update root fsInode.
+			fsys.root.ino = ino
 		} else if existing, ok := fsys.byPath[cur.path]; ok {
-			// Merge overwrites: preserve tree linkage.
-			savedParent := existing.parent
-			savedChildren := existing.children
-			*existing = *fe
-			existing.parent = savedParent
-			existing.children = savedChildren
+			// Merge overwrites: replace fsInode but preserve tree linkage.
+			// Detach the old fsInode so any remaining hard-linked names get a
+			// correct nlink.
+			if existing.ino != ino {
+				unlinkInode(existing.ino)
+			}
+			existing.ino = ino
 		} else {
 			fsys.addChild(fe)
 		}
