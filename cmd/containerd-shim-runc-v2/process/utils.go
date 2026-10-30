@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
-	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -157,13 +156,14 @@ func (p *pidFile) Read() (int, error) {
 // shutdownAndDrain shuts a terminal console down, so a copier parked on it
 // wakes, then waits for the process I/O to drain. A process deleted from the
 // created state never ran setExited, so this is its only shutdown.
-func shutdownAndDrain(ctx context.Context, platform stdio.Platform, cons console.Console, wg *sync.WaitGroup, what string) {
+func shutdownAndDrain(ctx context.Context, platform stdio.Platform, cons console.Console, wg *sync.WaitGroup, what string) error {
 	if cons != nil {
 		platform.ShutdownConsole(ctx, cons)
 	}
 	if err := waitTimeout(ctx, wg, 10*time.Second); err != nil {
-		log.G(ctx).WithError(err).Errorf("failed to drain %s io", what)
+		return err
 	}
+	return nil
 }
 
 // closeIO releases a process's I/O however it was wired. A terminal process

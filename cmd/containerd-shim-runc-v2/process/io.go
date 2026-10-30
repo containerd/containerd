@@ -56,13 +56,88 @@ type processIO struct {
 	uri   *url.URL
 	copy  bool
 	stdio stdio.Stdio
+
+	// mu protects fifos, readers and closing.
+	mu    sync.Mutex
+	fifos []io.Closer // fifo ends opened by copyPipes
+	// readers is the subset of fifos that are read ends, they are released as
+	// soon as CloseReaders is called.
+	readers []io.Closer
+	closing bool
 }
 
+// Close closes the fifo ends opened for copying and the underlying process io.
 func (p *processIO) Close() error {
+	p.mu.Lock()
+	p.closing = true
+	fifos := p.fifos
+	p.fifos = nil
+	p.readers = nil
+	p.mu.Unlock()
+
+	for _, f := range fifos {
+		f.Close()
+	}
 	if p.io != nil {
 		return p.io.Close()
 	}
 	return nil
+}
+
+// CloseReaders releases the read ends that copyPipes opened for the
+// container's stdout, stderr and stdin.
+//
+// The shim keeps an extra read end of each fifo open so that a consumer which
+// detaches and reconnects to the same fifo (containerd restart, `ctr task
+// attach` exiting, ...) keeps receiving the output. That read end has to be
+// released when the process goes away: as long as it is open, a write to a
+// fifo whose real consumer is gone blocks forever instead of failing with
+// EPIPE, so the copy could only be cleaned up by giving up on it after the
+// Delete timeout.
+//
+// Only read ends are released here. Output that is still being drained is not
+// affected, because writes keep succeeding while the real consumer is
+// attached, and the write ends are closed by the copy goroutines themselves
+// once they are done.
+//
+// The read ends are also still tracked in p.fifos, so Close may close them a
+// second time. That is safe: fifo.Fifo.Close is idempotent.
+func (p *processIO) CloseReaders() {
+	p.mu.Lock()
+	readers := p.readers
+	p.readers = nil
+	p.mu.Unlock()
+
+	for _, r := range readers {
+		r.Close()
+	}
+}
+
+// addWriter registers a fifo write end so that it is released by Close.
+func (p *processIO) addWriter(f io.Closer) {
+	p.track(f, false)
+}
+
+// addReader registers a fifo read end so that it is released by Close and by
+// CloseReaders.
+func (p *processIO) addReader(f io.Closer) {
+	p.track(f, true)
+}
+
+// track registers a fifo end to be closed with the process io. If the io is
+// already closing, the fifo end is closed immediately instead of being leaked.
+func (p *processIO) track(f io.Closer, reader bool) {
+	p.mu.Lock()
+	if p.closing {
+		p.mu.Unlock()
+		f.Close()
+		return
+	}
+	p.fifos = append(p.fifos, f)
+	if reader {
+		p.readers = append(p.readers, f)
+	}
+	p.mu.Unlock()
 }
 
 func (p *processIO) IO() runc.IO {
@@ -74,7 +149,7 @@ func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 		return nil
 	}
 	var cwg sync.WaitGroup
-	if err := copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
+	if err := copyPipes(ctx, p, p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
 		return fmt.Errorf("unable to copy pipes: %w", err)
 	}
 	cwg.Wait()
@@ -131,7 +206,8 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	return pio, nil
 }
 
-func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+func copyPipes(ctx context.Context, pio *processIO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+	rio := pio.IO()
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
@@ -189,9 +265,19 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			if fw, err = fifo.OpenFifo(ctx, i.name, syscall.O_WRONLY, 0); err != nil {
 				return fmt.Errorf("containerd-shim: opening w/o fifo %q failed: %w", i.name, err)
 			}
+			// Hold an extra read end open for as long as the process exists.
+			// It keeps the fifo pipe object alive when the consumer goes away
+			// (containerd restarting, `ctr task attach` detaching, ...), so a
+			// write blocks instead of failing with EPIPE and a consumer that
+			// reconnects to the same fifo still receives the output.
+			// processIO.CloseReaders releases it when the process is deleted,
+			// which unblocks the copy and lets it exit.
 			if fr, err = fifo.OpenFifo(ctx, i.name, syscall.O_RDONLY, 0); err != nil {
+				fw.Close()
 				return fmt.Errorf("containerd-shim: opening r/o fifo %q failed: %w", i.name, err)
 			}
+			pio.addWriter(fw)
+			pio.addReader(fr)
 		} else {
 			if sameFile != nil {
 				sameFile.bumpCount(1)
@@ -214,6 +300,9 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 	if err != nil {
 		return fmt.Errorf("containerd-shim: opening %s failed: %s", stdin, err)
 	}
+	// Release the read end when the process is deleted so a blocked copy
+	// does not keep the shim alive.
+	pio.addReader(f)
 	cwg.Add(1)
 	go func() {
 		cwg.Done()
