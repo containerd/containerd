@@ -362,6 +362,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
+	// CRI owns the pod SELinux label; a label from the controller is ignored.
+	if l := ctrl.Labels["selinux_label"]; l != "" && l != sandbox.ProcessLabel {
+		log.G(ctx).WithFields(log.Fields{
+			"sandbox":          id,
+			"controller_label": l,
+			"selinux_label":    sandbox.ProcessLabel,
+		}).Warn("ignoring the SELinux label returned by the sandbox controller, using the label allocated by CRI")
+	}
+
 	sandboxInfo.Labels = ctrl.Labels
 	sandboxInfo.Spec = ctrl.Spec
 
