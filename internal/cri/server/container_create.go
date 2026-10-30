@@ -56,7 +56,15 @@ func init() {
 }
 
 // CreateContainer creates a new container in the given PodSandbox.
-func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
+func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (*runtime.CreateContainerResponse, error) {
+	return c.createContainerFromCRI(ctx, r, false)
+}
+
+func (c *criService) createContainerForRestore(ctx context.Context, r *runtime.CreateContainerRequest) (*runtime.CreateContainerResponse, error) {
+	return c.createContainerFromCRI(ctx, r, true)
+}
+
+func (c *criService) createContainerFromCRI(ctx context.Context, r *runtime.CreateContainerRequest, restorePending bool) (_ *runtime.CreateContainerResponse, retErr error) {
 	span := tracing.SpanFromContext(ctx)
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
@@ -158,6 +166,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			containerdImage:       &containerdImage,
 			meta:                  &meta,
 			start:                 time.Now(),
+			restorePending:        restorePending,
 		},
 	)
 	if err != nil {
@@ -183,6 +192,7 @@ type createContainerRequest struct {
 	containerdImage       *containerd.Image
 	meta                  *containerstore.Metadata
 	start                 time.Time
+	restorePending        bool
 }
 
 func (c *criService) createContainer(r *createContainerRequest) (_ string, retErr error) {
@@ -416,7 +426,10 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
+	status := containerstore.Status{
+		CreatedAt:      time.Now().UnixNano(),
+		RestorePending: r.restorePending,
+	}
 	status = copyResourcesToStatus(spec, status)
 	container, err := containerstore.NewContainer(*r.meta,
 		containerstore.WithStatus(status, containerRootDir),

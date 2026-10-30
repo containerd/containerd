@@ -45,6 +45,9 @@ func DefaultImageConfig() ImageConfig {
 	}
 }
 
+// Checkpoint/restore is enabled unless the configuration disables it.
+const defaultCheckpointRestoreEnabled = true
+
 // DefaultRuntimeConfig returns default configurations of cri plugin.
 func DefaultRuntimeConfig() RuntimeConfig {
 	defaultRuncV2Opts := `
@@ -108,6 +111,5 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,
 		EnableUnprivilegedICMP:           true,
-		EnableCRIU:                       func() *bool { v := true; return &v }(),
 	}
 }

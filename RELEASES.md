@@ -638,6 +638,7 @@ The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in 
 |`[plugins."io.containerd.cri.v1.runtime".cni]`                        | `bin_dir`                    | containerd v2.1     | containerd v2.4 ✅         | Use `bin_dirs`, which supports a list of directories |
 |`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.4 ✅    | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
 |`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4 ✅         | CDI support will always be enabled                   |
+|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_criu`                | containerd v2.5     | containerd v2.6            | Use `enable_checkpoint_restore`                      |
 
 
 > **Note**

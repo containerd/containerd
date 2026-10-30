@@ -142,6 +142,9 @@ type criService struct {
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
+	// containerCheckpointsInProgress prevents Pod and standalone container
+	// checkpoint calls from sharing a container's checkpoint scratch state.
+	containerCheckpointsInProgress sync.Map
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin map[string]cni.CNI
 	// client is an instance of the containerd client
@@ -356,6 +359,12 @@ func (c *criService) Run(ready func()) error {
 	// register CRI domain with NRI
 	if err := c.nri.Register(); err != nil {
 		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
+	}
+
+	// Restore rollback needs recovered stores, CNI and NRI, but must finish
+	// before CRI accepts requests. Run it even when checkpointing is disabled.
+	if err := c.recoverPodRestores(ctrdutil.NamespacedContext()); err != nil {
+		return fmt.Errorf("failed to recover Pod restores: %w", err)
 	}
 
 	// Set the server as initialized. GRPC services could start serving traffic.
