@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
@@ -288,10 +289,14 @@ func (errs *Errors) UnmarshalJSON(data []byte) error {
 }
 
 func unexpectedResponseErr(resp *http.Response) (retErr error) {
-	retErr = remoteerrors.NewUnexpectedStatusErr(resp)
+	rerr := remoteerrors.NewUnexpectedStatusErr(resp).(remoteerrors.ErrUnexpectedStatus)
+	if t, ok := parseRetryAfter(time.Now().UTC(), resp.Header.Get("Retry-After")); ok {
+		rerr.RetryAfter = &t
+	}
+	retErr = rerr
 
 	// Decode registry error if provided
-	if rerr := retErr.(remoteerrors.ErrUnexpectedStatus); len(rerr.Body) > 0 {
+	if len(rerr.Body) > 0 {
 		var registryErr Errors
 		if err := json.Unmarshal(rerr.Body, &registryErr); err == nil && registryErr.Len() > 0 {
 			// Join the unexpected error with the typed errors, when printed it will
