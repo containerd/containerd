@@ -198,6 +198,26 @@ func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.Contain
 	return nil
 }
 
+func (s *Store) AddContainerIO(id string, io *cio.ContainerIO) (Container, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		if err == truncindex.ErrNotExist {
+			err = errdefs.ErrNotFound
+		}
+		return Container{}, err
+	}
+
+	c, ok := s.containers[id]
+	if !ok {
+		return Container{}, errdefs.ErrNotFound
+	}
+	c.IO = io
+	s.containers[id] = c
+	return c, nil
+}
+
 // Delete deletes the container from store with specified id.
 func (s *Store) Delete(id string) {
 	s.lock.Lock()
