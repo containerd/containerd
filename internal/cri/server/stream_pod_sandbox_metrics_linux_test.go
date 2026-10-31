@@ -29,6 +29,42 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
+func TestPodSandboxMetricsWithoutNetwork(t *testing.T) {
+	c := newTestCRIService()
+	sb := sandboxstore.NewSandbox(
+		sandboxstore.Metadata{
+			ID:   "sb-isolated",
+			Name: "sandbox-isolated",
+			Config: &runtime.PodSandboxConfig{
+				Metadata:   &runtime.PodSandboxMetadata{Name: "pod-isolated", Namespace: "test"},
+				PodNetwork: runtime.PodNetwork_POD_NETWORK_NONE,
+			},
+		},
+		sandboxstore.Status{State: sandboxstore.StateReady},
+	)
+	// A nonempty path must not trigger default-interface collection for an
+	// isolated sandbox. A nonexistent path makes accidental access fail without
+	// requiring privileges or creating a network namespace in this unit test.
+	sb.NetNSPath = t.TempDir() + "/netns"
+	require.NoError(t, c.sandboxStore.Add(sb))
+
+	metrics, err := c.collectPodSandboxMetrics(context.Background(), sb, []string{"pod-isolated", "test"})
+	require.NoError(t, err)
+	require.NotNil(t, metrics)
+	assert.Equal(t, sb.ID, metrics.PodSandboxId)
+	assert.Empty(t, metrics.Metrics, "isolated sandbox must not report default-interface counters")
+
+	resp, err := c.ListPodSandboxMetrics(context.Background(), &runtime.ListPodSandboxMetricsRequest{})
+	require.NoError(t, err)
+	require.Len(t, resp.PodMetrics, 1, "isolated sandbox metrics record must not be dropped")
+	assert.Equal(t, sb.ID, resp.PodMetrics[0].PodSandboxId)
+	assert.Empty(t, resp.PodMetrics[0].Metrics)
+
+	stream := newFakeStreamServer[runtime.StreamPodSandboxMetricsResponse](context.Background())
+	require.NoError(t, c.StreamPodSandboxMetrics(&runtime.StreamPodSandboxMetricsRequest{}, stream))
+	require.Len(t, stream.sent, 1, "isolated sandbox metrics record must also be streamed")
+}
+
 func TestStreamPodSandboxMetricsEmpty(t *testing.T) {
 	c := newTestCRIService()
 
