@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -140,7 +141,17 @@ func (e *execProcess) delete(ctx context.Context) error {
 		e.deleting = nil
 		close(done)
 	}()
-	shutdownAndDrain(ctx, e.parent.Platform, e.console, &e.wg, "exec process "+e.id)
+	if e.io != nil {
+		e.io.CloseReaders()
+	}
+	if err := shutdownAndDrain(ctx, e.parent.Platform, e.console, &e.wg, "exec process "+e.id); err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to drain exec process %s io", e.id)
+		if e.io != nil {
+			// The copy is stuck on the runtime io itself, release it so that
+			// the copy goroutine can exit instead of leaking.
+			e.io.Close()
+		}
+	}
 	closeIO(e.closers, e.console, e.io)
 	pidfile := filepath.Join(e.path, e.id+".pid")
 	// silently ignore error

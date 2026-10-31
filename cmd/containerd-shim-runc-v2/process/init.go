@@ -333,7 +333,22 @@ func (p *Init) delete(ctx context.Context) error {
 		p.deleting = nil
 		close(done)
 	}()
-	shutdownAndDrain(ctx, p.Platform, p.console, &p.wg, "init process "+p.id)
+	// Release the fifo read ends before draining: without them a copy whose
+	// consumer is gone (e.g. containerd restarted and has not reconnected yet)
+	// stays blocked writing to the fifo and would only be released by the
+	// timeout below.
+	if p.io != nil {
+		p.io.CloseReaders()
+	}
+	if err := shutdownAndDrain(ctx, p.Platform, p.console, &p.wg, "init process "+p.id); err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to drain init process %s io", p.id)
+		if p.io != nil {
+			// The copy is stuck on the runtime io itself (e.g. a child of the
+			// container keeps its stdio open). Release it so that the copy
+			// goroutine can exit instead of leaking until the shim exits.
+			p.io.Close()
+		}
+	}
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process
 	// but we still hold metadata and pipes
