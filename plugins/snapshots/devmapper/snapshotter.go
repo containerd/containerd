@@ -187,6 +187,9 @@ func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 		snap, err = storage.GetSnapshot(ctx, key)
 		return err
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active mount: %w", err)
+	}
 
 	snapInfo, err := s.Stat(ctx, key)
 	if err != nil {
