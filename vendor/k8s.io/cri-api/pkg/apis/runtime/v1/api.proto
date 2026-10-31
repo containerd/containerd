@@ -211,11 +211,11 @@ service RuntimeService {
 
     // RuntimeConfig returns configuration information of the runtime.
     // A couple of notes:
-    // - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
-    //   The former is for having runtime tell Kubelet what to do, the latter vice versa.
-    // - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
-    //   The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
-    //   avoid updating them without a full node reboot.
+    //   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+    //     The former is for having runtime tell Kubelet what to do, the latter vice versa.
+    //   - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+    //     The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+    //     avoid updating them without a full node reboot.
     rpc RuntimeConfig(RuntimeConfigRequest) returns (RuntimeConfigResponse) {}
 
     // UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
@@ -249,6 +249,34 @@ service ImageService {
     rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
     // PullImage pulls an image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
+    // PullSecurityProfile pulls a security profile with authentication config
+    // into the runtime's storage. If the profile is already present, the
+    // runtime must not contact the registry, unless a signature policy that
+    // did not apply to the earlier pull requires it. The profile is applied by
+    // passing its reference in SecurityProfile.oci_ref. Accepted artifact
+    // formats and their validation are up to the runtime.
+    // Pulled profiles are not images: they must only be returned by
+    // ListSecurityProfiles, and the kubelet manages their lifecycle with
+    // RemoveSecurityProfile.
+    // Errors use the well-known messages RegistryUnavailable,
+    // SignatureValidationFailed, or, for permanent rejections of the request
+    // or the artifact, SecurityProfileInvalid as the prefix of the gRPC status
+    // message. The kubelet retries all errors with backoff except
+    // SecurityProfileInvalid and the gRPC code Unimplemented.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc PullSecurityProfile(PullSecurityProfileRequest) returns (PullSecurityProfileResponse) {}
+    // ListSecurityProfiles lists the profiles pulled with PullSecurityProfile.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc ListSecurityProfiles(ListSecurityProfilesRequest) returns (ListSecurityProfilesResponse) {}
+    // RemoveSecurityProfile removes a profile pulled with PullSecurityProfile.
+    // This call is idempotent, and must not return an error if the profile has
+    // already been removed. Containers already running with the profile are
+    // not affected.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    rpc RemoveSecurityProfile(RemoveSecurityProfileRequest) returns (RemoveSecurityProfileResponse) {}
     // RemoveImage removes the image.
     // This call is idempotent, and must not return an error if the image has
     // already been removed.
@@ -308,12 +336,12 @@ message PortMapping {
     int32 container_port = 2;
     // Port number on the host to map the container port to.
     //
-    // * Valid host port range is 1-65535.
-    // * The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
-    // * The value 0 does NOT indicate dynamic port allocation. Future implementations
-    //   of dynamic allocation will use different values/semantics.
-    // * Implementations MUST handle the case where this field is explicitly set to 0,
-    //   This field SHOULD be omitted when no port is required.
+    //   - Valid host port range is 1-65535.
+    //   - The value 0 has explicit semantic meaning: it indicates NO host port should be allocated.
+    //   - The value 0 does NOT indicate dynamic port allocation. Future implementations
+    //     of dynamic allocation will use different values/semantics.
+    //   - Implementations MUST handle the case where this field is explicitly set to 0,
+    //     This field SHOULD be omitted when no port is required.
     //
     // Default: If omitted, container port will not be exposed on the host.
     int32 host_port = 3;
@@ -513,10 +541,11 @@ message LinuxSandboxSecurityContext {
     // AppArmor profile for the sandbox.
     SecurityProfile apparmor = 10;
     // Seccomp profile for the sandbox, candidate values are:
-    // * runtime/default: the default profile for the container runtime
-    // * unconfined: unconfined profile, ie, no seccomp sandboxing
-    // * localhost/<full-path-to-profile>: the profile installed on the node.
-    //   <full-path-to-profile> is the full path of the profile.
+    //   - runtime/default: the default profile for the container runtime
+    //   - unconfined: unconfined profile, ie, no seccomp sandboxing
+    //   - localhost/<full-path-to-profile>: the profile installed on the node.
+    //     <full-path-to-profile> is the full path of the profile.
+    //
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 7 [deprecated=true];
 }
@@ -531,6 +560,14 @@ message SecurityProfile {
         Unconfined = 1;
         // A pre-defined profile on the node should be used.
         Localhost = 2;
+        // A profile pulled with PullSecurityProfile should be used, merged
+        // with its base profile (see base_profile). If the profile is not
+        // present, runtimes must fail the call and must not pull it. Only
+        // supported for seccomp: runtimes must reject OCI in the apparmor
+        // field with InvalidArgument.
+        // Feature gate: SecurityProfileOCI
+        // See https://kep.k8s.io/6061 for more details.
+        OCI = 3;
     }
     // Indicator which `ProfileType` should be applied.
     ProfileType profile_type = 1;
@@ -538,6 +575,41 @@ message SecurityProfile {
     // Must only be set if `ProfileType` is `Localhost`.
     // For seccomp, it must be an absolute path to the seccomp profile.
     // For AppArmor, this field is the AppArmor `<profile name>/`
+    string localhost_ref = 2;
+    // oci_ref is the canonical, digest-pinned reference of a profile pulled
+    // with PullSecurityProfile, as written in the pod spec and passed in
+    // image.image of the pull (for example
+    // "registry.example.com/profile@sha256:abc123...").
+    // Must be set if `ProfileType` is `OCI`, and must not be set for other
+    // profile types: runtimes reject it with InvalidArgument.
+    string oci_ref = 3;
+    // base_profile is the optional base profile of an `OCI` profile. The
+    // effective profile is the intersection of the OCI profile and the base
+    // profile, so it permits an operation only if both do. If base_profile is
+    // not set, the base is the runtime default profile; runtimes must check
+    // that it is set, because its zero value selects RuntimeDefault as well.
+    // Must not be set for other profile types: runtimes reject it with
+    // InvalidArgument.
+    SecurityProfileBase base_profile = 4;
+}
+
+// SecurityProfileBase is the base profile of an OCI security profile. A
+// Localhost base takes the place of the runtime default profile, so a node
+// administrator can provide a looser or a stricter base than the default.
+message SecurityProfileBase {
+    // Available base profile types.
+    enum BaseType {
+        // The container runtime default profile is used as the base.
+        RuntimeDefault = 0;
+        // A pre-defined profile on the node is used as the base.
+        Localhost = 1;
+    }
+    // Indicator which `BaseType` should be applied.
+    BaseType type = 1;
+    // Absolute path to the base profile on the node, with the same semantics
+    // as SecurityProfile.localhost_ref.
+    // Must be set if `BaseType` is `Localhost`, and must not be set for other
+    // base types: runtimes reject it with InvalidArgument.
     string localhost_ref = 2;
 }
 
@@ -591,9 +663,9 @@ message PodSandboxConfig {
     // binary log files with structured logging data from the individual
     // containers. For example, the files might be newline separated JSON
     // structured logs, systemd-journald journal files, gRPC trace files, etc.
-    // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
-    //     ContainerConfig.LogPath = `containerName/Instance#.log`
+    // For example:
+    //   - PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
+    //   - ContainerConfig.LogPath = `containerName/Instance#.log`
     string log_directory = 3;
     // DNS config for the sandbox.
     DNSConfig dns_config = 4;
@@ -1102,19 +1174,39 @@ message LinuxContainerSecurityContext {
     // AppArmor profile for the container.
     SecurityProfile apparmor = 16;
     // AppArmor profile for the container, candidate values are:
-    // * runtime/default: equivalent to not specifying a profile.
-    // * unconfined: no profiles are loaded
-    // * localhost/<profile_name>: profile loaded on the node
-    //    (localhost) by name. The possible profile names are detailed at
-    //    https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
+    //   - runtime/default: equivalent to not specifying a profile.
+    //   - unconfined: no profiles are loaded
+    //   - localhost/<profile_name>: profile loaded on the node
+    //     (localhost) by name. The possible profile names are detailed at
+    //     https://gitlab.com/apparmor/apparmor/-/wikis/AppArmor_Core_Policy_Reference
     string apparmor_profile = 9 [deprecated=true];
     // Seccomp profile for the container, candidate values are:
-    // * runtime/default: the default profile for the container runtime
-    // * unconfined: unconfined profile, ie, no seccomp sandboxing
-    // * localhost/<full-path-to-profile>: the profile installed on the node.
-    //   <full-path-to-profile> is the full path of the profile.
+    //   - runtime/default: the default profile for the container runtime
+    //   - unconfined: unconfined profile, ie, no seccomp sandboxing
+    //   - localhost/<full-path-to-profile>: the profile installed on the node.
+    //     <full-path-to-profile> is the full path of the profile.
+    //
     // Default: "", which is identical with unconfined.
     string seccomp_profile_path = 10 [deprecated=true];
+    // cgroup_mount_mode controls how the cgroup filesystem is mounted in the
+    // container.
+    CgroupMountMode cgroup_mount_mode = 18;
+}
+
+// CgroupMountMode defines how the cgroup filesystem is mounted in a container.
+// The runtime MUST fail container creation if it cannot honor the requested
+// mode.
+enum CgroupMountMode {
+    // CGROUP_MOUNT_MODE_UNSPECIFIED uses the runtime's default mount mode.
+    CGROUP_MOUNT_MODE_UNSPECIFIED = 0;
+    // CGROUP_MOUNT_MODE_READ_ONLY mounts the cgroup filesystem read-only.
+    // A privileged container's cgroup filesystem is always writable. The
+    // runtime fails creation of a privileged container that requests this
+    // mode.
+    CGROUP_MOUNT_MODE_READ_ONLY = 1;
+    // CGROUP_MOUNT_MODE_READ_WRITE mounts the cgroup filesystem read-write.
+    // This mode requires the host to mount cgroup v2 with nsdelegate.
+    CGROUP_MOUNT_MODE_READ_WRITE = 2;
 }
 
 // LinuxContainerConfig contains platform-specific configuration for
@@ -1277,10 +1369,10 @@ message ContainerConfig {
     repeated Device devices = 8;
     // Key-value pairs that may be used to scope and select individual resources.
     // Label keys are of the form:
-    //     label-key ::= prefixed-name | name
-    //     prefixed-name ::= prefix '/' name
-    //     prefix ::= DNS_SUBDOMAIN
-    //     name ::= DNS_LABEL
+    //   - label-key ::= prefixed-name | name
+    //   - prefixed-name ::= prefix '/' name
+    //   - prefix ::= DNS_SUBDOMAIN
+    //   - name ::= DNS_LABEL
     map<string, string> labels = 9;
     // Unstructured key-value map that may be used by the kubelet to store and
     // retrieve arbitrary metadata.
@@ -1295,9 +1387,9 @@ message ContainerConfig {
     map<string, string> annotations = 10;
     // Path relative to PodSandboxConfig.LogDirectory for container to store
     // the log (STDOUT and STDERR) on the host.
-    // E.g.,
-    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
-    //     ContainerConfig.LogPath = `containerName/Instance#.log`
+    // For example:
+    //   - PodSandboxConfig.LogDirectory = `/var/log/pods/<NAMESPACE>_<NAME>_<UID>/`
+    //   - ContainerConfig.LogPath = `containerName/Instance#.log`
     string log_path = 11;
 
     // Variables for interactive containers, these have very specialized
@@ -1799,16 +1891,85 @@ message PullImageResponse {
     //
     // When referring to the same image, the container runtime MUST always return
     // the same value for:
-    //     - Image.id
-    //     - Container.image_id
-    //     - ContainerStatus.image_id
-    //     - PullImageResponse.image_ref
+    //   - Image.id
+    //   - Container.image_id
+    //   - ContainerStatus.image_id
+    //   - PullImageResponse.image_ref
+    //
     // Note: this field has a stricter meaning starting with v1.36.
     // It used to be image ID OR digest, which are different values,
     // and would not necessarily match other ID fields in the Container,
     // ContainerStatus, and Image messages
     string image_ref = 1;
 }
+
+// SecurityProfileKind identifies the security mechanism of a profile pulled
+// with PullSecurityProfile.
+enum SecurityProfileKind {
+    // Unspecified kind. Runtimes reject it like an unsupported kind.
+    SecurityProfileKindUnspecified = 0;
+    // A seccomp profile.
+    Seccomp = 1;
+}
+
+message PullSecurityProfileRequest {
+    // Spec of the profile. image.image and image.user_specified_image both
+    // hold the canonical, digest-pinned reference from the pod spec, and
+    // image.runtime_handler selects the runtime handler, as for PullImage.
+    ImageSpec image = 1;
+    // Authentication configuration for pulling the profile, resolved by the
+    // kubelet the same way as for PullImage.
+    AuthConfig auth = 2;
+    // Config of the PodSandbox, which is used to pull the profile in
+    // PodSandbox context.
+    PodSandboxConfig sandbox_config = 3;
+    // profile_kind identifies the expected security mechanism. The runtime
+    // rejects artifacts that do not hold a profile of this kind. Kinds the
+    // runtime does not support are rejected with gRPC code InvalidArgument
+    // and the SecurityProfileInvalid well-known error message.
+    SecurityProfileKind profile_kind = 4;
+}
+
+message PullSecurityProfileResponse {
+    // cached is true if the profile was already present and the runtime made
+    // no registry request, so the credentials of this request were not
+    // checked. It is false if the registry served or verified the profile for
+    // this request. The kubelet calls PullSecurityProfile on every pod sync,
+    // emits pull events only for actual pulls, and labels its pull duration
+    // metric with it. The response exists only for a successful call: an
+    // error, whether RegistryUnavailable, SignatureValidationFailed, or
+    // SecurityProfileInvalid, means the profile cannot be used for this
+    // request, whether or not it is present.
+    bool cached = 1;
+}
+
+message ListSecurityProfilesRequest {}
+
+// SecurityProfileInfo describes a profile pulled with PullSecurityProfile.
+// The kubelet considers a profile in use if a pod references its digest or
+// one of its refs.
+message SecurityProfileInfo {
+    // digest identifies the profile in the runtime's storage (for example
+    // "sha256:abc123..."). Its algorithm may differ from the digests of refs.
+    string digest = 1;
+    // refs are the image.image values of all PullSecurityProfile calls that
+    // resolved to the profile, including calls that found it already present.
+    repeated string refs = 2;
+    // size is the size of the profile in the runtime's storage, in bytes.
+    uint64 size = 3;
+}
+
+message ListSecurityProfilesResponse {
+    // List of pulled security profiles.
+    repeated SecurityProfileInfo profiles = 1;
+}
+
+message RemoveSecurityProfileRequest {
+    // digest of the profile to remove, as returned by ListSecurityProfiles.
+    string digest = 1;
+}
+
+message RemoveSecurityProfileResponse {}
 
 message RemoveImageRequest {
     // Spec of the image to remove.
@@ -1901,6 +2062,15 @@ message RuntimeFeatures {
     // mount_options is set to true if the runtime supports additional bind
     // mount options (noexec, nodev, nosuid) on container mounts.
     bool mount_options = 3;
+    // cgroup_mount_mode is set to true if the runtime supports the
+    // cgroup_mount_mode field of LinuxContainerSecurityContext.
+    bool cgroup_mount_mode = 4;
+    // seccomp_profile_oci is set to true if the runtime supports the `OCI`
+    // profile type in the seccomp fields of sandboxes and containers, and the
+    // security profile RPCs for the Seccomp kind.
+    // Feature gate: SecurityProfileOCI
+    // See https://kep.k8s.io/6061 for more details.
+    bool seccomp_profile_oci = 5;
 }
 
 message StatusResponse {
