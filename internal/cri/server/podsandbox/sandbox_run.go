@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/selinux/go-selinux"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -138,7 +137,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, config, &imageSpec.Config, metadata.NetNSPath, metadata.ProcessLabel, ociRuntime.PodAnnotations)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
@@ -150,14 +149,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			"spec":         spec,
 		}).Debug("sandbox container spec")
 	}
-
-	metadata.ProcessLabel = spec.Process.SelinuxLabel
-	defer func() {
-		if retErr != nil {
-			selinux.ReleaseLabel(metadata.ProcessLabel)
-		}
-	}()
-	labels["selinux_label"] = metadata.ProcessLabel
 
 	// handle any KVM based runtime
 	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {

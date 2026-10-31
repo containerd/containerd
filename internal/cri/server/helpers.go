@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -477,6 +478,18 @@ func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
 	}
 
 	return labels, nil
+}
+
+// initLabelsFromOpt allocates the SELinux process and mount labels described by
+// the given CRI SELinux options. On success the MCS level of the returned process
+// label is reserved and the caller owns it until it is either released with
+// selinux.ReleaseLabel or handed over to the label store.
+func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
+	labels, err := toLabel(selinuxOpts)
+	if err != nil {
+		return "", "", err
+	}
+	return label.InitLabels(labels)
 }
 
 func checkSelinuxLevel(level string) error {
