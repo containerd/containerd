@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/userns"
+	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -116,6 +117,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	if err != nil {
 		return "", fmt.Errorf("failed to remap snapshot: %w", err)
 	}
+	ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{"snapshot": usernsID, "parent": rsn.Parent}))
 
 	if _, err := snapshotter.Stat(ctx, usernsID); err == nil {
 		return usernsID, nil
@@ -142,6 +144,25 @@ type remappedSnapshot struct {
 }
 
 func (s *remappedSnapshot) ID() (string, error) {
+	fileCapabilities, err := supportsNamespacedFileCapabilities()
+	if err != nil {
+		return "", fmt.Errorf("check namespaced file capability support: %w", err)
+	}
+	return s.id(fileCapabilities)
+}
+
+func (s *remappedSnapshot) id(fileCapabilities bool) (string, error) {
+	for _, mappings := range [][]specs.LinuxIDMapping{s.IDMap.UidMap, s.IDMap.GidMap} {
+		for _, mapping := range mappings {
+			if mapping.Size == 0 {
+				return "", errors.New("remapped snapshot mapping has zero size")
+			}
+		}
+	}
+	if _, err := s.IDMap.RootPair(); err != nil {
+		return "", fmt.Errorf("invalid remapped snapshot root mapping: %w", err)
+	}
+
 	compare := func(a, b specs.LinuxIDMapping) int {
 		if a.ContainerID < b.ContainerID {
 			return -1
@@ -153,7 +174,13 @@ func (s *remappedSnapshot) ID() (string, error) {
 	slices.SortStableFunc(s.IDMap.UidMap, compare)
 	slices.SortStableFunc(s.IDMap.GidMap, compare)
 
-	buf, err := json.Marshal(s)
+	buf, err := json.Marshal(struct {
+		*remappedSnapshot
+		// Do not reuse snapshots produced before file capability preservation.
+		Version int `json:"Version"`
+		// Separate preserved and stripped snapshots across kernel changes.
+		FileCapabilities bool `json:"FileCapabilities"`
+	}{s, 1, fileCapabilities})
 	if err != nil {
 		return "", err
 	}
