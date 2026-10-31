@@ -29,6 +29,7 @@ const (
 	ProcessMetrics       = "process"
 	MiscellaneousMetrics = "misc"
 	ContainerSpecMetrics = "container_spec"
+	PressureMetrics      = "pressure"
 )
 
 var (
@@ -312,6 +313,40 @@ var (
 	containerSpecMemorySwapLimitBytes = &runtime.MetricDescriptor{
 		Name:      "container_spec_memory_swap_limit_bytes",
 		Help:      "Memory swap limit for the container",
+		LabelKeys: baseLabelKeys,
+	}
+)
+
+// Pressure metrics
+var (
+	containerPressureCPUStalledSecondsTotal = &runtime.MetricDescriptor{
+		Name:      "container_pressure_cpu_stalled_seconds_total",
+		Help:      "Total time duration no tasks in the container could make progress due to CPU congestion",
+		LabelKeys: baseLabelKeys,
+	}
+	containerPressureCPUWaitingSecondsTotal = &runtime.MetricDescriptor{
+		Name:      "container_pressure_cpu_waiting_seconds_total",
+		Help:      "Total time duration tasks in the container have waited due to CPU congestion",
+		LabelKeys: baseLabelKeys,
+	}
+	containerPressureMemoryStalledSecondsTotal = &runtime.MetricDescriptor{
+		Name:      "container_pressure_memory_stalled_seconds_total",
+		Help:      "Total time duration no tasks in the container could make progress due to memory congestion",
+		LabelKeys: baseLabelKeys,
+	}
+	containerPressureMemoryWaitingSecondsTotal = &runtime.MetricDescriptor{
+		Name:      "container_pressure_memory_waiting_seconds_total",
+		Help:      "Total time duration tasks in the container have waited due to memory congestion",
+		LabelKeys: baseLabelKeys,
+	}
+	containerPressureIOStalledSecondsTotal = &runtime.MetricDescriptor{
+		Name:      "container_pressure_io_stalled_seconds_total",
+		Help:      "Total time duration no tasks in the container could make progress due to IO congestion",
+		LabelKeys: baseLabelKeys,
+	}
+	containerPressureIOWaitingSecondsTotal = &runtime.MetricDescriptor{
+		Name:      "container_pressure_io_waiting_seconds_total",
+		Help:      "Total time duration tasks in the container have waited due to IO congestion",
 		LabelKeys: baseLabelKeys,
 	}
 )
