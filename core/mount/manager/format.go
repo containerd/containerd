@@ -17,11 +17,11 @@
 package manager
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
-	"text/template"
+	"text/template/parse"
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
@@ -73,8 +73,7 @@ func formatString(s string) func([]mount.ActiveMount) (string, error) {
 	}
 
 	return func(a []mount.ActiveMount) (string, error) {
-		// TODO: The formatting is very easy, don't use template
-		fm := template.FuncMap{
+		fm := map[string]any{
 			"source": func(i int) (string, error) {
 				if i < 0 || i >= len(a) {
 					return "", fmt.Errorf("index out of bounds: %d, has %d active mounts", i, len(a))
@@ -113,15 +112,88 @@ func formatString(s string) func([]mount.ActiveMount) (string, error) {
 				return strings.Join(dirs, ":"), nil
 			},
 		}
-		t, err := template.New("").Funcs(fm).Parse(s)
+
+		trees, err := parse.Parse("mount", s, "{{", "}}", fm)
 		if err != nil {
 			return "", err
 		}
-
-		buf := bytes.NewBuffer(nil)
-		if err := t.Execute(buf, nil); err != nil {
-			return "", err
-		}
-		return buf.String(), nil
+		return executeMountTemplate(trees["mount"].Root, fm)
 	}
+}
+
+// executeMountTemplate evaluates mount-reference expressions without
+// using the full Go template execution engine.
+func executeMountTemplate(root *parse.ListNode, funcs map[string]any) (string, error) {
+	var buf strings.Builder
+
+	for _, node := range root.Nodes {
+		switch n := node.(type) {
+		case *parse.TextNode:
+			buf.Write(n.Text)
+
+		case *parse.ActionNode:
+			if n.Pipe == nil || len(n.Pipe.Decl) != 0 || len(n.Pipe.Cmds) != 1 {
+				return "", fmt.Errorf("unsupported mount template action %q", n.String())
+			}
+
+			args := n.Pipe.Cmds[0].Args
+			if len(args) == 0 {
+				return "", errors.New("empty mount template action")
+			}
+
+			ident, ok := args[0].(*parse.IdentifierNode)
+			if !ok {
+				return "", fmt.Errorf("unsupported mount template action %q", n.String())
+			}
+
+			// Only literal integer arguments are supported.
+			indices := make([]int, 0, len(args)-1)
+			for _, arg := range args[1:] {
+				num, ok := arg.(*parse.NumberNode)
+				if !ok || !num.IsInt {
+					return "", fmt.Errorf("invalid argument %q for %s", arg.String(), ident.Ident)
+				}
+
+				i := int(num.Int64)
+				if int64(i) != num.Int64 {
+					return "", fmt.Errorf("mount index %q overflows int", num.Text)
+				}
+				indices = append(indices, i)
+			}
+
+			var (
+				value string
+				err   error
+			)
+
+			switch ident.Ident {
+			case "source", "target", "mount":
+				if len(indices) != 1 {
+					return "", fmt.Errorf("%s expects 1 argument, got %d", ident.Ident, len(indices))
+				}
+				fn := funcs[ident.Ident].(func(int) (string, error))
+				value, err = fn(indices[0])
+
+			case "overlay":
+				if len(indices) != 2 {
+					return "", fmt.Errorf("overlay expects 2 arguments, got %d", len(indices))
+				}
+				fn := funcs["overlay"].(func(int, int) (string, error))
+				value, err = fn(indices[0], indices[1])
+
+			default:
+				return "", fmt.Errorf("unsupported mount template function %q", ident.Ident)
+			}
+
+			if err != nil {
+				return "", err
+			}
+			buf.WriteString(value)
+
+		default:
+			return "", fmt.Errorf("unsupported mount template node %T", node)
+		}
+	}
+
+	return buf.String(), nil
 }

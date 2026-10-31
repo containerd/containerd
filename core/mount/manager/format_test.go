@@ -148,3 +148,117 @@ func TestFormatMount(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatString(t *testing.T) {
+	activeMounts := make([]mount.ActiveMount, 3)
+	for i := range activeMounts {
+		activeMounts[i] = mount.ActiveMount{
+			Mount: mount.Mount{
+				Source: fmt.Sprintf("/source/%d", i),
+				Target: fmt.Sprintf("/target/%d", i),
+			},
+			MountPoint: fmt.Sprintf("/mount/%d", i),
+		}
+	}
+
+	tests := []struct {
+		name    string
+		format  string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:   "source",
+			format: "{{ source 0 }}",
+			want:   "/source/0",
+		},
+		{
+			name:   "target",
+			format: "{{ target 1 }}",
+			want:   "/target/1",
+		},
+		{
+			name:   "mount",
+			format: "{{ mount 2 }}",
+			want:   "/mount/2",
+		},
+		{
+			name:   "overlay ascending",
+			format: "{{ overlay 0 2 }}",
+			want:   "/mount/0:/mount/1:/mount/2",
+		},
+		{
+			name:   "overlay descending",
+			format: "{{ overlay 2 0 }}",
+			want:   "/mount/2:/mount/1:/mount/0",
+		},
+		{
+			name:   "overlay single",
+			format: "{{ overlay 1 1 }}",
+			want:   "/mount/1",
+		},
+		{
+			name:   "multiple actions",
+			format: "{{ source 0 }}:{{ mount 1 }}",
+			want:   "/source/0:/mount/1",
+		},
+		{
+			name:   "literal text and suffix",
+			format: "lowerdir={{ mount 0 }}/diff",
+			want:   "lowerdir=/mount/0/diff",
+		},
+		{
+			name:   "whitespace trimming",
+			format: "before {{- mount 0 -}} after",
+			want:   "before/mount/0after",
+		},
+		{
+			name:    "negative index",
+			format:  "{{ mount -1 }}",
+			wantErr: true,
+		},
+		{
+			name:    "out of bounds",
+			format:  "{{ mount 3 }}",
+			wantErr: true,
+		},
+		{
+			name:    "invalid overlay range",
+			format:  "{{ overlay 0 3 }}",
+			wantErr: true,
+		},
+		{
+			name:    "string argument",
+			format:  `{{ mount "0" }}`,
+			wantErr: true,
+		},
+		{
+			name:    "unknown function",
+			format:  "{{ unknown 0 }}",
+			wantErr: true,
+		},
+		{
+			name:    "invalid syntax",
+			format:  "{{ mount 0",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			format := formatString(tt.format)
+			if format == nil {
+				t.Fatal("expected formatter")
+			}
+
+			got, err := format(activeMounts)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			if assert.NoError(t, err) {
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
