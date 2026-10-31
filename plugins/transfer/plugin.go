@@ -19,6 +19,7 @@ package transfer
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -35,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	// Load packages with type registrations
@@ -54,6 +56,9 @@ func init() {
 			plugins.DiffPlugin,
 			plugins.ImageVerifierPlugin,
 			plugins.SnapshotPlugin,
+			// The diff service exports whether sync_fs is enabled, which is
+			// applied on the unpack platforms below.
+			plugins.ServicePlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (any, error) {
@@ -129,6 +134,22 @@ func configureUnpackPlatforms(ic *plugin.InitContext, ms *metadata.DB, config *t
 			snCapabilities = p.Meta.Capabilities
 		}
 
+		// The transfer service applies layers through the differ plugin
+		// directly, bypassing the diff service, so it has to replicate the
+		// service's sync_fs behavior from the value it exports.
+		var applyOpts []diff.ApplyOpt
+		if sp := ic.Plugins().Get(plugins.ServicePlugin, services.DiffService); sp != nil {
+			if v, ok := sp.Meta.Exports[plugins.DiffServiceSyncFs]; ok {
+				syncFs, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s: invalid %s export %q: %w", services.DiffService, plugins.DiffServiceSyncFs, v, err)
+				}
+				if syncFs {
+					applyOpts = append(applyOpts, diff.WithSyncFs(true))
+				}
+			}
+		}
+
 		applier, skip, err := getApplier(ic, uc, p)
 		if err != nil {
 			return err
@@ -156,6 +177,7 @@ func configureUnpackPlatforms(ic *plugin.InitContext, ms *metadata.DB, config *t
 			SnapshotterExports:      snExports,
 			SnapshotterCapabilities: snCapabilities,
 			Applier:                 applier,
+			ApplyOpts:               applyOpts,
 			ConfigType:              uc.ConfigType,
 			LayerTypes:              uc.LayerTypes,
 		}
