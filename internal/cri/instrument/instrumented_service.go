@@ -66,6 +66,17 @@ func (in *instrumentedService) checkInitialized() error {
 	return errgrpc.ToGRPCf(errdefs.ErrUnavailable, "server is not initialized yet")
 }
 
+// logLevelFor returns the level to log a failed request at. NotFound is the
+// expected answer when a caller (e.g. the kubelet) asks about an object that
+// is already gone, so it must not be logged as an error. err is the gRPC
+// status that is returned to the caller.
+func logLevelFor(err error) log.Level {
+	if errdefs.IsNotFound(errgrpc.ToNative(err)) {
+		return log.DebugLevel
+	}
+	return log.ErrorLevel
+}
+
 func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (res *runtime.RunPodSandboxResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
@@ -107,7 +118,7 @@ func (in *instrumentedService) PodSandboxStatus(ctx context.Context, r *runtime.
 	log.G(ctx).Tracef("PodSandboxStatus for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("PodSandboxStatus for %q failed", r.GetPodSandboxId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "PodSandboxStatus for %q failed", r.GetPodSandboxId())
 		} else {
 			log.G(ctx).Tracef("PodSandboxStatus for %q returns status %+v", r.GetPodSandboxId(), res.GetStatus())
 		}
@@ -124,7 +135,7 @@ func (in *instrumentedService) StopPodSandbox(ctx context.Context, r *runtime.St
 	log.G(ctx).Infof("StopPodSandbox for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("StopPodSandbox for %q failed", r.GetPodSandboxId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "StopPodSandbox for %q failed", r.GetPodSandboxId())
 		} else {
 			log.G(ctx).Infof("StopPodSandbox for %q returns successfully", r.GetPodSandboxId())
 		}
@@ -142,7 +153,7 @@ func (in *instrumentedService) RemovePodSandbox(ctx context.Context, r *runtime.
 	log.G(ctx).Infof("RemovePodSandbox for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("RemovePodSandbox for %q failed", r.GetPodSandboxId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "RemovePodSandbox for %q failed", r.GetPodSandboxId())
 		} else {
 			log.G(ctx).Infof("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
@@ -159,7 +170,7 @@ func (in *instrumentedService) PortForward(ctx context.Context, r *runtime.PortF
 	log.G(ctx).Infof("Portforward for %q port %v", r.GetPodSandboxId(), r.GetPort())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("Portforward for %q failed", r.GetPodSandboxId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "Portforward for %q failed", r.GetPodSandboxId())
 		} else {
 			log.G(ctx).Infof("Portforward for %q returns URL %q", r.GetPodSandboxId(), res.GetUrl())
 		}
@@ -197,7 +208,7 @@ func (in *instrumentedService) StartContainer(ctx context.Context, r *runtime.St
 	log.G(ctx).Infof("StartContainer for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("StartContainer for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "StartContainer for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Infof("StartContainer for %q returns successfully", r.GetContainerId())
 		}
@@ -231,7 +242,7 @@ func (in *instrumentedService) ContainerStatus(ctx context.Context, r *runtime.C
 	log.G(ctx).Tracef("ContainerStatus for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ContainerStatus for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "ContainerStatus for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Tracef("ContainerStatus for %q returns status %+v", r.GetContainerId(), res.GetStatus())
 		}
@@ -248,7 +259,7 @@ func (in *instrumentedService) StopContainer(ctx context.Context, r *runtime.Sto
 	log.G(ctx).Infof("StopContainer for %q with timeout %d (s)", r.GetContainerId(), r.GetTimeout())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("StopContainer for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "StopContainer for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Infof("StopContainer for %q returns successfully", r.GetContainerId())
 		}
@@ -266,7 +277,7 @@ func (in *instrumentedService) RemoveContainer(ctx context.Context, r *runtime.R
 	log.G(ctx).Infof("RemoveContainer for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("RemoveContainer for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "RemoveContainer for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Infof("RemoveContainer for %q returns successfully", r.GetContainerId())
 		}
@@ -284,7 +295,7 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	log.G(ctx).Debugf("ExecSync for %q with command %+v and timeout %d (s)", r.GetContainerId(), r.GetCmd(), r.GetTimeout())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ExecSync for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "ExecSync for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Tracef("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
 		}
@@ -303,7 +314,7 @@ func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest)
 		r.GetContainerId(), r.GetCmd(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("Exec for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "Exec for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Debugf("Exec for %q returns URL %q", r.GetContainerId(), res.GetUrl())
 		}
@@ -321,7 +332,7 @@ func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequ
 	log.G(ctx).Debugf("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("Attach for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "Attach for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Debugf("Attach for %q returns URL %q", r.GetContainerId(), res.Url)
 		}
@@ -338,7 +349,7 @@ func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *
 	log.G(ctx).Infof("UpdateContainerResources for %q with Linux: %+v / Windows: %+v", r.GetContainerId(), r.GetLinux(), r.GetWindows())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("UpdateContainerResources for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "UpdateContainerResources for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Infof("UpdateContainerResources for %q returns successfully", r.GetContainerId())
 		}
@@ -457,7 +468,7 @@ func (in *instrumentedService) PodSandboxStats(ctx context.Context, r *runtime.P
 	log.G(ctx).Tracef("PodSandboxStats for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("PodSandboxStats for %q failed", r.GetPodSandboxId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "PodSandboxStats for %q failed", r.GetPodSandboxId())
 		} else {
 			log.G(ctx).Tracef("PodSandboxStats for %q returns stats %+v", r.GetPodSandboxId(), res.GetStats())
 		}
@@ -473,7 +484,7 @@ func (in *instrumentedService) ContainerStats(ctx context.Context, r *runtime.Co
 	log.G(ctx).Tracef("ContainerStats for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ContainerStats for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "ContainerStats for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Tracef("ContainerStats for %q returns stats %+v", r.GetContainerId(), res.GetStats())
 		}
@@ -569,7 +580,7 @@ func (in *instrumentedService) ReopenContainerLog(ctx context.Context, r *runtim
 	log.G(ctx).Debugf("ReopenContainerLog for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("ReopenContainerLog for %q failed", r.GetContainerId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "ReopenContainerLog for %q failed", r.GetContainerId())
 		} else {
 			log.G(ctx).Debugf("ReopenContainerLog for %q returns successfully", r.GetContainerId())
 		}
@@ -585,7 +596,7 @@ func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runti
 
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("CheckpointContainer failed, error")
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "CheckpointContainer failed, error")
 		} else {
 			log.G(ctx).Debug("CheckpointContainer returns successfully")
 		}
@@ -670,7 +681,7 @@ func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r 
 	log.G(ctx).Infof("UpdatePodSandboxResources for %q with Overhead: %+v / Resources: %+v", r.GetPodSandboxId(), r.GetOverhead(), r.GetResources())
 	defer func() {
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("UpdatePodSandboxResources for %q failed", r.GetPodSandboxId())
+			log.G(ctx).WithError(err).Logf(logLevelFor(err), "UpdatePodSandboxResources for %q failed", r.GetPodSandboxId())
 		} else {
 			log.G(ctx).Infof("UpdatePodSandboxResources for %q returns successfully", r.GetPodSandboxId())
 		}
