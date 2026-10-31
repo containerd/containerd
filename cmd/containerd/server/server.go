@@ -341,8 +341,12 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 
 		case string(plugins.ContentPlugin), "content":
 			t = plugins.ContentPlugin
+			var opts []csproxy.Opt
+			if blobs := pp.Exports["blobs"]; blobs != "" {
+				opts = append(opts, csproxy.WithLocalBlobs(blobs))
+			}
 			f = func(conn *grpc.ClientConn) any {
-				return csproxy.NewContentStore(conn)
+				return csproxy.NewContentStore(conn, opts...)
 			}
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
