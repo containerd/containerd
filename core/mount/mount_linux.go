@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/containerd/log"
@@ -250,72 +251,121 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 }
 
 func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (_ []string, _ func(), retErr error) {
-	commonDir, err := getCommonDirectory(lowerDirs)
+	groups, err := groupLowerDirs(lowerDirs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to determine common parent: %w", err)
+		return nil, nil, fmt.Errorf("failed to determine lowerdir roots: %w", err)
 	}
 
-	tempRemountsLocation, err := os.MkdirTemp(tmpDir, "ovl-idmapped")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+	type idMappedRoot struct {
+		tempDir string
+		mounted bool
 	}
-	cleanDir := func() {
-		if err := os.Remove(tempRemountsLocation); err != nil {
-			log.L.WithError(err).Infof("failed to remove idmapped directory")
-		}
-	}
-	defer func() {
-		if retErr != nil {
-			cleanDir()
-		}
-	}()
-
-	// IDMapMount the directory containing all the layers
-	if err := IDMapMountWithAttrs(commonDir, tempRemountsLocation, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
-		return nil, nil, err
-	}
-
-	cleanMount := func() {
-		// Use the Unmount helper that does retries because there can be easily an open fd
-		// to the idmapped directory and when containerd forks to create a userns fd (maybe
-		// for another container), it will make the mount busy for a few ms.
-		err := UnmountRecursive(tempRemountsLocation, 0)
-		if err != nil {
-			log.L.WithError(err).Warnf("failed to unmount idmapped directory %s: %v", tempRemountsLocation, err)
-		}
-	}
-	defer func() {
-		if retErr != nil {
-			cleanMount()
-		}
-	}()
-
-	// Build new lower dir paths through the idmapped directory
-	tmpLowerDirs := buildIDMappedPaths(lowerDirs, commonDir, tempRemountsLocation)
+	remounts := make([]idMappedRoot, 0, len(groups))
 
 	cleanup := func() {
-		cleanMount()
-		cleanDir()
+		for _, remount := range slices.Backward(remounts) {
+			if remount.mounted {
+				// Use the Unmount helper that does retries because there can be easily an open fd
+				// to the idmapped directory and when containerd forks to create a userns fd (maybe
+				// for another container), it will make the mount busy for a few ms.
+				if err := UnmountRecursive(remount.tempDir, 0); err != nil {
+					log.L.WithError(err).Warnf("failed to unmount idmapped directory %s: %v", remount.tempDir, err)
+				}
+			}
+			if err := os.Remove(remount.tempDir); err != nil {
+				log.L.WithError(err).Infof("failed to remove idmapped directory")
+			}
+		}
 	}
+	defer func() {
+		if retErr != nil {
+			cleanup()
+		}
+	}()
+
+	tmpLowerDirs := make([]string, len(lowerDirs))
+	for _, g := range groups {
+		tempRemountsLocation, err := os.MkdirTemp(tmpDir, "ovl-idmapped")
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+		}
+		remounts = append(remounts, idMappedRoot{tempDir: tempRemountsLocation})
+
+		// IDMapMount the directory containing this root's layers
+		if err := IDMapMountWithAttrs(g.root, tempRemountsLocation, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
+			return nil, nil, err
+		}
+		remounts[len(remounts)-1].mounted = true
+
+		groupDirs := make([]string, len(g.indices))
+		for j, idx := range g.indices {
+			groupDirs[j] = path.Clean(lowerDirs[idx])
+		}
+		mapped := buildIDMappedPaths(groupDirs, g.root, tempRemountsLocation)
+		for j, idx := range g.indices {
+			tmpLowerDirs[idx] = mapped[j]
+		}
+	}
+
 	return tmpLowerDirs, cleanup, nil
 }
 
-// getCommonDirectory finds the common directory among the lowerDirs passed in.
-// "/" and "." are considered invalid common directories and are treated as error
-func getCommonDirectory(lowerDirs []string) (string, error) {
-	commonPrefix := longestCommonPrefix(lowerDirs)
-	if commonPrefix == "" {
-		return "", errors.New("no common prefix found")
+type lowerDirGroup struct {
+	root    string
+	indices []int
+}
+
+// groupLowerDirs partitions lowerDirs by their backing root directory while
+// preserving each layer's original index in the overlay stack. Snapshotter
+// layers (".../snapshots/<id>/fs") group on their "snapshots" directory, deeper
+// non-snapshotter paths (such as mount-manager "<targets>/<id>/<n>" submounts)
+// group on their parent directory, and shallow paths directly under "/", a
+// top-level mount directory like "/mnt", or "/var/lib" stay in their own group
+// instead of failing on "/" or cloning a broad parent directory.
+func groupLowerDirs(lowerDirs []string) ([]lowerDirGroup, error) {
+	if len(lowerDirs) == 0 {
+		return nil, errors.New("no lower directories provided")
 	}
 
-	// Ensure the common prefix ends at a directory boundary
-	commonPrefix = path.Dir(commonPrefix)
-
-	if commonPrefix == "." || commonPrefix == "/" {
-		return "", fmt.Errorf("invalid common directory: %s", commonPrefix)
+	var (
+		groups      []lowerDirGroup
+		groupByRoot = make(map[string]int)
+	)
+	for i, d := range lowerDirs {
+		root, err := lowerDirRoot(d)
+		if err != nil {
+			return nil, err
+		}
+		idx, ok := groupByRoot[root]
+		if !ok {
+			idx = len(groups)
+			groupByRoot[root] = idx
+			groups = append(groups, lowerDirGroup{root: root})
+		}
+		groups[idx].indices = append(groups[idx].indices, i)
 	}
+	return groups, nil
+}
 
-	return commonPrefix, nil
+func lowerDirRoot(lowerDir string) (string, error) {
+	if lowerDir == "" {
+		return "", errors.New("empty lower directory")
+	}
+	cleaned := path.Clean(lowerDir)
+	if !path.IsAbs(cleaned) || cleaned == "/" {
+		return "", fmt.Errorf("invalid lower directory: %s", lowerDir)
+	}
+	if path.Base(cleaned) == "fs" {
+		snapRoot := path.Dir(path.Dir(cleaned))
+		if path.Base(snapRoot) == "snapshots" {
+			return snapRoot, nil
+		}
+	}
+	parent := path.Dir(cleaned)
+	if parent == "/" || path.Dir(parent) == "/" || parent == "/var/lib" {
+		return cleaned, nil
+	}
+	return parent, nil
 }
 
 // buildIDMappedPaths constructs new lower directory paths through an idmapped mount of the commonDir.
