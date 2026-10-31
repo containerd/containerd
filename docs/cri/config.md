@@ -9,6 +9,37 @@ for more information about containerd config.
 Note that the `[plugins."io.containerd.grpc.v1.cri"]` section is specific to CRI,
 and not recognized by other containerd clients such as `ctr`, `nerdctl`, and Docker/Moby.
 
+## Container identity environment variables
+
+For CRI-created containers, containerd can add these environment variables to
+the OCI process configuration when enabled:
+
+* `CONTAINER_INSTANCE_ID` contains the container ID assigned by containerd.
+* `CONTAINER_IMAGE_ID` contains the digest of the image manifest selected for
+  the container's platform. For a multi-platform image, this is the
+  platform-specific manifest digest, not the parent image index digest.
+
+When enabled, these values are available to processes started in the container.
+They are injected after the image and CRI environment variables, so they take
+precedence if either source sets the same variable.
+
+Identity environment variables are disabled by default. To enable digest
+resolution and injection for all CRI-created containers, set
+`enable_container_identity_env = true` in the CRI runtime configuration:
+
+```toml
+# containerd 2.x
+[plugins.'io.containerd.cri.v1.runtime']
+  enable_container_identity_env = true
+
+# containerd 2.x with config version 2 (legacy CRI config migrated to the runtime plugin)
+[plugins."io.containerd.grpc.v1.cri"]
+  enable_container_identity_env = true
+```
+
+When enabled, containerd replaces any values supplied through the image or CRI
+request with its identity values.
+
 ## Config versions
 The content of `/etc/containerd/config.toml` must start with a version header, for example:
 ```toml

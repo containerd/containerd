@@ -36,6 +36,8 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
@@ -260,6 +262,16 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if name := r.containerConfig.GetImage().GetUserSpecifiedImage(); name != "" {
 		imageName = name
 	}
+	identityOpts, err := containerIdentitySpecOpts(
+		r.ctx,
+		*r.containerdImage,
+		r.containerID,
+		platform,
+		c.config.EnableContainerIdentityEnv,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to prepare container identity environment variables: %w", err)
+	}
 
 	spec, err := c.buildContainerSpec(
 		platform,
@@ -279,6 +291,16 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container %q spec: %w", r.containerID, err)
 	}
+	defer func() {
+		if retErr != nil {
+			selinux.ReleaseLabel(spec.Process.SelinuxLabel)
+		}
+	}()
+	if identityOpts != nil {
+		if err := identityOpts(r.ctx, nil, nil, spec); err != nil {
+			return "", fmt.Errorf("failed to add container identity environment variables: %w", err)
+		}
+	}
 
 	r.meta.ProcessLabel = spec.Process.SelinuxLabel
 
@@ -292,12 +314,6 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		// the unused MCS label can be release later
 		spec.Process.SelinuxLabel = ""
 	}
-	defer func() {
-		if retErr != nil {
-			selinux.ReleaseLabel(spec.Process.SelinuxLabel)
-		}
-	}()
-
 	logger := log.G(r.ctx)
 	if logger.Logger.IsLevelEnabled(log.DebugLevel) {
 		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
@@ -454,6 +470,85 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	)
 
 	return containerRootDir, nil
+}
+
+// resolveImageManifestDigest returns the manifest digest selected for the
+// platform the container will run on. For multi-platform images this is the
+// platform-specific manifest, rather than the parent image index.
+func resolveImageManifestDigest(
+	ctx context.Context,
+	target imagespec.Descriptor,
+	provider content.Provider,
+	imageName string,
+	platform platforms.MatchComparer,
+) (string, error) {
+	var manifestDigest string
+	children := images.LimitManifests(
+		images.FilterPlatforms(images.ChildrenHandler(provider), platform),
+		platform,
+		1,
+	)
+	handler := images.Handlers(
+		images.HandlerFunc(func(_ context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+			if images.IsManifestType(desc.MediaType) {
+				manifestDigest = desc.Digest.String()
+			}
+			return nil, nil
+		}),
+		children,
+	)
+	if err := images.Walk(ctx, handler, target); err != nil {
+		return "", err
+	}
+	if manifestDigest == "" {
+		return "", fmt.Errorf("image %q has no manifest for the requested platform", imageName)
+	}
+	return manifestDigest, nil
+}
+
+func containerIdentitySpecOpts(ctx context.Context, image containerd.Image, containerID string, platform imagespec.Platform, enabled bool) (oci.SpecOpts, error) {
+	if !enabled {
+		return nil, nil
+	}
+
+	platformComparer := image.Platform()
+	if platformComparer == nil {
+		platformComparer = platforms.Default()
+	}
+	imageManifestDigest, err := resolveImageManifestDigest(
+		ctx,
+		image.Target(),
+		image.ContentStore(),
+		image.Name(),
+		platformComparer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve image manifest digest: %w", err)
+	}
+	return withContainerIdentity(containerID, imageManifestDigest, platform), nil
+}
+
+func withContainerIdentity(containerID, imageManifestDigest string, platform imagespec.Platform) oci.SpecOpts {
+	identityEnv := []string{
+		"CONTAINER_IMAGE_ID=" + imageManifestDigest,
+		"CONTAINER_INSTANCE_ID=" + containerID,
+	}
+	return func(ctx context.Context, client oci.Client, container *containers.Container, spec *oci.Spec) error {
+		env := spec.Process.Env[:0]
+		for _, entry := range spec.Process.Env {
+			key, _, _ := strings.Cut(entry, "=")
+			matchesIdentityKey := key == "CONTAINER_IMAGE_ID" || key == "CONTAINER_INSTANCE_ID"
+			if platform.OS == "windows" {
+				matchesIdentityKey = strings.EqualFold(key, "CONTAINER_IMAGE_ID") || strings.EqualFold(key, "CONTAINER_INSTANCE_ID")
+			}
+			if matchesIdentityKey {
+				continue
+			}
+			env = append(env, entry)
+		}
+		spec.Process.Env = env
+		return oci.WithEnv(identityEnv)(ctx, client, container, spec)
+	}
 }
 
 // volumeMounts sets up image volumes for container. Rely on the removal of container
