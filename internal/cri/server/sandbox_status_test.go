@@ -150,7 +150,7 @@ func TestSetUpdatedResources(t *testing.T) {
 		info            map[string]string
 		expectOverhead  *runtime.LinuxContainerResources
 		expectResources *runtime.LinuxContainerResources
-		expectErr       bool
+		expectInfo      string
 	}{
 		{
 			desc: "should update info with resources",
@@ -174,12 +174,32 @@ func TestSetUpdatedResources(t *testing.T) {
 			expectResources: nil,
 		},
 		{
-			desc:   "should return error on invalid json",
-			status: sandboxstore.Status{},
+			desc: "should keep info that is not a JSON object",
+			status: sandboxstore.Status{
+				Resources: &runtime.ContainerResources{Linux: resources},
+			},
 			info: map[string]string{
 				"info": `invalid-json`,
 			},
-			expectErr: true,
+			expectInfo: `invalid-json`,
+		},
+		{
+			desc: "should keep fields unknown to CRI",
+			status: sandboxstore.Status{
+				Resources: &runtime.ContainerResources{Linux: resources},
+			},
+			info: map[string]string{
+				"info": `{"vmID":"vm-1"}`,
+			},
+			expectInfo: `{"resources":{"linux":{"cpu_period":200}},"vmID":"vm-1"}`,
+		},
+		{
+			desc: "should add resources when info is missing",
+			status: sandboxstore.Status{
+				Overhead: &runtime.ContainerResources{Linux: overhead},
+			},
+			info:           map[string]string{},
+			expectOverhead: overhead,
 		},
 		{
 			desc:            "should handle nil info map gracefully",
@@ -194,13 +214,13 @@ func TestSetUpdatedResources(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			sb := sandboxstore.NewSandbox(sandboxstore.Metadata{}, test.status)
 			err := setUpdatedResources(context.Background(), sb, test.info)
-			if test.expectErr {
-				assert.Error(t, err)
-				return
-			}
 			assert.NoError(t, err)
 
 			if test.info == nil {
+				return
+			}
+			if test.expectInfo != "" {
+				assert.Equal(t, test.expectInfo, test.info["info"])
 				return
 			}
 
