@@ -39,7 +39,7 @@ import (
 
 func createContentStore(ctx context.Context, root string, opts ...DBOpt) (context.Context, content.Store, func() error, error) {
 	// TODO: Use mocked or in-memory store
-	cs, err := local.NewStore(root)
+	cs, err := local.NewStore(root, nil)
 	if err != nil {
 		return nil, nil, nil, err
 	}

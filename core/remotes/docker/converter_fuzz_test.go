@@ -41,7 +41,7 @@ func FuzzConvertManifest(f *testing.F) {
 			return
 		}
 		tmpdir := t.TempDir()
-		cs, err := local.NewStore(tmpdir)
+		cs, err := local.NewStore(tmpdir, nil)
 		if err != nil {
 			return
 		}
