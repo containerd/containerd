@@ -146,6 +146,7 @@ func newTestCRIService(opts ...testOpt) *criService {
 	labels := label.NewStore()
 	service := &criService{
 		config:             testConfig,
+		listStreaming:      criconfig.DefaultServerConfig().ListStreaming,
 		os:                 ostesting.NewFakeOS(),
 		labels:             labels,
 		sandboxStore:       sandboxstore.NewStore(labels, nil),
