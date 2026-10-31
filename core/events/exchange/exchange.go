@@ -18,6 +18,7 @@ package exchange
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ import (
 	"github.com/containerd/typeurl/v2"
 	goevents "github.com/docker/go-events"
 )
+
+const K8sContainerdNamespace = "k8s.io"
 
 // Exchange broadcasts events
 type Exchange struct {
@@ -68,6 +71,16 @@ func (e *Exchange) Forward(ctx context.Context, envelope *events.Envelope) (err 
 			logger.WithError(err).Error("error forwarding event")
 		} else {
 			logger.Trace("event forwarded")
+			if envelope.Namespace != K8sContainerdNamespace {
+				v, err := typeurl.UnmarshalAny(envelope.Event)
+				if err != nil {
+					log.G(ctx).WithError(err).Warn("cannot unmarshal an event from Any")
+				} else {
+					if out, err := json.Marshal(v); err == nil {
+						logger.Infof("%s", out)
+					}
+				}
+			}
 		}
 	}()
 
