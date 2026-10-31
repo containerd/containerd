@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -114,15 +115,16 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 				return &stringSliceArgs{posArgs}, nil
 			}
 
-			posArgs = append(posArgs, firstArg)
+			// firstArg is a trimmed copy that classifies the argument; the
+			// argument itself is what the action receives, byte for byte.
+			posArgs = append(posArgs, rargs[0])
 			continue
 		}
 
 		numMinuses := 1
-		// this is same as firstArg == "-"
-		if len(firstArg) == 1 {
-			posArgs = append(posArgs, firstArg)
-			break
+		if firstArg == "-" {
+			posArgs = append(posArgs, rargs[0])
+			continue
 		}
 
 		shortOptionHandling := cmd.useShortOptionHandling()
@@ -131,7 +133,7 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 		if firstArg[1] == '-' {
 			numMinuses++
 			shortOptionHandling = false
-		} else if !unicode.IsLetter(rune(firstArg[1])) {
+		} else if firstRune, _ := utf8.DecodeRuneInString(firstArg[1:]); !unicode.IsLetter(firstRune) {
 			// this is not a flag
 			tracef("parseFlags not a unicode letter. Stop parsing")
 			posArgs = append(posArgs, rargs...)
@@ -145,7 +147,9 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 		valFromEqual := false
 		tracef("flagName:1 (fName=%[1]q)", flagName)
 		if index := strings.Index(flagName, "="); index != -1 {
-			flagVal = flagName[index+1:]
+			// Classify the flag using the trimmed token, but leave value
+			// whitespace handling to the flag's value parser.
+			_, flagVal, _ = strings.Cut(rargs[0], "=")
 			flagName = flagName[:index]
 			valFromEqual = true
 		}
@@ -208,28 +212,42 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 			return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", providedButNotDefinedErrMsg, flagName)
 		}
 
-		// try to split the flags
+		// ranging over flagName yields byte offsets, so the last flag starts
+		// where its rune starts, which is not len-1 for a multi-byte rune
+		_, lastSize := utf8.DecodeLastRuneInString(flagName)
+		lastIndex := len(flagName) - lastSize
+
+		// every flag of the group has to exist before any of them is set,
+		// otherwise a group holding an unknown flag is reported by whichever
+		// of its flags happens to be examined first
 		for index, c := range flagName {
-			tracef("processing flag (fName=%[1]q)", string(c))
-			if sf := cmd.lookupFlag(string(c)); sf == nil {
+			if sf := cmd.lookupAppliedFlag(string(c)); sf == nil {
 				if index == 0 && cmd.DefaultCommand != "" {
 					posArgs = append(posArgs, rargs...)
 					return &stringSliceArgs{posArgs}, nil
 				}
 				return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", providedButNotDefinedErrMsg, flagName)
-			} else if fb, ok := sf.(boolFlag); ok && fb.IsBoolFlag() {
+			}
+		}
+
+		// try to split the flags
+		for index, c := range flagName {
+			tracef("processing flag (fName=%[1]q)", string(c))
+			// the check above has already found every flag of the group
+			sf := cmd.lookupAppliedFlag(string(c))
+			if fb, ok := sf.(boolFlag); ok && fb.IsBoolFlag() {
 				fv := flagVal
-				if index == (len(flagName)-1) && flagVal == "" {
+				if index == lastIndex && flagVal == "" {
 					fv = "true"
 				}
 				if fv == "" {
 					fv = "true"
 				}
-				if err := cmd.set(flagName, sf, fv); err != nil {
+				if err := cmd.set(string(c), sf, fv); err != nil {
 					tracef("processing flag.2 (fName=%[1]q)", string(c))
 					return &stringSliceArgs{posArgs}, err
 				}
-			} else if index == len(flagName)-1 { // last flag can take an arg
+			} else if index == lastIndex { // last flag can take an arg
 				if flagVal == "" {
 					if len(rargs) == 1 {
 						return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", argumentNotProvidedErrMsg, string(c))
@@ -238,10 +256,15 @@ func (cmd *Command) parseFlags(args Args) (Args, error) {
 					rargs = rargs[1:]
 				}
 				tracef("parseFlags (flagName %[1]q) (flagVal %[2]q)", flagName, flagVal)
-				if err := cmd.set(flagName, sf, flagVal); err != nil {
+				if err := cmd.set(string(c), sf, flagVal); err != nil {
 					tracef("processing flag.4 (fName=%[1]q)", string(c))
 					return &stringSliceArgs{posArgs}, err
 				}
+			} else {
+				// only the last flag of a group can take an argument, so a flag
+				// that needs one has nothing to read it from here
+				tracef("processing flag.5 (fName=%[1]q)", string(c))
+				return &stringSliceArgs{posArgs}, fmt.Errorf("%s%s", argumentNotProvidedErrMsg, string(c))
 			}
 		}
 	}
