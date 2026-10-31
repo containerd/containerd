@@ -829,3 +829,39 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 		t.Error("expected option first option to be provided option \"volatile\"")
 	}
 }
+
+// By default the snapshotter syncs the upperdir filesystem before Commit
+// marks a snapshot as committed; WithoutSyncOnCommit opts out.
+func TestSyncOnCommitDefault(t *testing.T) {
+	root := t.TempDir()
+
+	defaultSn, err := NewSnapshotter(filepath.Join(root, "default"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer defaultSn.Close()
+	if !defaultSn.(*snapshotter).syncOnCommit {
+		t.Fatal("expected sync-on-commit to be enabled by default")
+	}
+
+	disabledSn, err := NewSnapshotter(filepath.Join(root, "disabled"), WithoutSyncOnCommit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer disabledSn.Close()
+	if disabledSn.(*snapshotter).syncOnCommit {
+		t.Fatal("expected sync-on-commit to be disabled with WithoutSyncOnCommit")
+	}
+}
+
+// syncFs must succeed on a regular directory and surface errors for a path
+// that cannot be opened.
+func TestSyncFs(t *testing.T) {
+	dir := t.TempDir()
+	if err := syncFs(dir); err != nil {
+		t.Fatalf("syncFs(%q) returned error: %v", dir, err)
+	}
+	if err := syncFs(filepath.Join(dir, "does-not-exist")); err == nil {
+		t.Fatal("expected syncFs on a missing path to fail")
+	}
+}
