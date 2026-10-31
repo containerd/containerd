@@ -267,6 +267,14 @@ func WithConcurrentLayerFetchBuffer(buffer int) RemoteOpt {
 	}
 }
 
+// WithIgnoreDescriptorURLs skips URLs in image descriptors during pull.
+func WithIgnoreDescriptorURLs(ignore bool) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.IgnoreDescriptorURLs = ignore
+		return nil
+	}
+}
+
 // WithMaxConcurrentUploadedLayers sets max concurrent uploaded layer limit.
 func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {

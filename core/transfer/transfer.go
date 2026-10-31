@@ -44,8 +44,9 @@ type ImageResolverOptionSetter interface {
 type ImageResolverOption func(*ImageResolverOptions)
 
 type ImageResolverOptions struct {
-	DownloadLimiter *semaphore.Weighted
-	Performances    ImageResolverPerformanceSettings
+	DownloadLimiter      *semaphore.Weighted
+	Performances         ImageResolverPerformanceSettings
+	IgnoreDescriptorURLs bool
 }
 
 type ImageResolverPerformanceSettings struct {
@@ -68,6 +69,12 @@ func WithMaxConcurrentDownloads(maxConcurrentDownloads int) ImageResolverOption 
 func WithConcurrentLayerFetchBuffer(ConcurrentLayerFetchBuffer int) ImageResolverOption {
 	return func(opts *ImageResolverOptions) {
 		opts.Performances.ConcurrentLayerFetchBuffer = ConcurrentLayerFetchBuffer
+	}
+}
+
+func WithIgnoreDescriptorURLs(ignore bool) ImageResolverOption {
+	return func(opts *ImageResolverOptions) {
+		opts.IgnoreDescriptorURLs = ignore
 	}
 }
 
