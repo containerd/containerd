@@ -75,6 +75,8 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	s := &service{
 		context:              ctx,
 		events:               make(chan any, 128),
+		stopForward:          make(chan struct{}),
+		forwardDone:          make(chan struct{}),
 		ec:                   reaper.Default.Subscribe(),
 		cg1oom:               ep,
 		cg2oom:               oomv2.New(),
@@ -85,6 +87,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		runningExecs:         make(map[*runc.Container]int),
 		execCountSubscribers: make(map[*runc.Container]chan<- int),
 		containerInitExit:    make(map[*runc.Container]runcC.Exit),
+		initExitSent:         make(map[*runc.Container]chan struct{}),
 		exitSubscribers:      make(map[*map[int][]runcC.Exit]struct{}),
 	}
 	go s.processExits()
@@ -93,6 +96,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
 	go s.forward(ctx, publisher)
+	sd.RegisterCallback(s.stopForwarding)
 
 	if address, err := shim.ReadAddress("address"); err == nil {
 		sd.RegisterCallback(func(context.Context) error {
@@ -115,6 +119,11 @@ type service struct {
 
 	publisher events.Publisher
 
+	// stopForward tells forward to publish the queued events and return.
+	stopForward chan struct{}
+	// forwardDone is closed when forward returns.
+	forwardDone chan struct{}
+
 	containers map[string]*runc.Container
 
 	lifecycleMu  sync.Mutex
@@ -132,6 +141,12 @@ type service struct {
 	// Note that this flag gets updated before the container's [process.Init.Status]
 	// is transitioned to "stopped".
 	containerInitExit map[*runc.Container]runcC.Exit
+	// container -> closed once the init process exit event is queued,
+	// guarded by lifecycleMu.
+	// Set before the init process is marked as exited, which a started
+	// process must be before it can be deleted, so that Delete can send the
+	// delete event after the exit event.
+	initExitSent map[*runc.Container]chan struct{}
 	// Subscriptions to exits for PIDs. Adding/deleting subscriptions and
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
@@ -361,15 +376,12 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	}
 	// if we deleted an init task, send the task delete event
 	if r.ExecID == "" {
+		// Send the delete event before removing the container, which allows
+		// the shim to be shut down.
+		s.sendDelete(ctx, container, p)
 		s.mu.Lock()
 		delete(s.containers, r.ID)
 		s.mu.Unlock()
-		s.send(&eventstypes.TaskDelete{
-			ContainerID: container.ID,
-			Pid:         uint32(p.Pid()),
-			ExitStatus:  uint32(p.ExitStatus()),
-			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
-		})
 		s.lifecycleMu.Lock()
 		delete(s.containerInitExit, container)
 		s.lifecycleMu.Unlock()
@@ -764,8 +776,16 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 }
 
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
-	p.SetExited(e.Status)
 	_, isInit := p.(*process.Init)
+	if isInit {
+		exitSent := make(chan struct{})
+		defer close(exitSent)
+		s.lifecycleMu.Lock()
+		s.initExitSent[c] = exitSent
+		s.lifecycleMu.Unlock()
+	}
+
+	p.SetExited(e.Status)
 	if isInit {
 		e.Timestamp = p.ExitedAt()
 		if err := runc.WriteExitStatus(c.Bundle, e); err != nil {
@@ -799,6 +819,28 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 	}
 }
 
+// sendDelete sends the delete event of the container's init process. If the
+// process has exited, it first waits for its exit event to be queued, as
+// docs/runtime-v2.md requires the exit event to come first.
+func (s *service) sendDelete(ctx context.Context, c *runc.Container, p process.Process) {
+	s.lifecycleMu.Lock()
+	exitSent := s.initExitSent[c]
+	delete(s.initExitSent, c)
+	s.lifecycleMu.Unlock()
+	if exitSent != nil {
+		select {
+		case <-exitSent:
+		case <-ctx.Done():
+		}
+	}
+	s.send(&eventstypes.TaskDelete{
+		ContainerID: c.ID,
+		Pid:         uint32(p.Pid()),
+		ExitStatus:  uint32(p.ExitStatus()),
+		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+	})
+}
+
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
 	p, err := container.Process("")
 	if err != nil {
@@ -815,8 +857,22 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 	return pids, nil
 }
 
+// stopForwarding stops forward and waits until it has published the queued
+// events, so that they are not lost when the shim exits. It runs as a shutdown
+// callback: the shim exits once these have returned.
+func (s *service) stopForwarding(ctx context.Context) error {
+	close(s.stopForward)
+	select {
+	case <-s.forwardDone:
+	case <-ctx.Done():
+		log.G(s.context).WithError(ctx.Err()).Warn("shim exits before publishing all its events")
+	}
+	return nil
+}
+
 func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 	ctx = context.WithoutCancel(ctx)
+	defer close(s.forwardDone)
 	defer publisher.Close()
 
 	publish := func(e any) {
@@ -829,7 +885,7 @@ func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 		select {
 		case e := <-s.events:
 			publish(e)
-		case <-s.shutdown.Done():
+		case <-s.stopForward:
 			for {
 				select {
 				case e := <-s.events:
