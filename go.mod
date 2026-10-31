@@ -13,12 +13,12 @@ require (
 	github.com/containerd/cgroups/v3 v3.1.3
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/api v1.12.0
-	github.com/containerd/continuity v0.5.0
+	github.com/containerd/continuity v0.5.1-0.20261030062335-3e057cd1a998
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/errdefs/pkg v0.3.0
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.14
-	github.com/containerd/go-dmverity v0.1.0
+	github.com/containerd/go-dmverity v0.0.0-20260611211332-9879dd340c85
 	github.com/containerd/go-runc v1.2.1
 	github.com/containerd/imgcrypt/v2 v2.0.3
 	github.com/containerd/log v0.2.0
@@ -37,7 +37,7 @@ require (
 	github.com/docker/go-events v0.1.0
 	github.com/docker/go-metrics v0.1.0
 	github.com/docker/go-units v0.5.0
-	github.com/erofs/go-erofs v0.3.1
+	github.com/erofs/go-erofs v0.3.2
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/certtostore v1.0.7
 	github.com/google/go-cmp v0.7.0

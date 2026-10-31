@@ -32,7 +32,7 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 	for _, root := range roots {
 		if err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
-				return err
+				return handleWalkError(root, path, err)
 			}
 
 			select {

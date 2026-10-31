@@ -43,21 +43,25 @@ import (
 type ConvertOpt func(*convertOptions)
 
 type convertOptions struct {
-	compressors     string
-	mkfsExtraOpts   []string
 	blobCompression string
 }
 
+// WithCompressors sets the per-file compression algorithms mkfs.erofs used
+// inside the EROFS image.
+//
+// Deprecated: The converter builds EROFS images in Go and no longer runs
+// mkfs.erofs. The option has no effect: images are not compressed per file.
+// Use [WithBlobCompression] to compress the layer blob.
 func WithCompressors(compressors string) ConvertOpt {
-	return func(opts *convertOptions) {
-		opts.compressors = compressors
-	}
+	return func(*convertOptions) {}
 }
 
+// WithMkfsOptions passed extra options to mkfs.erofs.
+//
+// Deprecated: The converter builds EROFS images in Go and no longer runs
+// mkfs.erofs. The option has no effect.
 func WithMkfsOptions(extraOpts []string) ConvertOpt {
-	return func(opts *convertOptions) {
-		opts.mkfsExtraOpts = extraOpts
-	}
+	return func(*convertOptions) {}
 }
 
 func WithBlobCompression(compression string) ConvertOpt {
@@ -172,11 +176,6 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 // LayerConvertFunc (which then stores the blob in the content store) and
 // BuildLayerCache (which stores it in the layer content cache).
 func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Descriptor, outPath string, opts ...ConvertOpt) (digest.Digest, error) {
-	var copts convertOptions
-	for _, opt := range opts {
-		opt(&copts)
-	}
-
 	uncompressedDesc := &desc
 	if !uncompress.IsUncompressedType(desc.MediaType) {
 		var err error
@@ -197,18 +196,11 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 	defer ra.Close()
 	sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
 
-	var mkfsArgs []string
-	if copts.compressors != "" {
-		mkfsArgs = append(mkfsArgs, "-z"+copts.compressors, "-C", "65536")
-	}
-	mkfsArgs = append(mkfsArgs, copts.mkfsExtraOpts...)
-	mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
-
 	// Derive the erofs UUID from the uncompressed digest (diffID) so the blob is a
 	// deterministic function of the layer content, independent of how the source
 	// was compressed. This is also the key the layer content cache uses.
 	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+uncompressedDesc.Digest))
-	if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
+	if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String()); err != nil {
 		return "", fmt.Errorf("failed to convert to EROFS: %w", err)
 	}
 	log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)

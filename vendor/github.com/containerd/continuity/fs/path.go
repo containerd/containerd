@@ -235,7 +235,7 @@ func RootPath(root, path string) (string, error) {
 		}
 		path = newpath
 		if i == linksWalked {
-			newpath = filepath.Join("/", newpath)
+			newpath = filepath.Join(string(os.PathSeparator), newpath)
 			if path == newpath {
 				return filepath.Join(root, newpath), nil
 			}
@@ -249,8 +249,8 @@ func walkLink(root, path string, linksWalked *int) (newpath string, islink bool,
 		return "", false, errTooManyLinks
 	}
 
-	path = filepath.Join("/", path)
-	if path == "/" {
+	path = filepath.Join(string(os.PathSeparator), path)
+	if path == string(os.PathSeparator) {
 		return path, false, nil
 	}
 	realPath := filepath.Join(root, path)
@@ -281,7 +281,7 @@ func walkLinks(root, path string, linksWalked *int) (string, error) {
 		return newpath, err
 	case file == "":
 		if os.IsPathSeparator(dir[len(dir)-1]) {
-			if dir == "/" {
+			if dir == string(os.PathSeparator) {
 				return dir, nil
 			}
 			return walkLinks(root, dir[:len(dir)-1], linksWalked)

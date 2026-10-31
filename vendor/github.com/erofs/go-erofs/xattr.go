@@ -23,9 +23,9 @@ func (idx xattrIndex) String() string {
 	case 1:
 		return "user."
 	case 2:
-		return "system.posix_acl_access."
+		return "system.posix_acl_access"
 	case 3:
-		return "system.posix_acl_default."
+		return "system.posix_acl_default"
 	case 4:
 		return "trusted."
 	case 5:
