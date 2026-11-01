@@ -317,6 +317,33 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+	if o.syncOnCommit {
+		// Flush the upperdir to stable storage before the snapshot is
+		// marked as committed. Without this, the metadata commit below is
+		// durable while the unpacked file contents may still live in the
+		// page cache — a storage-level data loss inside the write-back
+		// window then leaves a committed snapshot with valid metadata but
+		// empty file contents.
+		//
+		// The flush runs outside the metadata write transaction: syncfs is
+		// filesystem-wide and unbounded, so holding the daemon-wide bolt
+		// write lock during the flush would block unrelated metadata
+		// operations. Nothing writes to this upperdir between the flush and
+		// the commit below — the unpack finished before Commit was called.
+		var id string
+		if err := o.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+			var err error
+			id, _, _, err = storage.GetInfo(ctx, key)
+			return err
+		}); err != nil {
+			return fmt.Errorf("failed to get active snapshot %s: %w", key, err)
+		}
+		upperdir := o.upperPath(id)
+		if err := syncFsFn(upperdir); err != nil {
+			return fmt.Errorf("failed to sync filesystem containing upperdir %s: %w", upperdir, err)
+		}
+	}
+
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
 		// grab the existing id
 		id, _, _, err := storage.GetInfo(ctx, key)
@@ -329,19 +356,6 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 			return err
 		}
 
-		if o.syncOnCommit {
-			// Flush the upperdir to stable storage before the snapshot is
-			// marked as committed. Without this, the metadata commit below
-			// is durable while the unpacked file contents may still live in
-			// the page cache — a storage-level data loss inside the
-			// write-back window then leaves a committed snapshot with valid
-			// metadata but empty file contents.
-			upperdir := o.upperPath(id)
-			if err := syncFs(upperdir); err != nil {
-				return fmt.Errorf("failed to sync filesystem containing upperdir %s: %w", upperdir, err)
-			}
-		}
-
 		if _, err = storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
 			return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 		}
@@ -349,7 +363,7 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	})
 }
 
-// syncFs flushes the filesystem containing path (both data and metadata) to
+// syncFs flushes the filesystem containing path (data and metadata) to
 // stable storage.
 func syncFs(path string) error {
 	fd, err := os.Open(path)
@@ -363,6 +377,10 @@ func syncFs(path string) error {
 	}
 	return nil
 }
+
+// syncFsFn is the flush function used by Commit; a variable so tests can
+// inject failures or observe the flushed path.
+var syncFsFn = syncFs
 
 // Remove abandons the snapshot identified by key. The snapshot will
 // immediately become unavailable and unrecoverable. Disk space will

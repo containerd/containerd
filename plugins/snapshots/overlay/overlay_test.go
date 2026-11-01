@@ -865,3 +865,110 @@ func TestSyncFs(t *testing.T) {
 		t.Fatal("expected syncFs on a missing path to fail")
 	}
 }
+
+// Commit must flush the upperdir before the metadata commit makes the
+// snapshot visible under its committed name.
+func TestCommitFlushesUpperdir(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	sn, err := NewSnapshotter(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sn.Close()
+
+	if _, err := sn.Prepare(ctx, "extract-1", ""); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "snapshots"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected exactly one snapshot dir, got %d", len(entries))
+	}
+	upper := filepath.Join(root, "snapshots", entries[0].Name(), "fs")
+	if err := os.WriteFile(filepath.Join(upper, "probe"), []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	var flushed []string
+	orig := syncFsFn
+	syncFsFn = func(path string) error {
+		flushed = append(flushed, path)
+		return nil
+	}
+	defer func() { syncFsFn = orig }()
+
+	if err := sn.Commit(ctx, "committed-1", "extract-1"); err != nil {
+		t.Fatalf("commit failed: %v", err)
+	}
+
+	if len(flushed) != 1 || flushed[0] != upper {
+		t.Fatalf("expected exactly one flush of %q, got %v", upper, flushed)
+	}
+	if _, err := sn.Stat(ctx, "committed-1"); err != nil {
+		t.Fatalf("committed snapshot not visible: %v", err)
+	}
+}
+
+// A sync failure must fail the commit loudly: the snapshot stays active and
+// nothing appears under the committed name.
+func TestCommitSyncFailureLeavesSnapshotActive(t *testing.T) {
+	ctx := context.Background()
+	sn, err := NewSnapshotter(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sn.Close()
+
+	if _, err := sn.Prepare(ctx, "extract-1", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	orig := syncFsFn
+	syncFsFn = func(path string) error { return fmt.Errorf("injected sync failure") }
+	defer func() { syncFsFn = orig }()
+
+	if err := sn.Commit(ctx, "committed-1", "extract-1"); err == nil {
+		t.Fatal("expected commit to fail when the flush fails")
+	}
+
+	if _, err := sn.Stat(ctx, "extract-1"); err != nil {
+		t.Fatalf("snapshot should still be active after a failed commit: %v", err)
+	}
+	if _, err := sn.Stat(ctx, "committed-1"); err == nil {
+		t.Fatal("committed snapshot must not exist after a failed commit")
+	}
+}
+
+// WithoutSyncOnCommit must skip the flush entirely while the commit still
+// succeeds.
+func TestWithoutSyncOnCommitSkipsFlush(t *testing.T) {
+	ctx := context.Background()
+	sn, err := NewSnapshotter(t.TempDir(), WithoutSyncOnCommit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sn.Close()
+
+	if _, err := sn.Prepare(ctx, "extract-1", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	var flushed []string
+	orig := syncFsFn
+	syncFsFn = func(path string) error {
+		flushed = append(flushed, path)
+		return nil
+	}
+	defer func() { syncFsFn = orig }()
+
+	if err := sn.Commit(ctx, "committed-1", "extract-1"); err != nil {
+		t.Fatalf("commit failed: %v", err)
+	}
+
+	if len(flushed) != 0 {
+		t.Fatalf("expected no flush with WithoutSyncOnCommit, got %v", flushed)
+	}
+}
