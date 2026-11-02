@@ -82,11 +82,10 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		if !os.IsExist(err) {
 			return nil, err
 		}
-		// Unmount the rootfs first, as Bundle.Delete does, so that RemoveAll
+		// Clear the rootfs first, as Bundle.Delete does, so that RemoveAll
 		// does not walk into a mount that is still active.
-		staleRootfs := filepath.Join(b.Path, "rootfs")
-		if err := mount.UnmountRecursive(staleRootfs, 0); err != nil {
-			return nil, fmt.Errorf("failed to unmount stale bundle rootfs %q: %w", staleRootfs, err)
+		if err := cleanRootfs(filepath.Join(b.Path, "rootfs")); err != nil {
+			return nil, err
 		}
 		if err := os.RemoveAll(b.Path); err != nil {
 			return nil, fmt.Errorf("failed to remove stale bundle path %q: %w", b.Path, err)
@@ -169,11 +168,8 @@ type Bundle struct {
 func (b *Bundle) Delete() error {
 	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
-	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
-		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
-	}
-	if err := os.Remove(rootfs); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove bundle rootfs: %w", err)
+	if err := cleanRootfs(rootfs); err != nil {
+		return err
 	}
 	err := atomicDelete(b.Path)
 	if err == nil {
@@ -191,6 +187,19 @@ func (b *Bundle) Delete() error {
 		}
 	}
 	return fmt.Errorf("failed to remove both bundle and workdir locations: %v: %w", err2, err)
+}
+
+// cleanRootfs unmounts rootfs and removes the emptied directory. Removing it
+// without recursion fails if a mount is still busy, so callers never delete
+// through a live mount.
+func cleanRootfs(rootfs string) error {
+	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
+		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
+	}
+	if err := os.Remove(rootfs); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove bundle rootfs: %w", err)
+	}
+	return nil
 }
 
 // atomicDelete renames the path to a hidden file before removal
