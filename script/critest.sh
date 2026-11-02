@@ -50,6 +50,17 @@ function cleanup() {
 trap cleanup EXIT
 
 mkdir -p ${BDIR}/{root,state}
+
+# SANDBOXER is the sandbox controller of the runtime handler: "podsandbox"
+# (the pause container, the default) or "shim" (the Sandbox API of the shim,
+# which needs no pause image).
+SANDBOXER="${SANDBOXER:-podsandbox}"
+SANDBOX_CONFIG="sandboxer = \"${SANDBOXER}\""
+if [ "${SANDBOXER}" = "shim" ]; then
+  SANDBOX_CONFIG="${SANDBOX_CONFIG}
+disable_pause_image_pull = true"
+fi
+
 containerd_config="${CONTAINERD_CONFIG_FILE:-${BDIR}/config.toml}"
 if [[ -z "${CONTAINERD_CONFIG_FILE:-}" ]]; then
   cat > "${containerd_config}" <<EOF
@@ -57,6 +68,7 @@ version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
 runtime_type = "${TEST_RUNTIME}"
 runtime_path = "${TEST_RUNTIME_PATH:-}"
+${SANDBOX_CONFIG}
 [plugins."io.containerd.snapshotter.v1.overlayfs"]
 # slow_chown is needed to avoid an error with kernel < 5.19:
 # > "snapshotter \"overlayfs\" doesn't support idmap mounts on this host,
