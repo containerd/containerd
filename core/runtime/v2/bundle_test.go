@@ -56,3 +56,19 @@ func TestNewBundleSelfHealsExistingPath(t *testing.T) {
 	_, err = os.Stat(filepath.Join(b.Path, "stale"))
 	assert.True(t, os.IsNotExist(err), "stale file should have been cleared by self-heal")
 }
+
+// TestNewBundleKeepsBusyRootfs verifies that a stale bundle whose rootfs still
+// has content is not removed through, as it might be a live mount.
+func TestNewBundleKeepsBusyRootfs(t *testing.T) {
+	dir := t.TempDir()
+	const id = "busy-rootfs"
+	ctx := namespaces.WithNamespace(context.Background(), namespaces.Default)
+
+	stale := filepath.Join(dir, "state", namespaces.Default, id, "rootfs", "data")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0700))
+	require.NoError(t, os.WriteFile(stale, []byte("x"), 0600))
+
+	_, err := NewBundle(ctx, filepath.Join(dir, "root"), filepath.Join(dir, "state"), id, nil)
+	require.Error(t, err)
+	assert.FileExists(t, stale)
+}
