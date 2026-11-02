@@ -172,6 +172,23 @@ func TestReferenceParser(t *testing.T) {
 			Input: "example.com/library/../image:latest",
 			Err:   ErrInvalid,
 		},
+		{
+			// A percent-encoded slash decodes into a path separator, silently
+			// aliasing "foo%2Fbar" onto the unrelated repository "foo/bar".
+			// Percent is not a valid character in a distribution repository
+			// path, so the reference must be rejected rather than rewritten.
+			Name:  "EncodedSlashAliasesPathSegment",
+			Input: "example.com/foo%2Fbar:latest",
+			Err:   ErrInvalid,
+		},
+		{
+			// Any other percent-encoded sequence would likewise rewrite the
+			// path after decoding ("%41" -> "A"), which must not happen
+			// silently.
+			Name:  "EncodedByteRewritesPath",
+			Input: "example.com/%41bc:latest",
+			Err:   ErrInvalid,
+		},
 	} {
 		t.Run(testcase.Name, func(t *testing.T) {
 			ref, err := Parse(testcase.Input)
