@@ -239,7 +239,7 @@ func (m *ShimManager) resolveRuntimeWithFallback(ctx context.Context, runtime, i
 	if name := m.runtimeName(ctx, id); name != "" && name != runtime {
 		if r, rerr := m.resolveRuntimePath(name); rerr == nil {
 			log.G(ctx).WithField("id", id).WithField("runtime", name).
-				Info("pinned shim binary path is stale; re-resolved from runtime name")
+				Warn("pinned shim binary path is stale; re-resolved from runtime name")
 			return r, nil
 		}
 	}
@@ -253,7 +253,7 @@ func (m *ShimManager) runtimeName(ctx context.Context, id string) string {
 	if c, err := m.containers.Get(ctx, id); err == nil {
 		return c.Runtime.Name
 	} else if !errdefs.IsNotFound(err) {
-		log.G(ctx).WithError(err).Errorf("loading container %s for runtime name", id)
+		log.G(ctx).WithError(err).Errorf("failed to look up container %s runtime name while recovering stale shim path", id)
 	}
 	if sb, err := m.sandboxStore.Get(ctx, id); err == nil {
 		return sb.Runtime.Name
