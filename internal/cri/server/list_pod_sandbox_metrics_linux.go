@@ -158,8 +158,9 @@ func (c *criService) collectPodSandboxMetrics(ctx context.Context, sandbox sandb
 	podLabels := append(append([]string(nil), labels...), "", sandbox.ID, "")
 	timestamp := time.Now().UnixNano()
 
-	// Collect pod-level network metrics
-	if sandbox.NetNSPath != "" {
+	// Isolated sandboxes have no default network interface. Keep their metrics
+	// record, but omit the default-interface network counters.
+	if sandbox.NetNSPath != "" && !isNetworkIsolated(sandbox.Config) {
 		linkStats, err := getContainerNetIO(ctx, sandbox.NetNSPath)
 		if err != nil {
 			return nil, err
