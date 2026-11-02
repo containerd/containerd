@@ -29,6 +29,8 @@ ROOT="$(pwd)"
 
 # FOCUS focuses the test to run.
 FOCUS=${FOCUS:-""}
+# SKIP leaves out the tests matching the pattern.
+SKIP=${SKIP:-""}
 # REPORT_DIR is the directory to store test logs.
 if [ $IS_WINDOWS -eq 0 ]; then
   REPORT_DIR=${REPORT_DIR:-"/tmp/test-integration"}
@@ -55,7 +57,7 @@ if [ -n "${RUNC_FLAVOR:-}" ]; then
 fi
 CMD+="${PWD}/bin/cri-integration.test${EXE_SUFFIX}"
 
-${CMD} --test.run="${FOCUS}" --test.v \
+${CMD} --test.run="${FOCUS}" --test.skip="${SKIP}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
   --runtime-handler="${RUNTIME}" \
   --runtime-type="${RUNTIME_TYPE}" \

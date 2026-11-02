@@ -200,6 +200,9 @@ func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 }
 
 func push(ctx context.Context, provider content.Provider, pusher Pusher, desc ocispec.Descriptor) error {
+	if desc.Size < 0 {
+		return fmt.Errorf("invalid descriptor size %d: %w", desc.Size, errdefs.ErrInvalidArgument)
+	}
 	log.G(ctx).Debug("push")
 
 	var (

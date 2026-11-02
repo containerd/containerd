@@ -4,7 +4,7 @@ This guide is useful if you intend to contribute on containerd. Thanks for your
 effort. Every contribution is very appreciated.
 
 This doc includes:
-* [Getting started with GitHub Codespaces](#getting-started-with-gitHub-codespaces)
+* [Getting started with GitHub Codespaces](#getting-started-with-github-codespaces)
 * [Build requirements](#build-requirements)
 * [Build the development environment](#build-the-development-environment)
 * [Build containerd](#build-containerd)

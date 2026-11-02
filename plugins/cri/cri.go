@@ -94,12 +94,12 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	if err := validateRuntimePlatforms(runtimeConfig.Runtimes, imageConfig.RuntimePlatforms); err != nil {
 		return nil, err
 	}
+	imageSvc.UpdateDefaultRuntimeName(runtimeConfig.DefaultRuntimeName)
 	for runtimeName, rt := range runtimeConfig.Runtimes {
 		var imagePlatform *images.ImagePlatform
 		if rt.Snapshotter != "" {
 			imagePlatform = &images.ImagePlatform{
 				Snapshotter: rt.Snapshotter,
-				Platform:    platforms.DefaultSpec(),
 			}
 		}
 		imageSvc.UpdateRuntime(runtimeName, imagePlatform)
@@ -185,7 +185,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	service := &criGRPCServer{
 		RuntimeServiceServer: rs,
 		ImageServiceServer:   is,
-		Closer:               s, // TODO: Where is close run?
+		Closer:               s, // closed by Server.Stop in cmd/containerd/server
 		initializer:          s,
 	}
 

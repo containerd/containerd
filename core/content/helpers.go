@@ -132,6 +132,9 @@ func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) (
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
 func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc ocispec.Descriptor, opts ...Opt) error {
+	if desc.Size < 0 {
+		return fmt.Errorf("invalid content size %d: %w", desc.Size, errdefs.ErrInvalidArgument)
+	}
 	cw, err := OpenWriter(ctx, cs, WithRef(ref), WithDescriptor(desc))
 	if err != nil {
 		if !errdefs.IsAlreadyExists(err) {
@@ -185,13 +188,19 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 // Copy copies data with the expected digest from the reader into the
 // provided content store writer. This copy commits the writer.
 //
-// This is useful when the digest and size are known beforehand. When
-// the size or digest is unknown, these values may be empty.
+// A size of 0 indicates an unknown size, in which case the reader is
+// copied until EOF. For backward compatibility, -1 is also accepted
+// as an unknown size. Other negative sizes are invalid. Positive sizes
+// are enforced, and an empty expected digest disables digest verification.
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
 func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected digest.Digest, opts ...Opt) error {
-	if size < 0 {
+	if size < -1 {
 		return fmt.Errorf("invalid content size %d: %w", size, errdefs.ErrInvalidArgument)
+	}
+	if size == -1 {
+		// Writer.Commit uses 0 for an unknown size.
+		size = 0
 	}
 	for i := 0; ; i++ {
 		if i >= 1 {

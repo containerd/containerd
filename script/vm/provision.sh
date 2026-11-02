@@ -32,7 +32,7 @@ fi
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 containerd_dir="$(cd -- "${script_dir}/../.." > /dev/null 2>&1; pwd -P)"
 
-: "${GO_VERSION:=1.27.2}"
+: "${GO_VERSION:=1.27.3}"
 : "${RUNC_FLAVOR:=runc}"
 : "${SELINUX:=Enforcing}"
 : "${INSTALL_PACKAGES:=}"
@@ -78,8 +78,9 @@ fi
 
 cd "${containerd_dir}"
 
-# Install runc (pass RUNC_FLAVOR=crun to install crun as runc)
-RUNC_FLAVOR="${RUNC_FLAVOR}" script/setup/install-runc
+# Install runc (pass RUNC_FLAVOR=crun to install crun as runc).
+# EL has no libseccomp-static, so build runc dynamically like runc's own CI does.
+RUNC_FLAVOR="${RUNC_FLAVOR}" RUNC_DYNAMIC=1 script/setup/install-runc
 type runc
 runc --version
 # "type -ap" may print the same file under multiple names, e.g., on
