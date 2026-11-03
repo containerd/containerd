@@ -363,6 +363,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 
 	b := shimBinary(bundle, shimBinaryConfig{
 		runtime:      runtimePath,
+		override:     filepath.IsAbs(opts.Runtime),
 		address:      m.containerdAddress,
 		ttrpcAddress: m.containerdTTRPCAddress,
 		socketDir:    m.socketDir,

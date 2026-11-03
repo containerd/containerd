@@ -193,6 +193,7 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 		Name        string
 		Runtime     string
 		RealFile    bool // create Runtime as a real file so os.Stat succeeds
+		Override    bool // Runtime was an explicit runtime_path override
 		Containers  containers.Store
 		Sandboxes   sandbox.Store
 		Cache       map[string]string
@@ -241,6 +242,17 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			ExpectError: true,
 		},
 		{
+			// A marked override must not fall back even when its binary
+			// has the same name as the default shim.
+			Name:        "stale same-name override errors",
+			Runtime:     stalePath,
+			Override:    true,
+			Containers:  fakeContainerStore{container: container(runtimeName)},
+			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
+			Cache:       map[string]string{binName: validPath},
+			ExpectError: true,
+		},
+		{
 			// Metadata name equals the (stale) runtime: the guard skips a
 			// pointless retry and the original error propagates.
 			Name:        "stale path equal to metadata name errors",
@@ -263,7 +275,7 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 				require.NoError(t, os.WriteFile(runtime, nil, 0o755))
 				expected = runtime
 			}
-			got, err := m.resolveRuntimeWithFallback(context.Background(), runtime, "id")
+			got, err := m.resolveRuntimeWithFallback(context.Background(), runtime, "id", tc.Override)
 			if tc.ExpectError {
 				require.Error(t, err)
 				return
@@ -271,5 +283,19 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, expected, got)
 		})
+	}
+}
+
+func TestSaveShimBinaryPath(t *testing.T) {
+	for _, override := range []bool{false, true} {
+		dir := t.TempDir()
+		require.NoError(t, saveShimBinaryPath(dir, "/some/shim", override))
+
+		data, err := os.ReadFile(filepath.Join(dir, shimBinaryPathFile))
+		require.NoError(t, err)
+		require.Equal(t, "/some/shim", string(data))
+
+		_, err = os.Stat(filepath.Join(dir, shimBinaryOverrideFile))
+		require.Equal(t, override, err == nil)
 	}
 }
