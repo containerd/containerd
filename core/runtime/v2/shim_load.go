@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"golang.org/x/sync/errgroup"
 )
@@ -229,14 +230,16 @@ func shouldCleanupShim(sgetErr, pidErr error, pInfo []runtimeapi.ProcessInfo) bo
 // runtime is a pinned absolute path that no longer resolves (e.g. an update
 // moved or replaced the binary that the path was resolved to at task start), it
 // falls back to re-resolving from the runtime name recorded in metadata for id,
-// which stays valid across such moves. If the fallback also fails, the original
-// resolution error is returned.
+// which stays valid across such moves. The fallback only applies when the pinned
+// binary has the name that the metadata runtime maps to, so an explicit
+// runtime_path override is never replaced by a different shim. If the fallback
+// also fails, the original resolution error is returned.
 func (m *ShimManager) resolveRuntimeWithFallback(ctx context.Context, runtime, id string) (string, error) {
 	resolved, err := m.resolveRuntimePath(runtime)
 	if err == nil {
 		return resolved, nil
 	}
-	if name := m.runtimeName(ctx, id); name != "" && name != runtime {
+	if name := m.runtimeName(ctx, id); name != "" && name != runtime && filepath.Base(runtime) == shimbinary.BinaryName(name) {
 		if r, rerr := m.resolveRuntimePath(name); rerr == nil {
 			log.G(ctx).WithField("id", id).WithField("runtime", name).
 				Warn("pinned shim binary path is stale; re-resolved from runtime name")

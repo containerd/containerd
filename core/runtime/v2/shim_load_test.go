@@ -226,6 +226,16 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			ExpectError: true,
 		},
 		{
+			// An explicit runtime_path override to a differently named binary
+			// must not silently fall back to the default shim.
+			Name:        "stale override of a different shim errors",
+			Runtime:     "/nonexistent/override/custom-shim",
+			Containers:  fakeContainerStore{container: container(runtimeName)},
+			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
+			Cache:       map[string]string{shimbinary.BinaryName(runtimeName): validPath},
+			ExpectError: true,
+		},
+		{
 			// Metadata name equals the (stale) runtime: the guard skips a
 			// pointless retry and the original error propagates.
 			Name:        "stale path equal to metadata name errors",
