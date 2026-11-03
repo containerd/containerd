@@ -178,10 +178,15 @@ func TestRuntimeName(t *testing.T) {
 }
 
 func TestResolveRuntimeWithFallback(t *testing.T) {
-	const (
-		stalePath   = "/nonexistent/stale/containerd-shim-runc-v2"
-		runtimeName = "io.containerd.runc.v2"
-		validPath   = "/usr/local/bin/containerd-shim-runc-v2"
+	const runtimeName = "io.containerd.runc.v2"
+	// Built with filepath.Join and BinaryName so the paths are absolute and
+	// carry the .exe suffix on Windows.
+	var (
+		dir       = t.TempDir()
+		binName   = shimbinary.BinaryName(runtimeName)
+		goneDir   = filepath.Join(dir, "gone")
+		stalePath = filepath.Join(goneDir, binName)
+		validPath = filepath.Join(dir, binName)
 	)
 
 	testCases := []struct {
@@ -205,7 +210,7 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			Runtime:    stalePath,
 			Containers: fakeContainerStore{container: container(runtimeName)},
 			Sandboxes:  fakeSandboxStore{err: errdefs.ErrNotFound},
-			Cache:      map[string]string{shimbinary.BinaryName(runtimeName): validPath},
+			Cache:      map[string]string{binName: validPath},
 			Expected:   validPath,
 		},
 		{
@@ -214,7 +219,7 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			Runtime:    stalePath,
 			Containers: fakeContainerStore{err: errdefs.ErrNotFound},
 			Sandboxes:  fakeSandboxStore{sandbox: sbox(runtimeName)},
-			Cache:      map[string]string{shimbinary.BinaryName(runtimeName): validPath},
+			Cache:      map[string]string{binName: validPath},
 			Expected:   validPath,
 		},
 		{
@@ -229,10 +234,10 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			// An explicit runtime_path override to a differently named binary
 			// must not silently fall back to the default shim.
 			Name:        "stale override of a different shim errors",
-			Runtime:     "/nonexistent/override/custom-shim",
+			Runtime:     filepath.Join(goneDir, "custom-shim"),
 			Containers:  fakeContainerStore{container: container(runtimeName)},
 			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
-			Cache:       map[string]string{shimbinary.BinaryName(runtimeName): validPath},
+			Cache:       map[string]string{binName: validPath},
 			ExpectError: true,
 		},
 		{
@@ -254,7 +259,7 @@ func TestResolveRuntimeWithFallback(t *testing.T) {
 			}
 			runtime, expected := tc.Runtime, tc.Expected
 			if tc.RealFile {
-				runtime = filepath.Join(t.TempDir(), "containerd-shim-runc-v2")
+				runtime = filepath.Join(t.TempDir(), binName)
 				require.NoError(t, os.WriteFile(runtime, nil, 0o755))
 				expected = runtime
 			}
