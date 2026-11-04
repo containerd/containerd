@@ -374,6 +374,9 @@ func (c *criService) CRImportCheckpoint(
 		}
 		log.G(ctx).Debugf("Unpacked checkpoint in %s", mountPoint)
 	}
+	if err := assertCheckpointDirSafe(mountPoint); err != nil {
+		return "", err
+	}
 	// Load spec.dump from temporary directory
 	dumpSpec := new(spec.Spec)
 	if _, err := crmetadata.ReadJSONFile(dumpSpec, mountPoint, crmetadata.SpecDumpFile); err != nil {
