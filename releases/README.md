@@ -75,8 +75,9 @@ verified:
 
 4. (major/minor release only) Create `release/x.y` branch from tag and push to `git@github.com:containerd/containerd.git`.
 
-5. Run `make release-support` on `main` and open a pull request so the release links in
-   `RELEASES.md` point to the new tag.
+5. The Release support workflow opens a pull request within a day so the release links in
+   `RELEASES.md` point to the new tag. To do it sooner, run `make release-support` on `main`
+   and open the pull request yourself.
 
 6. (major/minor release only) Create `cherry-pick/x.y.x` and `cherry-picked/x.y.x` labels
 
