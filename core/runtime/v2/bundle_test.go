@@ -20,6 +20,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -30,45 +32,128 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestNewBundleSelfHealsExistingPath verifies that NewBundle recovers when a
-// previous task's bundle state directory is left behind on disk. On Windows,
-// atomicDelete's os.Rename can fail while a still-exiting shim holds file
-// handles on bundle files, leaving the directory in place; the next NewTask
-// must not fail with "file already exists".
-func TestNewBundleSelfHealsExistingPath(t *testing.T) {
+// bundleDirs returns a context and the root and state dirs to create bundles in.
+func bundleDirs(t *testing.T) (context.Context, string, string) {
 	dir := t.TempDir()
-	root := filepath.Join(dir, "root")
-	state := filepath.Join(dir, "state")
-	const id = "self-heal"
-
 	ctx := namespaces.WithNamespace(context.Background(), namespaces.Default)
-
-	// Simulate a leftover bundle directory from a previous run, including a
-	// rootfs directory and a stale file inside it to prove RemoveAll runs.
-	stalePath := filepath.Join(state, namespaces.Default, id)
-	require.NoError(t, os.MkdirAll(filepath.Join(stalePath, "rootfs"), 0700))
-	require.NoError(t, os.WriteFile(filepath.Join(stalePath, "stale"), []byte("x"), 0600))
-
-	b, err := NewBundle(ctx, root, state, id, nil)
-	require.NoError(t, err, "NewBundle should self-heal a pre-existing bundle path")
-	require.NotNil(t, b)
-
-	_, err = os.Stat(filepath.Join(b.Path, "stale"))
-	assert.True(t, os.IsNotExist(err), "stale file should have been cleared by self-heal")
+	return ctx, filepath.Join(dir, "root"), filepath.Join(dir, "state")
 }
 
-// TestNewBundleKeepsBusyRootfs verifies that a stale bundle whose rootfs still
-// has content is not removed through, as it might be a live mount.
-func TestNewBundleKeepsBusyRootfs(t *testing.T) {
-	dir := t.TempDir()
-	const id = "busy-rootfs"
-	ctx := namespaces.WithNamespace(context.Background(), namespaces.Default)
+// failDelete makes b.Delete fail, as it does on Windows when a shim that is
+// still exiting holds files in the bundle, and returns a function that undoes
+// that. A rootfs with content cannot be removed, but is not a live mount.
+func failDelete(t *testing.T, b *Bundle) (release func()) {
+	busy := filepath.Join(b.Path, "rootfs", "busy")
+	require.NoError(t, os.WriteFile(busy, []byte("x"), 0600))
+	require.ErrorContains(t, b.Delete(), "failed to remove bundle rootfs")
+	return func() { require.NoError(t, os.Remove(busy)) }
+}
 
-	stale := filepath.Join(dir, "state", namespaces.Default, id, "rootfs", "data")
-	require.NoError(t, os.MkdirAll(filepath.Dir(stale), 0700))
+// TestNewBundleRejectsExistingBundle verifies that a second create for the ID of
+// a live bundle fails and leaves that bundle alone.
+func TestNewBundleRejectsExistingBundle(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "existing"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	live := filepath.Join(b.Path, "live")
+	require.NoError(t, os.WriteFile(live, []byte("x"), 0600))
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.ErrorIs(t, err, os.ErrExist)
+	assert.FileExists(t, live)
+	_, err = os.Stat(filepath.Join(b.Path, "work"))
+	assert.NoError(t, err, "work link of the live bundle must be kept")
+
+	require.NoError(t, b.Delete())
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.NoError(t, err, "ID must be reusable once the bundle is deleted")
+}
+
+// TestNewBundleReplacesLeftoverBundle verifies that NewBundle recovers when the
+// Delete of a previous bundle left its directory behind. On Windows,
+// atomicDelete's os.Rename can fail while a still-exiting shim holds files in
+// the bundle, and the next NewTask must not fail with "file already exists".
+func TestNewBundleReplacesLeftoverBundle(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "leftover"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	release := failDelete(t, b)
+	release()
+	stale := filepath.Join(b.Path, "stale")
 	require.NoError(t, os.WriteFile(stale, []byte("x"), 0600))
 
-	_, err := NewBundle(ctx, filepath.Join(dir, "root"), filepath.Join(dir, "state"), id, nil)
-	require.Error(t, err)
-	assert.FileExists(t, stale)
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err, "NewBundle should replace the leftover bundle")
+	assert.NoFileExists(t, stale)
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.ErrorIs(t, err, os.ErrExist, "the new bundle is live and must not be replaced")
+}
+
+// TestNewBundleKeepsBusyLeftover verifies that a leftover bundle is not removed
+// through a rootfs that is still in use, and can be replaced once it is not.
+func TestNewBundleKeepsBusyLeftover(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "busy-leftover"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	release := failDelete(t, b)
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.ErrorContains(t, err, "failed to remove bundle rootfs")
+	assert.FileExists(t, filepath.Join(b.Path, "rootfs", "busy"))
+
+	release()
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.NoError(t, err)
+}
+
+// TestNewBundleConcurrentLeftover verifies that of several creates racing for a
+// leftover bundle, exactly one replaces it.
+func TestNewBundleConcurrentLeftover(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "concurrent-leftover"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	failDelete(t, b)()
+
+	var (
+		wg      sync.WaitGroup
+		created atomic.Int32
+	)
+	for range 8 {
+		wg.Go(func() {
+			if _, err := NewBundle(ctx, root, state, id, nil); err == nil {
+				created.Add(1)
+			} else {
+				assert.ErrorIs(t, err, os.ErrExist)
+			}
+		})
+	}
+	wg.Wait()
+	assert.EqualValues(t, 1, created.Load())
+	_, err = os.Stat(filepath.Join(b.Path, "work"))
+	assert.NoError(t, err, "work link of the new bundle must be kept")
+}
+
+// TestBundleDeleteWithStaleAtomicPath verifies that a removal left behind by an
+// earlier failed Delete does not make later Deletes fail.
+func TestBundleDeleteWithStaleAtomicPath(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+
+	b, err := NewBundle(ctx, root, state, "stale-atomic", nil)
+	require.NoError(t, err)
+	hidden := filepath.Join(filepath.Dir(b.Path), "."+b.ID)
+	require.NoError(t, os.MkdirAll(filepath.Join(hidden, "rootfs"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(hidden, "rootfs", "x"), []byte("x"), 0600))
+
+	require.NoError(t, b.Delete())
+	assert.NoDirExists(t, b.Path)
+	assert.NoDirExists(t, hidden)
 }
