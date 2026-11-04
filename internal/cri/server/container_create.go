@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
+
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
@@ -59,6 +61,10 @@ func init() {
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
 	span := tracing.SpanFromContext(ctx)
 	config := r.GetConfig()
+	securityContext := config.GetLinux().GetSecurityContext()
+	if err := sputil.ValidateSecurityProfiles(securityContext.GetSeccomp(), securityContext.GetApparmor(), securityContext.GetPrivileged()); err != nil {
+		return nil, err
+	}
 	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())

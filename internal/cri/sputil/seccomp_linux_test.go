@@ -18,7 +18,9 @@ package sputil
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +30,15 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
+
+func TestTruncateMergeDiff(t *testing.T) {
+	longDiff := "é" + strings.Repeat("x", maxMergeDiffLogBytes)
+	truncated := truncateMergeDiff(longDiff)
+	assert.LessOrEqual(t, len(truncated), maxMergeDiffLogBytes)
+	assert.True(t, utf8.ValidString(truncated))
+	assert.True(t, strings.HasSuffix(truncated, mergeDiffTruncation))
+	assert.Equal(t, "short diff", truncateMergeDiff("short diff"))
+}
 
 func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 	for _, test := range []struct {

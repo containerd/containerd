@@ -93,7 +93,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
-		c.seccompEnabled())
+		c.seccompEnabled(), sputil.ProfileLoaderFrom(c.ImageService))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 	}

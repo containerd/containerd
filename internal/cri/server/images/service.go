@@ -30,8 +30,10 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	profilestore "github.com/containerd/containerd/v2/internal/cri/store/securityprofile"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"golang.org/x/sync/semaphore"
@@ -68,6 +70,8 @@ type ImagePlatform struct {
 }
 
 type CRIImageService struct {
+	securityProfiles *profilestore.Store
+	profileVerifiers map[string]imageverifier.ImageVerifier
 	runtime.UnimplementedImageServiceServer
 
 	// config contains all image configurations.
@@ -98,6 +102,8 @@ type CRIImageService struct {
 
 	// downloadLimiter is used to limit the number of concurrent downloads.
 	downloadLimiter *semaphore.Weighted
+	// securityProfilePulls prevents duplicate in-flight pulls for one reference.
+	securityProfilePulls kmutex.KeyedLocker
 }
 
 type resolvedRuntimeHandler struct {
@@ -110,7 +116,9 @@ type GRPCCRIImageService struct {
 }
 
 type CRIImageServiceOptions struct {
-	Content content.Store
+	SecurityProfiles *profilestore.Store
+	ProfileVerifiers map[string]imageverifier.ImageVerifier
+	Content          content.Store
 
 	Images images.Store
 
@@ -141,6 +149,8 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		downloadLimiter = semaphore.NewWeighted(int64(config.MaxConcurrentDownloads))
 	}
 	svc := CRIImageService{
+		securityProfiles:            options.SecurityProfiles,
+		profileVerifiers:            options.ProfileVerifiers,
 		config:                      config,
 		images:                      options.Images,
 		client:                      &platformImageClient{Client: options.Client},
@@ -151,8 +161,10 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
 		downloadLimiter:             downloadLimiter,
+		securityProfilePulls:        kmutex.New(),
 	}
 
+	securityProfileMetricsStore.Store(options.SecurityProfiles)
 	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		svc.snapshotStore,

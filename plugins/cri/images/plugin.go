@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -30,6 +31,8 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
+	profilestore "github.com/containerd/containerd/v2/internal/cri/store/securityprofile"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
@@ -49,6 +52,7 @@ func init() {
 		Config: &config,
 		Requires: []plugin.Type{
 			plugins.LeasePlugin,
+			plugins.ImageVerifierPlugin,
 			plugins.MetadataPlugin,
 			plugins.SandboxStorePlugin,
 			plugins.ServicePlugin,  // For client
@@ -101,6 +105,20 @@ func init() {
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
 				Transferrer:      ts.(transfer.Transferrer),
+			}
+
+			profiles, err := profilestore.NewStore(filepath.Join(ic.Properties[plugins.PropertyRootDir], "security-profiles"))
+			if err != nil {
+				return nil, err
+			}
+			options.SecurityProfiles = profiles
+			verifiers, err := ic.GetByType(plugins.ImageVerifierPlugin)
+			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
+				return nil, err
+			}
+			options.ProfileVerifiers = make(map[string]imageverifier.ImageVerifier, len(verifiers))
+			for name, verifier := range verifiers {
+				options.ProfileVerifiers[name] = verifier.(imageverifier.ImageVerifier)
 			}
 
 			ctrdCli, err := containerd.New(

@@ -57,6 +57,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/seccomp"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
@@ -290,6 +291,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
 		SupplementalGroupsPolicy:  true,
+		SeccompProfileOci:         seccomp.IsEnabled(),
 		UserNamespacesHostNetwork: goruntime.GOOS == "linux",
 	}
 

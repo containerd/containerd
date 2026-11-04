@@ -17,7 +17,10 @@
 package images
 
 import (
+	"sync/atomic"
 	"time"
+
+	profilestore "github.com/containerd/containerd/v2/internal/cri/store/securityprofile"
 
 	"github.com/docker/go-metrics"
 	prom "github.com/prometheus/client_golang/prometheus"
@@ -26,8 +29,9 @@ import (
 const mibToByte = 1024 * 1024
 
 var (
-	imagePulls           metrics.LabeledCounter
-	inProgressImagePulls metrics.Gauge
+	securityProfileMetricsStore atomic.Pointer[profilestore.Store]
+	imagePulls                  metrics.LabeledCounter
+	inProgressImagePulls        metrics.Gauge
 	// imagePullThroughput observes one MiB/s sample per image pull: bytes
 	// actually fetched from the registry over end-to-end pull duration.
 	// Fully-cached pulls are skipped.
@@ -78,6 +82,8 @@ func init() {
 	)
 	ns.Add(imagePullThroughput)
 	ns.Add(imagePullThroughputMiBps)
+	ns.Add(prom.NewGaugeFunc(prom.GaugeOpts{Namespace: namespace, Subsystem: subsystem, Name: "security_profiles", Help: "Number of stored security profiles"}, func() float64 { return securityProfileUsage(false) }))
+	ns.Add(prom.NewGaugeFunc(prom.GaugeOpts{Namespace: namespace, Subsystem: subsystem, Name: "security_profiles_bytes", Help: "Bytes of stored security profiles"}, func() float64 { return securityProfileUsage(true) }))
 	metrics.Register(ns)
 }
 
@@ -94,4 +100,16 @@ func recordImagePullThroughput(obs prom.Observer, bytesPulled uint64, duration t
 		return
 	}
 	obs.Observe(float64(bytesPulled) / mibToByte / duration.Seconds())
+}
+
+func securityProfileUsage(bytes bool) float64 {
+	store := securityProfileMetricsStore.Load()
+	if store == nil {
+		return 0
+	}
+	count, size := store.Usage()
+	if bytes {
+		return float64(size)
+	}
+	return float64(count)
 }

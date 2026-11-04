@@ -39,6 +39,9 @@ func GenerateApparmorSecurityProfile(profilePath string) (*runtime.SecurityProfi
 
 // GenerateApparmorSpecOpts generates containerd SpecOpts for apparmor.
 func GenerateApparmorSpecOpts(sp *runtime.SecurityProfile, privileged, apparmorEnabled bool) (oci.SpecOpts, error) {
+	if err := ValidateOCIFields(sp, false, privileged); err != nil {
+		return nil, err
+	}
 	if !apparmorEnabled {
 		// Should fail loudly if user try to specify apparmor profile
 		// but we don't support it.

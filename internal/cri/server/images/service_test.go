@@ -23,6 +23,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
@@ -39,17 +40,19 @@ const (
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
-		config:           testImageConfig,
-		runtimePlatforms: map[string]*ImagePlatform{},
-		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
-		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
-		snapshotStore:    snapshotstore.NewStore(),
+		config:               testImageConfig,
+		runtimePlatforms:     map[string]*ImagePlatform{},
+		imageFSPaths:         map[string]string{"overlayfs": testImageFSPath},
+		imageStore:           imagestore.NewStore(nil, nil, platforms.Default()),
+		snapshotStore:        snapshotstore.NewStore(),
+		securityProfilePulls: kmutex.New(),
 	}
 
 	return service, &GRPCCRIImageService{service}
 }
 
 var testImageConfig = criconfig.ImageConfig{
+	ImagePullProgressTimeout: "5m",
 	PinnedImages: map[string]string{
 		"sandbox": testSandboxImage,
 	},

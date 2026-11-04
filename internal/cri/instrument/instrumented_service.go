@@ -802,3 +802,32 @@ func (in *instrumentedService) StreamImages(r *runtime.StreamImagesRequest, s gr
 	}
 	return errgrpc.ToGRPC(err)
 }
+
+func (in *instrumentedService) PullSecurityProfile(ctx context.Context, r *runtime.PullSecurityProfileRequest) (res *runtime.PullSecurityProfileResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	res, err = in.c.PullSecurityProfile(ctrdutil.WithNamespace(ctx), r)
+	if err != nil {
+		err = ctrdutil.SanitizeError(err)
+		log.G(ctx).WithError(err).Errorf("PullSecurityProfile %q failed", r.GetImage().GetImage())
+	}
+	tracing.SpanFromContext(ctx).RecordError(err)
+	return res, errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) ListSecurityProfiles(ctx context.Context, r *runtime.ListSecurityProfilesRequest) (*runtime.ListSecurityProfilesResponse, error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	res, err := in.c.ListSecurityProfiles(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) RemoveSecurityProfile(ctx context.Context, r *runtime.RemoveSecurityProfileRequest) (*runtime.RemoveSecurityProfileResponse, error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	res, err := in.c.RemoveSecurityProfile(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
