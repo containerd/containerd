@@ -43,6 +43,7 @@ func init() {
 	plugins.Register(&transfertypes.ImageStore{}, &Store{}) // TODO: Rename ImageStoreDestination
 }
 
+// Store is an image store source or Destination
 type Store struct {
 	imageName     string
 	imageLabels   map[string]string
