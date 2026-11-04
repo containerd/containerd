@@ -19,10 +19,10 @@ package v2
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -76,26 +76,13 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
 		return nil, err
 	}
-	// On Windows, a crashed shim or failed atomicDelete may leave the bundle
-	// path behind; mirror the work-dir handling below to self-heal.
-	if err := os.Mkdir(b.Path, 0700); err != nil {
-		if !os.IsExist(err) {
-			return nil, err
+	if err := mkdirBundle(ctx, b.Path); err != nil {
+		// os.IsExist does not unwrap, so a failed cleanup of a leftover does not
+		// match, though ENOTEMPTY would match errors.Is(err, os.ErrExist).
+		if os.IsExist(err) {
+			return nil, fmt.Errorf("bundle for %s: %w", id, errdefs.ErrAlreadyExists)
 		}
-		// Clear the rootfs first, as Bundle.Delete does, so that RemoveAll
-		// does not walk into a mount that is still active.
-		if err := cleanRootfs(filepath.Join(b.Path, "rootfs")); err != nil {
-			return nil, err
-		}
-		if err := os.RemoveAll(b.Path); err != nil {
-			return nil, fmt.Errorf("failed to remove stale bundle path %q: %w", b.Path, err)
-		}
-		if err := os.Mkdir(b.Path, 0700); err != nil {
-			if errors.Is(err, os.ErrExist) {
-				return nil, fmt.Errorf("bundle for %s: %w", id, errdefs.ErrAlreadyExists)
-			}
-			return nil, err
-		}
+		return nil, err
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {
 		if err := prepareBundleDirectoryPermissions(b.Path, spec.GetValue()); err != nil {
@@ -112,16 +99,9 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		return nil, err
 	}
 	paths = append(paths, rootfs)
-	if err := os.Mkdir(work, 0711); err != nil {
-		if !os.IsExist(err) {
-			return nil, err
-		}
-		if err := os.RemoveAll(work); err != nil {
-			return nil, fmt.Errorf("failed to remove stale work dir %q: %w", work, err)
-		}
-		if err := os.Mkdir(work, 0711); err != nil {
-			return nil, err
-		}
+	// The bundle is ours at this point, so an existing work dir is a leftover.
+	if err := mkdirReplace(ctx, work, 0711, true); err != nil {
+		return nil, err
 	}
 	paths = append(paths, work)
 	// create work link (symlink on unix, junction on windows)
@@ -164,13 +144,48 @@ type Bundle struct {
 	Namespace string
 }
 
+var (
+	// leftoverBundles holds the paths of bundles whose Delete failed.
+	leftoverBundles sync.Map
+	// mkdirBundleMu serializes the creation of bundle directories, so that
+	// concurrent creates cannot interleave with replacing a leftover.
+	mkdirBundleMu sync.Mutex
+)
+
+// mkdirBundle creates the bundle directory. An existing one is replaced only
+// if its own Delete failed. Any other belongs to a task that is live or still
+// being created, so a second create for the same ID fails with "file exists"
+// and leaves it alone.
+func mkdirBundle(ctx context.Context, path string) error {
+	mkdirBundleMu.Lock()
+	defer mkdirBundleMu.Unlock()
+
+	_, leftover := leftoverBundles.Load(path)
+	if err := mkdirReplace(ctx, path, 0700, leftover); err != nil {
+		return err
+	}
+	leftoverBundles.Delete(path)
+	return nil
+}
+
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
 	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
-	if err := cleanRootfs(rootfs); err != nil {
-		return err
+	err := cleanRootfs(rootfs)
+	if err == nil {
+		err = b.removeDirs(work, werr)
 	}
+	if err != nil {
+		leftoverBundles.Store(b.Path, struct{}{})
+	} else {
+		leftoverBundles.Delete(b.Path)
+	}
+	return err
+}
+
+// removeDirs removes the bundle directory and the work dir it links to.
+func (b *Bundle) removeDirs(work string, werr error) error {
 	err := atomicDelete(b.Path)
 	if err == nil {
 		if werr == nil {
@@ -187,6 +202,25 @@ func (b *Bundle) Delete() error {
 		}
 	}
 	return fmt.Errorf("failed to remove both bundle and workdir locations: %v: %w", err2, err)
+}
+
+// mkdirReplace creates dir. If dir already exists and replace is set, the old
+// one is removed first and the creation is retried once.
+func mkdirReplace(ctx context.Context, dir string, perm os.FileMode, replace bool) error {
+	err := os.Mkdir(dir, perm)
+	if err == nil || !replace || !os.IsExist(err) {
+		return err
+	}
+	log.G(ctx).WithField("path", dir).Warn("removing leftover directory")
+	// Only a bundle has a rootfs, which must be unmounted before it is
+	// removed, so that RemoveAll does not walk into a live mount.
+	if err := cleanRootfs(filepath.Join(dir, "rootfs")); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("failed to remove leftover directory %q: %w", dir, err)
+	}
+	return os.Mkdir(dir, perm)
 }
 
 // cleanRootfs unmounts rootfs and removes the emptied directory. Removing it
@@ -206,6 +240,11 @@ func cleanRootfs(rootfs string) error {
 func atomicDelete(path string) error {
 	// create a hidden dir for an atomic removal
 	atomicPath := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
+	// A removal that failed after the rename left atomicPath behind, which
+	// would make every later rename fail.
+	if err := os.RemoveAll(atomicPath); err != nil {
+		return err
+	}
 	if err := os.Rename(path, atomicPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil
