@@ -44,6 +44,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-sandboxed-runc-v2/sandbox"
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/internal/shimenv"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -97,7 +98,7 @@ func newCommand(ctx context.Context, id, containerdAddress string, debug bool) (
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
+	cmd.Env = shimenv.DaemonEnv(os.Environ(), "4")
 	cmd.Env = append(cmd.Env, "OTEL_SERVICE_NAME=containerd-shim-"+id)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,

@@ -132,6 +132,9 @@ documentation.
   - **mutation_threshold** guarantees GC is scheduled after n number of database mutations (Default: **100**),
   - **schedule_delay** defines the delay after trigger event before scheduling a GC (Default **"0ms"** [immediate]),
   - **startup_delay** defines the delay after startup before scheduling a GC (Default **"100ms"**)
+- **[plugins."io.containerd.shim.v1.manager"]** specifies options for configuring the shim manager:
+  - **env** specifies environment variables added to shim processes (Default: **[]**), for example `["GOMAXPROCS=1", "GOGC=30"]`
+  - **socket_dir** specifies the directory to place shim unix sockets
 - **[plugins."io.containerd.runtime.v2.task"]** specifies options for configuring the runtime shim:
   - **platforms** specifies the list of supported platforms
   - **sched_core** Core scheduling is a feature that allows only trusted tasks

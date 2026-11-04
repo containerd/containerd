@@ -18,9 +18,11 @@ package manager
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/containerd/containerd/v2/internal/shimenv"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/stretchr/testify/require"
@@ -79,6 +81,47 @@ func TestNewCommandTracingResource(t *testing.T) {
 					require.Equal(t, expected, value.AsString(), key)
 				}
 			}
+		})
+	}
+}
+
+func TestNewCommandGOMAXPROCS(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		inherited string // GOMAXPROCS in the shim's environment, if set
+		unset     bool
+		fromShim  []string // [plugins."io.containerd.shim.v1.manager"] env via CommandEnv, if set
+		expected  string
+	}{
+		{name: "unset", unset: true, expected: "4"},
+		{name: "empty", expected: "4"},
+		{name: "default 2 from containerd helper becomes 4", inherited: "2", expected: "4"},
+		{name: "explicit 1", inherited: "1", expected: "1"},
+		{name: "explicit 2 from shim manager env preserved", fromShim: []string{"GOMAXPROCS=2"}, expected: "2"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GOMAXPROCS", tc.inherited)
+			if tc.unset {
+				require.NoError(t, os.Unsetenv("GOMAXPROCS"))
+			}
+			if len(tc.fromShim) > 0 {
+				for _, entry := range shimenv.CommandEnv(os.Environ(), nil, tc.fromShim, true) {
+					if key, val, ok := strings.Cut(entry, "="); ok && strings.Contains(key, "GOMAXPROCS") {
+						t.Setenv(key, val)
+					}
+				}
+			}
+			ctx := namespaces.WithNamespace(context.Background(), "test-ns")
+			cmd, err := newCommand(ctx, "test-shim", "/containerd.sock", "/containerd.sock.ttrpc", false)
+			require.NoError(t, err)
+			// Environ applies exec.Cmd's duplicate-variable handling.
+			var values []string
+			for _, entry := range cmd.Environ() {
+				if value, ok := strings.CutPrefix(entry, "GOMAXPROCS="); ok {
+					values = append(values, value)
+				}
+			}
+			require.Equal(t, []string{tc.expected}, values)
 		})
 	}
 }
