@@ -23,6 +23,8 @@ package failpoint
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,6 +48,8 @@ const (
 	TypePanic
 	// TypeDelay sleeps with the specified number of milliseconds
 	TypeDelay
+	// TypePauseOnFIFO pauses until a byte is read from the specified FIFO
+	TypePauseOnFIFO
 )
 
 // String returns the name of type.
@@ -59,6 +63,8 @@ func (t Type) String() string {
 		return "panic"
 	case TypeDelay:
 		return "delay"
+	case TypePauseOnFIFO:
+		return "pause_on_fifo"
 	default:
 		return "invalid"
 	}
@@ -76,6 +82,7 @@ func (t Type) String() string {
 //	error:	Triggers failpoint error with specified argument(string)
 //	panic:	Triggers panic with specified argument(string)
 //	delay:	Sleep the specified number of milliseconds
+//	pause_on_fifo:	Wait for a byte from a FIFO. The FIFO must exist
 //
 // The <count>* modifiers prior to <type> control when <type> is executed. For
 // example, "5*error(oops)" means "return error oops 5 times total". The
@@ -166,7 +173,7 @@ func (fpe *failpointEntry) marshal() string {
 	switch fpe.typ {
 	case TypeOff:
 		return base
-	case TypeError, TypePanic:
+	case TypeError, TypePanic, TypePauseOnFIFO:
 		return fmt.Sprintf("%s(%s)", base, fpe.arg.(string))
 	case TypeDelay:
 		return fmt.Sprintf("%s(%d)", base, fpe.arg.(time.Duration)/time.Millisecond)
@@ -186,9 +193,31 @@ func (fpe *failpointEntry) evaluate() error {
 	case TypeDelay:
 		time.Sleep(fpe.arg.(time.Duration))
 		return nil
+	case TypePauseOnFIFO:
+		return pauseOnFIFO(fpe.arg.(string))
 	default:
 		panic("invalid failpoint type")
 	}
+}
+
+func pauseOnFIFO(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeNamedPipe == 0 {
+		return fmt.Errorf("pause_on_fifo: %s is not a FIFO", path)
+	}
+	var signal [1]byte
+	if _, err := io.ReadFull(f, signal[:]); err != nil {
+		return fmt.Errorf("read FIFO %s: %w", path, err)
+	}
+	return nil
 }
 
 func parseTerms(term []byte) ([]*failpointEntry, error) {
@@ -237,10 +266,11 @@ func parseTerm(term []byte) ([]byte, *failpointEntry, error) {
 
 func parseType(term []byte, entry *failpointEntry) ([]byte, error) {
 	var nameToTyp = map[string]Type{
-		"off":    TypeOff,
-		"error(": TypeError,
-		"panic(": TypePanic,
-		"delay(": TypeDelay,
+		"off":            TypeOff,
+		"error(":         TypeError,
+		"panic(":         TypePanic,
+		"delay(":         TypeDelay,
+		"pause_on_fifo(": TypePauseOnFIFO,
 	}
 
 	var found bool
@@ -258,7 +288,7 @@ func parseType(term []byte, entry *failpointEntry) ([]byte, error) {
 	}
 
 	switch entry.typ {
-	case TypePanic, TypeError:
+	case TypePanic, TypeError, TypePauseOnFIFO:
 		endIdx := bytes.IndexByte(term, ')')
 		if endIdx <= 0 {
 			return nil, fmt.Errorf("invalid argument for %s type", entry.typ)
