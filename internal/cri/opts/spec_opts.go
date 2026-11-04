@@ -346,6 +346,13 @@ func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.Spec
 
 // WithPodNamespaces sets the pod namespaces for the container
 func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
+	// Fail closed if sandboxPid == 0: we cannot derive /proc/0/ns/* and must not silently use host.
+	// Callers that have explicit namespace paths should use WithPodNamespacesWithPaths instead.
+	if sandboxPid == 0 {
+		return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+			return fmt.Errorf("sandbox pid is 0: cannot derive pod namespaces from pid, explicit namespace path required")
+		}
+	}
 	namespaces := config.GetNamespaceOptions()
 
 	opts := []oci.SpecOpts{
@@ -354,6 +361,11 @@ func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid
 		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: GetUTSNamespace(sandboxPid)}),
 	}
 	if namespaces.GetPid() != runtime.NamespaceMode_CONTAINER {
+		if targetPid == 0 {
+			return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+				return fmt.Errorf("target pid is 0: cannot derive pid namespace from pid, explicit pid namespace path required")
+			}
+		}
 		opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: GetPIDNamespace(targetPid)}))
 	}
 
@@ -362,12 +374,157 @@ func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid
 		case runtime.NamespaceMode_NODE:
 			// Nothing to do. Not adding userns field uses the node userns.
 		case runtime.NamespaceMode_POD:
+			// sandboxPid == 0 is already rejected above.
 			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: GetUserNamespace(sandboxPid)}))
 			opts = append(opts, oci.WithUserNamespace(uids, gids))
 		}
 	}
 
 	return oci.Compose(opts...)
+}
+
+// PodNamespacePaths holds explicit namespace paths for a pod sandbox.
+// When a path is non-empty, it should be used directly instead of deriving
+// from sandbox PID (e.g. /proc/<pid>/ns/*). This allows pauseless sandboxes
+// where pid == 0 to still provide stable namespace joins.
+// Only network, IPC, UTS and PID are handled here; user namespace remains
+// pid-derived (or host) and is intentionally deferred — it is already pinned
+// via getSandboxPinnedUserNamespace for POD mode and does not need an
+// explicit persisted path at this layer.
+type PodNamespacePaths struct {
+	Net string
+	IPC string
+	UTS string
+	PID string
+}
+
+// WithPodNamespacesWithPaths is like WithPodNamespaces but prefers explicit paths.
+// If an explicit path is provided for a namespace, it is used directly.
+// Otherwise, if sandboxPid/targetPid is non-zero, the path is derived from the pid.
+// Otherwise, it fails closed with an error instead of silently falling back to host
+// or /proc/0/ns/*.
+// The function does not introduce any hard-coded pin directory layout; the caller
+// provides whatever stable path the sandbox shim exposes.
+// podSandboxConfig is used to determine host namespace modes (NODE) where missing
+// explicit paths with pid==0 should result in host namespace rather than error.
+func WithPodNamespacesWithPaths(config *runtime.LinuxContainerSecurityContext, podSandboxConfig *runtime.PodSandboxConfig, sandboxPid uint32, targetPid uint32, paths PodNamespacePaths, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		namespaces := config.GetNamespaceOptions()
+		var opts []oci.SpecOpts
+		var podNsOpts *runtime.NamespaceOption
+		if podSandboxConfig != nil && podSandboxConfig.GetLinux() != nil && podSandboxConfig.GetLinux().GetSecurityContext() != nil {
+			podNsOpts = podSandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions()
+		}
+
+		// Network, IPC, UTS are pod namespaces (sandbox's namespaces).
+		// For host namespaces (NODE), missing explicit with pid==0 should not error;
+		// instead the container should use host namespace (no pod namespace join).
+		isHostNetwork := podNsOpts != nil && podNsOpts.GetNetwork() == runtime.NamespaceMode_NODE
+		isHostIPC := podNsOpts != nil && podNsOpts.GetIpc() == runtime.NamespaceMode_NODE
+		if isHostNetwork {
+			// Host network: always use host (no network namespace join), regardless of any provided pins.
+			opts = append(opts, WithoutNamespace(runtimespec.NetworkNamespace))
+		} else {
+			netPath, err := resolveNamespacePath(paths.Net, sandboxPid, runtimespec.NetworkNamespace)
+			if err != nil {
+				return fmt.Errorf("network namespace: %w", err)
+			}
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: netPath}))
+		}
+
+		if isHostIPC {
+			// Host IPC: always use host, regardless of any provided pins.
+			opts = append(opts, WithoutNamespace(runtimespec.IPCNamespace))
+		} else {
+			ipcPath, err := resolveNamespacePath(paths.IPC, sandboxPid, runtimespec.IPCNamespace)
+			if err != nil {
+				return fmt.Errorf("ipc namespace: %w", err)
+			}
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.IPCNamespace, Path: ipcPath}))
+		}
+
+		// UTS is tied to network for hostNetwork pods (sandbox drops UTS when Network=NODE).
+		if isHostNetwork {
+			if paths.UTS != "" {
+				opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: paths.UTS}))
+			} else if sandboxPid != 0 {
+				opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: GetUTSNamespace(sandboxPid)}))
+			} else {
+				opts = append(opts, WithoutNamespace(runtimespec.UTSNamespace))
+			}
+		} else {
+			utsPath, err := resolveNamespacePath(paths.UTS, sandboxPid, runtimespec.UTSNamespace)
+			if err != nil {
+				return fmt.Errorf("uts namespace: %w", err)
+			}
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: utsPath}))
+		}
+
+		// PID namespace handling respects NamespaceMode_CONTAINER, NODE (host), POD and TARGET.
+		switch namespaces.GetPid() {
+		case runtime.NamespaceMode_CONTAINER:
+			// Container gets its own PID namespace; no pod PID namespace to join.
+		case runtime.NamespaceMode_NODE:
+			// Host PID namespace — always host, ignore any pod PID pin.
+			opts = append(opts, WithoutNamespace(runtimespec.PIDNamespace))
+		case runtime.NamespaceMode_TARGET:
+			// TARGET must join the target container's PID namespace, not the pod's.
+			// Ignore pod's explicit Pid pin.
+			if targetPid == 0 {
+				return fmt.Errorf("target pid is 0: cannot derive target PID namespace")
+			}
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: GetPIDNamespace(targetPid)}))
+		default: // POD and others
+			pidPath, err := resolveNamespacePath(paths.PID, targetPid, runtimespec.PIDNamespace)
+			if err != nil {
+				return fmt.Errorf("pid namespace: %w", err)
+			}
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: pidPath}))
+		}
+
+		if namespaces.GetUsernsOptions() != nil {
+			switch namespaces.GetUsernsOptions().GetMode() {
+			case runtime.NamespaceMode_NODE:
+				// host user namespace, nothing to do
+			case runtime.NamespaceMode_POD:
+				// User namespace is intentionally not handled via explicit path at this layer;
+				// it is pinned via getSandboxPinnedUserNamespace and derived from pid.
+				// Fail closed if pid==0.
+				if sandboxPid == 0 {
+					return fmt.Errorf("sandbox pid is 0: user namespace POD mode requires a sandbox pid (explicit user namespace paths are not supported at this layer)")
+				}
+				opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: GetUserNamespace(sandboxPid)}))
+				opts = append(opts, oci.WithUserNamespace(uids, gids))
+			}
+		}
+
+		return oci.Compose(opts...)(ctx, client, c, s)
+	}
+}
+
+// resolveNamespacePath returns explicit path if provided, otherwise derives from pid.
+// If both are empty/0, it fails closed.
+func resolveNamespacePath(explicitPath string, pid uint32, nsType runtimespec.LinuxNamespaceType) (string, error) {
+	if explicitPath != "" {
+		return explicitPath, nil
+	}
+	if pid == 0 {
+		return "", fmt.Errorf("path is empty and pid is 0: explicit namespace path required for %s (would otherwise use /proc/0/ns/*)", nsType)
+	}
+	switch nsType {
+	case runtimespec.NetworkNamespace:
+		return GetNetworkNamespace(pid), nil
+	case runtimespec.IPCNamespace:
+		return GetIPCNamespace(pid), nil
+	case runtimespec.UTSNamespace:
+		return GetUTSNamespace(pid), nil
+	case runtimespec.PIDNamespace:
+		return GetPIDNamespace(pid), nil
+	case runtimespec.UserNamespace:
+		return GetUserNamespace(pid), nil
+	default:
+		return "", fmt.Errorf("unknown namespace type %q", nsType)
+	}
 }
 
 const (
