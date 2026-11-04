@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,21 @@ func NamespacedContext() context.Context {
 // WithNamespace adds kubernetes namespace to the context.
 func WithNamespace(ctx context.Context) context.Context {
 	return namespaces.WithNamespace(ctx, constants.K8sContainerdNamespace)
+}
+
+// ShimPath returns the PATH from a shim plugin's environment, or an empty
+// string when the plugin does not set one. The last PATH entry wins.
+func ShimPath(shimPlugin any) string {
+	hasEnv, ok := shimPlugin.(interface{ Env() []string })
+	if !ok {
+		return ""
+	}
+	for _, value := range slices.Backward(hasEnv.Env()) {
+		if path, ok := strings.CutPrefix(value, "PATH="); ok {
+			return path
+		}
+	}
+	return ""
 }
 
 // GetPassthroughAnnotations filters requested pod annotations by comparing

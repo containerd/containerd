@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
-	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -36,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/instrument"
 	"github.com/containerd/containerd/v2/internal/cri/server"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
+	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
@@ -140,21 +139,11 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 		return nil, fmt.Errorf("failed to get streaming config: %w", err)
 	}
 
-	var shimPath string
 	shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shim plugin: %w", err)
 	}
-	if hasEnv, ok := shimPlugin.(interface{ Env() []string }); ok {
-		env := hasEnv.Env()
-		for _, value := range slices.Backward(env) {
-			// iterate backwards to grab the last PATH=
-			if path, ok := strings.CutPrefix(value, "PATH="); ok {
-				shimPath = path
-				break
-			}
-		}
-	}
+	shimPath := ctrdutil.ShimPath(shimPlugin)
 
 	options := &server.CRIServiceOptions{
 		RuntimeService:     runtimeSvc,

@@ -435,9 +435,23 @@ type RuntimeConfig struct {
 	// Default: "2m"
 	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
 
-	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
+	// EnableCheckpointRestore enables checkpoint/restore support.
 	// When set to false, checkpoint/restore operations will be disabled.
-	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
+	// When unset, the platform default applies: enabled except on Windows.
+	EnableCheckpointRestore *bool `toml:"enable_checkpoint_restore" json:"enableCheckpointRestore"`
+
+	// EnableCRIU is the deprecated name for EnableCheckpointRestore.
+	// ValidateRuntimeConfig moves its value to EnableCheckpointRestore. The
+	// verbose CRI status still reports the effective value as enableCRIU.
+	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU,omitempty"`
+}
+
+// CheckpointRestoreEnabled reports whether checkpoint/restore is enabled.
+func (c *RuntimeConfig) CheckpointRestoreEnabled() bool {
+	if c.EnableCheckpointRestore != nil {
+		return *c.EnableCheckpointRestore
+	}
+	return defaultCheckpointRestoreEnabled
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -618,6 +632,15 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 // ValidateRuntimeConfig validates the given runtime configuration.
 func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
+	if c.EnableCRIU != nil {
+		if c.EnableCheckpointRestore != nil && *c.EnableCheckpointRestore != *c.EnableCRIU {
+			return warnings, errors.New("`enable_criu` and `enable_checkpoint_restore` are both set and disagree; remove the deprecated `enable_criu`")
+		}
+		warnings = append(warnings, deprecation.CRIEnableCRIU)
+		log.G(ctx).Warning("`enable_criu` is deprecated, please use `enable_checkpoint_restore` instead")
+		c.EnableCheckpointRestore = c.EnableCRIU
+		c.EnableCRIU = nil
+	}
 	if c.ContainerdConfig.Runtimes == nil {
 		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
 	}

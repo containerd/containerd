@@ -174,6 +174,40 @@ containerd 1.7, and improves with every release.
 
 - [Minimal in-memory Runtime v2 shim that also implements the Sandbox API](../core/runtime/v2/example/sandbox/)
 
+## Pod checkpoint and restore
+
+Checkpoint and restore are optional sandbox-controller capabilities. The CRI
+`CheckpointPod` and `RestorePod` RPCs own the CRI lifecycle sequence: they
+validate CRI resources, select the runtime's sandbox controller, create the
+restored sandbox and containers, and roll those resources back on failure.
+
+Implementation-specific work stays behind `CheckpointController`: the
+checkpoint format, how processes are stopped and captured, and how restored
+containers are prepared. The pause-container controller uses cgroup freezing,
+CRIU and recovery markers; a VM-based controller can implement the same
+capability without inheriting any of those assumptions. See
+[Pod checkpoint and restore](cri/pod-checkpoint-restore.md) for the
+pause-container implementation.
+
+The boundary is data-only. Sandbox and container configurations, selected
+container status, runtime options, paths, and restored container results are
+carried by `CheckpointOptions`, `RestoreOptions` and `RestoreResult`.
+Implementations do not need CRI stores or lifecycle callbacks.
+
+A successful restore can return a containerd task checkpoint image for each
+restored container. The controller owns these images until `Restore`
+succeeds. Ownership then transfers to CRI, which consumes each image when
+starting the container or deletes it if the restore is abandoned. A controller
+that restores through another mechanism leaves the task checkpoint image empty.
+
+The `enable_checkpoint_restore` setting applies to all controllers. Each
+controller checks its own runtime requirements.
+
+`CheckpointController` is a Go interface for in-process sandbox controllers.
+The sandbox-controller and sandbox-shim services do not forward it, so shim
+and remote controllers report `Unimplemented`. Existing controllers remain
+compatible without implementing it.
+
 ## Status
 
 The Sandbox API was first introduced in containerd 1.7 as an experimental API and was promoted to stable in 2.0.

@@ -137,6 +137,14 @@ func (r *RuntimeService) UpdatePodSandboxResources(podSandboxID string, overhead
 	return err
 }
 
+func (r *RuntimeService) CheckpointPod(request *runtimeapi.CheckpointPodRequest, _ ...grpc.CallOption) error {
+	return r.runtimeService.CheckpointPod(context.Background(), request)
+}
+
+func (r *RuntimeService) RestorePod(request *runtimeapi.RestorePodRequest, _ ...grpc.CallOption) (*runtimeapi.RestorePodResponse, error) {
+	return r.runtimeService.RestorePod(context.Background(), request)
+}
+
 func (r *RuntimeService) StopPodSandbox(podSandboxID string, _ ...grpc.CallOption) error {
 	return r.runtimeService.StopPodSandbox(context.Background(), podSandboxID)
 }

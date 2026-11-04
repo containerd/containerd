@@ -23,6 +23,7 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -58,6 +59,9 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		// we should try to recover from this state by removing entry for this container
 		// from the container store as well and return successfully.
 		log.G(ctx).WithError(err).Warn("get container info failed")
+		if err := c.removeContainerTaskCheckpoint(ctx, container); err != nil {
+			return nil, err
+		}
 		c.containerStore.Delete(ctrID)
 		c.containerNameIndex.ReleaseByKey(ctrID)
 		return &runtime.RemoveContainerResponse{}, nil
@@ -103,6 +107,12 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	// kubelet implementation, we'll never start a container once we decide to remove it,
 	// so we don't need the "Dead" state for now.
 
+	// Keep the container metadata until checkpoint image cleanup succeeds so a
+	// failed image deletion can be retried without losing its owner.
+	if err := c.removeContainerTaskCheckpoint(ctx, container); err != nil {
+		return nil, err
+	}
+
 	// Delete containerd container.
 	if err := container.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -141,6 +151,29 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	)
 
 	return &runtime.RemoveContainerResponse{}, nil
+}
+
+func (c *criService) removeContainerTaskCheckpoint(ctx context.Context, container containerstore.Container) error {
+	status := container.Status.Get()
+	image := status.TaskCheckpointImage
+	if image == "" {
+		return nil
+	}
+	if err := c.client.ImageService().Delete(ctx, image, images.SynchronousDelete()); err != nil && !errdefs.IsNotFound(err) {
+		return fmt.Errorf("failed to delete task checkpoint image %q for container %q: %w", image, container.ID, err)
+	}
+	// Keep the reference for an unstarted container until its metadata is removed.
+	// If removal fails, StartContainer must not create a task without restoring it.
+	if status.StartedAt == 0 && status.FinishedAt == 0 {
+		return nil
+	}
+	if err := container.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+		status.TaskCheckpointImage = ""
+		return status, nil
+	}); err != nil {
+		return fmt.Errorf("failed to clear task checkpoint image for container %q: %w", container.ID, err)
+	}
+	return nil
 }
 
 // setContainerRemoving sets the container into removing state. In removing state, the
