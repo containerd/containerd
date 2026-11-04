@@ -100,9 +100,11 @@ func command(ctx context.Context, config *commandConfig) (*exec.Cmd, error) {
 
 	cmd := exec.CommandContext(ctx, config.RuntimePath, args...)
 	cmd.Dir = config.WorkDir
+	// GOMAXPROCS is deliberately not set here, so that a value set in
+	// containerd's environment or in the shim manager's env reaches the shim.
+	// Shims built on pkg/shim default to GOMAXPROCS=2 when it is unset.
 	cmd.Env = append(
 		os.Environ(),
-		"GOMAXPROCS=2",
 		maxVersionEnv+"=2",
 		// TODO: Remove in a future release in favor of Bootstrap protocol.
 		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
