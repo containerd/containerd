@@ -1076,6 +1076,23 @@ func WithCapabilities(caps []string) SpecOpts {
 	}
 }
 
+// WithCapabilityProfile sets Linux capabilities on the process from a named
+// capability profile (e.g. [CapabilityProfileDefault] or
+// [CapabilityProfileReduced]). An empty profile name is treated as
+// [CapabilityProfileDefault].
+func WithCapabilityProfile(profile string) SpecOpts {
+	if profile == "" {
+		profile = CapabilityProfileDefault
+	}
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		caps, ok := capabilityProfiles[profile]
+		if !ok {
+			return fmt.Errorf("unknown capability profile %q, must be %q or %q", profile, CapabilityProfileDefault, CapabilityProfileReduced)
+		}
+		return WithCapabilities(caps())(ctx, client, c, s)
+	}
+}
+
 func capsContain(caps []string, s string) bool {
 	return slices.Contains(caps, s)
 }
