@@ -22,6 +22,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/archive/tartest"
 	"github.com/containerd/continuity/tarconv"
+	"github.com/containerd/errdefs"
 	goerofs "github.com/erofs/go-erofs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -377,6 +379,62 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 	// Verify opaque: old.txt was in layer 1's opaquedir but hidden by opaque marker in layer 2
 	if _, err := v.Open("opaquedir/old.txt"); err == nil {
 		t.Error("opaquedir/old.txt should not exist (opaque directory)")
+	}
+}
+
+// TestFSMountsOverlayUnsupportedOptions checks that unsupported options return
+// ErrNotImplemented and supported options still allow file reads.
+func TestFSMountsOverlayUnsupportedOptions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("lowerdir ':' separator collides with Windows drive letters")
+	}
+	lower1, lower2, data := t.TempDir(), t.TempDir(), t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(lower2, "file"), []byte("content"), 0o644))
+	lowerdir := "lowerdir=" + lower1 + ":" + lower2
+
+	type testCase struct {
+		name        string
+		options     []string
+		unsupported bool
+	}
+	tests := []testCase{
+		{"plain", []string{lowerdir}, false},
+		{"uidmap ranges", []string{lowerdir, "uidmap=0:1000:1,1:2000:1"}, false},
+		{"gidmap ranges", []string{lowerdir, "gidmap=0:1000:1,1:2000:1"}, false},
+		{"features off", []string{lowerdir, "metacopy=off", "verity=off", "redirect_dir=nofollow"}, false},
+		{"data-only lower", []string{lowerdir + "::" + data}, true},
+		{"datadir", []string{lowerdir, "datadir+=" + data}, true},
+		{"appended lower", []string{"lowerdir+=" + lower1, "lowerdir+=" + lower2}, true},
+		{"metacopy", []string{lowerdir, "metacopy=on"}, true},
+		{"verity", []string{lowerdir, "verity=on"}, true},
+		{"redirect_dir on", []string{lowerdir, "redirect_dir=on"}, true},
+		{"redirect_dir off", []string{lowerdir, "redirect_dir=off"}, true},
+	}
+	if runtime.GOOS == "linux" {
+		// Commas and backslash escapes are Linux kernel mount-option syntax.
+		tests = append(tests,
+			testCase{"metacopy comma-joined", []string{lowerdir, "index=off,metacopy=on"}, true},
+			testCase{"lowerdir index", []string{lowerdir + ",index=off"}, true},
+			testCase{"lowerdir escaped comma", []string{lowerdir + "\\,x"}, true},
+			testCase{"lowerdir escaped colon", []string{lowerdir + "\\:x"}, true},
+		)
+	}
+	for _, tc := range tests {
+		for _, typ := range []string{"overlay", "format/overlay"} {
+			t.Run(tc.name+"/"+typ, func(t *testing.T) {
+				v, err := fsview.FSMounts([]mount.Mount{{Type: typ, Source: "overlay", Options: tc.options}})
+				if tc.unsupported {
+					assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
+					assert.Nil(t, v)
+					return
+				}
+				require.NoError(t, err)
+				defer v.Close()
+				data, err := fs.ReadFile(v, "file")
+				require.NoError(t, err)
+				assert.Equal(t, "content", string(data))
+			})
+		}
 	}
 }
 
