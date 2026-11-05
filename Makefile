@@ -272,6 +272,14 @@ bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and om
 	@echo "$(WHALE) $@"
 	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
 
+bin/containerd-shim-sandboxed-runc-v2: cmd/containerd-shim-sandboxed-runc-v2 FORCE # experimental pause-less sandbox shim, static like containerd-shim-runc-v2
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-sandboxed-runc-v2
+
+bin/containerd-sandbox-init: cmd/containerd-sandbox-init FORCE # PID 1 of a shared pod PID namespace for the sandboxed shim, static like the shims
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-sandbox-init
+
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
 

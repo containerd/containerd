@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -102,10 +104,22 @@ type controllerLocal struct {
 var _ sandbox.Controller = (*controllerLocal)(nil)
 
 func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc runtimeAPI.TTRPCSandboxService) {
-	// Let the shim exit, then we can clean up the bundle after.
-	if _, sErr := svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{
+	// The caller's context may be the reason Create or Start failed, canceled
+	// or past its deadline; the cleanup must still run, so it keeps the values
+	// of that context (namespace, logger) but not its cancellation, and each
+	// step gets its own deadline instead.
+	ctx = context.WithoutCancel(ctx)
+
+	// Let the shim exit, then we can clean up the bundle after. The deadline
+	// leaves room for the shim to stop what it runs for the sandbox, which
+	// takes its own bounded wait. A closed connection means the shim exited
+	// before answering, as for Shutdown.
+	sctx, scancel := context.WithTimeout(ctx, 30*time.Second)
+	_, sErr := svc.ShutdownSandbox(sctx, &runtimeAPI.ShutdownSandboxRequest{
 		SandboxID: sandboxID,
-	}); sErr != nil {
+	})
+	scancel()
+	if sErr != nil && !errors.Is(sErr, ttrpc.ErrClosed) {
 		log.G(ctx).WithError(sErr).WithField("sandboxID", sandboxID).
 			Error("failed to shutdown sandbox")
 	}
@@ -124,7 +138,9 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 	var coptions sandbox.CreateOptions
 	sandboxID := info.ID
 	for _, opt := range opts {
-		opt(&coptions)
+		if err := opt(&coptions); err != nil {
+			return err
+		}
 	}
 
 	if _, err := c.shims.Get(ctx, sandboxID); err == nil {
@@ -141,10 +157,16 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		}
 	}()
 
+	// The shim manager accepts an absolute binary path in place of a
+	// runtime name.
+	runtimeName := info.Runtime.Name
+	if coptions.RuntimePath != "" {
+		runtimeName = coptions.RuntimePath
+	}
 	shim, err := c.shims.Start(ctx, sandboxID, bundle, runtime.CreateOpts{
 		Spec:           info.Spec,
 		RuntimeOptions: info.Runtime.Options,
-		Runtime:        info.Runtime.Name,
+		Runtime:        runtimeName,
 		TaskOptions:    nil,
 	})
 	if err != nil {
@@ -252,8 +274,11 @@ func (c *controllerLocal) Shutdown(ctx context.Context, sandboxID string) error 
 		return err
 	}
 
+	// A shim may exit as soon as it has shut its sandbox down, before the
+	// response is read; a closed connection means the shutdown happened, as
+	// for the task Shutdown RPC.
 	_, err = svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{SandboxID: sandboxID})
-	if err != nil {
+	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
 		return fmt.Errorf("failed to shutdown sandbox: %w", errgrpc.ToNative(err))
 	}
 
@@ -331,7 +356,7 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 	req := &runtimeAPI.SandboxMetricsRequest{SandboxID: sandboxID}
 	resp, err := sb.SandboxMetrics(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, errgrpc.ToNative(err)
 	}
 	return resp.Metrics, nil
 }
