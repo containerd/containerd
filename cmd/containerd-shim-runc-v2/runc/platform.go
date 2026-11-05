@@ -83,15 +83,14 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		if err != nil {
 			return nil, err
 		}
-		cc.stdin = in
+		cc.stdinReader = in
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
 			bp := bufPool.Get().(*[]byte)
 			defer bufPool.Put(bp)
 			io.CopyBuffer(epollConsole, in, *bp)
-			// stdin closed or broken: release the console
-			cc.Close()
+			cc.closeStdin()
 		}()
 	}
 
@@ -219,40 +218,49 @@ func (p *linuxPlatform) ShutdownConsole(ctx context.Context, cons console.Consol
 // console, and removing it again would hit that one.
 //
 // Close runs shutdown, closes the master, and closes the stdin FIFO reader,
-// once. Closing the reader is what stops the stdin copier, which is blocked
-// reading it. The copier, CopyConsole's error path, ShutdownConsole and
-// delete all release through these two.
+// once. Its closeStdin, shutdown, and Close methods are idempotent and safe
+// for concurrent calls. The stdin copier, CopyConsole's error path,
+// ShutdownConsole and delete all release through these methods.
 type closingConsole struct {
 	*console.EpollConsole
 	epoller      *console.Epoller
-	stdin        io.Closer
+	stdinReader  io.Closer
+	stdinOnce    sync.Once
+	stdinErr     error
 	shutdownOnce sync.Once
 	shutdownErr  error
 	closeOnce    sync.Once
 	closeErr     error
 }
 
-func (t *closingConsole) shutdown() error {
-	t.shutdownOnce.Do(func() {
-		t.shutdownErr = t.Shutdown(t.epoller.CloseConsole)
-	})
-	return t.shutdownErr
-}
-
-func (t *closingConsole) Close() error {
-	t.closeOnce.Do(func() {
-		t.shutdown()
-		t.closeErr = t.EpollConsole.Close()
-		// a writer parked on the master before it closed retries on this
-		// wake and sees the closed file instead of another hangup
-		t.Shutdown(func(int) error { return nil })
-		if t.stdin != nil {
-			if err := t.stdin.Close(); err != nil && t.closeErr == nil {
-				t.closeErr = err
-			}
+func (c *closingConsole) closeStdin() error {
+	c.stdinOnce.Do(func() {
+		if c.stdinReader != nil {
+			c.stdinErr = c.stdinReader.Close()
 		}
 	})
-	return t.closeErr
+	return c.stdinErr
+}
+
+func (c *closingConsole) shutdown() error {
+	c.shutdownOnce.Do(func() {
+		c.shutdownErr = c.Shutdown(c.epoller.CloseConsole)
+	})
+	return c.shutdownErr
+}
+
+func (c *closingConsole) Close() error {
+	c.closeOnce.Do(func() {
+		c.shutdown()
+		c.closeErr = c.EpollConsole.Close()
+		// a writer parked on the master before it closed retries on this
+		// wake and sees the closed file instead of another hangup
+		c.Shutdown(func(int) error { return nil })
+		if err := c.closeStdin(); err != nil && c.closeErr == nil {
+			c.closeErr = err
+		}
+	})
+	return c.closeErr
 }
 
 func (p *linuxPlatform) Close() error {
