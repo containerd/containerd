@@ -30,6 +30,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -147,6 +148,8 @@ type Bundle struct {
 var (
 	// leftoverBundles holds the paths of bundles whose Delete failed.
 	leftoverBundles sync.Map
+	// bundleLocks serializes create and delete of the same bundle path.
+	bundleLocks = kmutex.New()
 )
 
 // mkdirBundle creates the bundle directory. An existing one is replaced only
@@ -154,8 +157,11 @@ var (
 // being created, so a second create for the same ID fails with "file exists"
 // and leaves it alone.
 func mkdirBundle(ctx context.Context, path string) error {
-	// Claiming the marker lets only one create replace the leftover, without
-	// a lock held across the unmount. Others fail with "file exists".
+	if err := bundleLocks.Lock(ctx, path); err != nil {
+		return err
+	}
+	defer bundleLocks.Unlock(path)
+	// Only one create claims the marker. Others fail with "file exists".
 	_, leftover := leftoverBundles.LoadAndDelete(path)
 	if err := mkdirReplace(ctx, path, 0700, leftover); err != nil {
 		if leftover && !os.IsExist(err) {
@@ -168,6 +174,10 @@ func mkdirBundle(ctx context.Context, path string) error {
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
+	// Held through the marker update, so a create never sees it stale.
+	// Cannot fail without a cancelable context.
+	bundleLocks.Lock(context.Background(), b.Path)
+	defer bundleLocks.Unlock(b.Path)
 	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
 	err := cleanRootfs(rootfs)

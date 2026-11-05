@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
@@ -141,6 +142,35 @@ func TestNewBundleConcurrentLeftover(t *testing.T) {
 	assert.EqualValues(t, 1, created.Load())
 	_, err = os.Stat(filepath.Join(b.Path, "work"))
 	assert.NoError(t, err, "work link of the new bundle must be kept")
+}
+
+// TestBundleLocksSamePath verifies that create and delete of one bundle path
+// wait for each other, so a Delete cannot publish a stale leftover marker after
+// a create. Other paths must not wait.
+func TestBundleLocksSamePath(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+
+	b, err := NewBundle(ctx, root, state, "locked", nil)
+	require.NoError(t, err)
+	require.NoError(t, bundleLocks.Lock(ctx, b.Path))
+
+	_, err = NewBundle(ctx, root, state, "other", nil)
+	assert.NoError(t, err, "other paths must not wait")
+
+	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	_, err = NewBundle(short, root, state, "locked", nil)
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "create must wait for the lock")
+
+	done := make(chan error, 1)
+	go func() { done <- b.Delete() }()
+	select {
+	case err := <-done:
+		t.Fatalf("Delete must wait for the lock, got %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	bundleLocks.Unlock(b.Path)
+	require.NoError(t, <-done)
 }
 
 // TestBundleDeleteWithStaleAtomicPath verifies that a removal left behind by an
