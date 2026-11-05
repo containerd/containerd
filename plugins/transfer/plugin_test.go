@@ -19,6 +19,7 @@ package transfer
 import (
 	"errors"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/diff"
@@ -27,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/local"
 	"github.com/containerd/containerd/v2/plugins"
 	contentlocal "github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -38,9 +40,11 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 		name                  string
 		candidates            []*plugin.Registration
 		config                transferConfig
+		diffServiceSyncFs     *bool
 		expectedErr           error
 		expectedUnpackConfigs int
 		expectedApplier       bool
+		expectApplySyncFs     bool
 	}{
 		{
 			name: "optional explicit differ skip",
@@ -104,11 +108,47 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 			expectedUnpackConfigs: 1,
 			expectedApplier:       true,
 		},
+		{
+			name: "diff service sync_fs enabled propagates to unpack platforms",
+			candidates: []*plugin.Registration{
+				newTestDiffPlugin("walking", testApplier{}, nil, platforms.DefaultSpec()),
+			},
+			config: transferConfig{
+				UnpackConfiguration: []unpackConfiguration{
+					{
+						Platform:    platforms.Format(platforms.DefaultSpec()),
+						Snapshotter: "native",
+					},
+				},
+			},
+			diffServiceSyncFs:     boolPtr(true),
+			expectedUnpackConfigs: 1,
+			expectedApplier:       true,
+			expectApplySyncFs:     true,
+		},
+		{
+			name: "diff service sync_fs disabled leaves unpack platforms default",
+			candidates: []*plugin.Registration{
+				newTestDiffPlugin("walking", testApplier{}, nil, platforms.DefaultSpec()),
+			},
+			config: transferConfig{
+				UnpackConfiguration: []unpackConfiguration{
+					{
+						Platform:    platforms.Format(platforms.DefaultSpec()),
+						Snapshotter: "native",
+					},
+				},
+			},
+			diffServiceSyncFs:     boolPtr(false),
+			expectedUnpackConfigs: 1,
+			expectedApplier:       true,
+			expectApplySyncFs:     false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ms, ic := newTestInitContext(t, map[string]snapshots.Snapshotter{"native": &testSnapshotter{}}, tt.candidates)
+			ms, ic := newTestInitContext(t, map[string]snapshots.Snapshotter{"native": &testSnapshotter{}}, tt.candidates, tt.diffServiceSyncFs)
 			lc := &local.TransferConfig{}
 
 			err := configureUnpackPlatforms(ic, ms, &tt.config, lc)
@@ -123,11 +163,22 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 					t.Fatalf("expected test applier, got %T", lc.UnpackPlatforms[0].Applier)
 				}
 			}
+			if tt.expectedUnpackConfigs > 0 {
+				var ac diff.ApplyConfig
+				for _, opt := range lc.UnpackPlatforms[0].ApplyOpts {
+					if err := opt(t.Context(), ocispec.Descriptor{}, &ac); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if ac.SyncFs != tt.expectApplySyncFs {
+					t.Fatalf("expected unpack ApplyConfig.SyncFs=%v, got %v", tt.expectApplySyncFs, ac.SyncFs)
+				}
+			}
 		})
 	}
 }
 
-func newTestInitContext(t *testing.T, snapshotters map[string]snapshots.Snapshotter, candidates []*plugin.Registration) (*metadata.DB, *plugin.InitContext) {
+func newTestInitContext(t *testing.T, snapshotters map[string]snapshots.Snapshotter, candidates []*plugin.Registration, diffServiceSyncFs *bool) (*metadata.DB, *plugin.InitContext) {
 	t.Helper()
 
 	cs, err := contentlocal.NewStore(t.TempDir())
@@ -166,8 +217,26 @@ func newTestInitContext(t *testing.T, snapshotters map[string]snapshots.Snapshot
 			t.Fatal(err)
 		}
 	}
+	if diffServiceSyncFs != nil {
+		ic := plugin.NewContext(t.Context(), ps, nil)
+		p := (&plugin.Registration{
+			Type: plugins.ServicePlugin,
+			ID:   services.DiffService,
+			InitFn: func(ic *plugin.InitContext) (any, error) {
+				ic.Meta.Exports[plugins.DiffServiceSyncFs] = strconv.FormatBool(*diffServiceSyncFs)
+				return struct{}{}, nil
+			},
+		}).Init(ic)
+		if err := ps.Add(p); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	return db, plugin.NewContext(t.Context(), ps, nil)
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
 
 func newTestDiffPlugin(id string, applier diff.Applier, err error, supported ...ocispec.Platform) *plugin.Registration {

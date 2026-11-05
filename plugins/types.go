@@ -109,5 +109,9 @@ const (
 )
 
 const (
+	// SnapshotterRootDir is the plugin export key for the snapshotter root directory.
 	SnapshotterRootDir = "root"
+	// DiffServiceSyncFs is the plugin export key for the diff service's effective
+	// sync_fs setting, so other plugins (e.g. the transfer service) can honor it.
+	DiffServiceSyncFs = "sync_fs"
 )

@@ -39,7 +39,7 @@ func TestConfigureUnpackPlatformsDefaultConfigSkipsUnavailableErofsDiffer(t *tes
 	}, []*plugin.Registration{
 		newTestDiffPlugin(defaults.DefaultDiffer, testApplier{}, nil, defaultSpec),
 		newTestDiffPlugin("erofs", nil, plugin.ErrSkipPlugin, erofsSpec),
-	})
+	}, nil)
 	lc := &local.TransferConfig{}
 
 	err := configureUnpackPlatforms(ic, ms, defaultConfig(), lc)
