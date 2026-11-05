@@ -17,6 +17,15 @@ type Entry struct {
 	Chunks       []Chunk   // physical block refs (metadata-only mode)
 	Contiguous   bool      // data blocks are contiguous; flat-plain is sufficient
 	MetadataOnly bool      // chunk-based layout even without chunks
+
+	// Dev and Ino identify the source inode (e.g. syscall.Stat_t.Dev/Ino, or
+	// the NID within a source EROFS image). When Nlink > 1, the writer uses
+	// (Dev, Ino) to detect additional names that refer to the same source
+	// file and share a single fsInode for them, mirroring an explicit Link()
+	// call. Ino == 0 means "unknown"; such entries never participate in hard
+	// link detection. Inode numbers are only unique per device, so Dev must
+	// be included in the comparison.
+	Dev, Ino uint64
 }
 
 // NullPhysicalBlock is the sentinel value for Chunk.PhysicalBlock that marks

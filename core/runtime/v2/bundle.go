@@ -99,8 +99,8 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		return nil, err
 	}
 	paths = append(paths, work)
-	// symlink workdir
-	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
+	// create work link (symlink on unix, junction on windows)
+	if err := createWorkLink(work, b.Path); err != nil {
 		return nil, err
 	}
 	// Spec may be nil for some sandboxers that do not initialize the spec, for
@@ -172,7 +172,7 @@ func (b *Bundle) Delete() error {
 	// Cannot fail without a cancelable context.
 	bundleLocks.Lock(context.Background(), b.Path)
 	defer bundleLocks.Unlock(b.Path)
-	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
+	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
 	err := cleanRootfs(rootfs)
 	if err == nil {
