@@ -149,9 +149,21 @@ func (s *Service) CreateSandbox(ctx context.Context, r *api.CreateSandboxRequest
 		}
 	}()
 
-	pins, err := setupNamespaces(bundle, cfg)
+	// If anything below fails, the container process of a shared-PID pod is
+	// stopped before the deferred Cleanup. The failure may be the
+	// cancellation of ctx itself.
+	pins, p, err := setupNamespaces(ctx, bundle, cfg)
 	if err != nil {
 		return nil, errgrpc.ToGRPCf(err, "failed to set up the pod namespaces")
+	}
+	if p != nil {
+		defer func() {
+			if retErr != nil {
+				if _, err := p.stop(context.WithoutCancel(ctx)); err != nil {
+					log.G(ctx).WithError(err).WithField("id", cfg.ID).Warnf("failed to stop %s after a failed sandbox creation", InitBinary)
+				}
+			}
+		}()
 	}
 	// TODO: SELinux. The shim allocates no pod process label and CRI does not
 	// allocate one for a Sandbox API shim yet, so on an enforcing host the
@@ -165,26 +177,7 @@ func (s *Service) CreateSandbox(ctx context.Context, r *api.CreateSandboxRequest
 	if err != nil {
 		return nil, errgrpc.ToGRPCf(err, "failed to set up the pod files")
 	}
-	var (
-		initP *initProcess
-		pidNS string
-	)
-	if cfg.SharedPID {
-		// Created last, once the pins it joins exist; if anything below
-		// fails it is stopped before the deferred Cleanup runs.
-		if initP, err = createInit(ctx, bundle, cfg, pins); err != nil {
-			return nil, errgrpc.ToGRPCf(err, "failed to create the pod PID namespace")
-		}
-		defer func() {
-			if retErr != nil {
-				if _, err := initP.stop(ctx); err != nil {
-					log.G(ctx).WithError(err).WithField("id", cfg.ID).Warnf("failed to stop %s after a failed sandbox creation", InitBinary)
-				}
-			}
-		}()
-		pidNS = initP.pidNS
-	}
-	spec, err := typeurl.MarshalAnyToProto(buildSpec(cfg, pins, mounts, pidNS))
+	spec, err := typeurl.MarshalAnyToProto(sandboxSpec(cfg, pins, mounts))
 	if err != nil {
 		return nil, errgrpc.ToGRPCf(err, "failed to marshal the sandbox spec")
 	}
@@ -195,11 +188,11 @@ func (s *Service) CreateSandbox(ctx context.Context, r *api.CreateSandboxRequest
 		pins:      pins,
 		spec:      spec,
 		createdAt: time.Now(),
-		init:      initP,
+		init:      p,
 		done:      make(chan struct{}),
 	}
 	s.sandbox = inst
-	if initP != nil {
+	if p != nil {
 		// The watcher outlives this request: it keeps the namespace and
 		// log fields of the request without its cancellation.
 		go s.watchInit(context.WithoutCancel(ctx), inst)

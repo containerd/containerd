@@ -42,8 +42,8 @@ import (
 //	<bundle>/hosts          a copy of the host /etc/hosts
 //	<bundle>/resolv.conf    the pod DNS configuration
 //	<bundle>/shm            the pod /dev/shm tmpfs
-//	<bundle>/rootfs         the tmpfs rootfs of containerd-sandbox-init, with
-//	                        its config.json and init.pid beside (shared-PID pods)
+//	<bundle>/runc           the bundle of the setup runc container: its
+//	                        config.json, init.pid, runc log and empty rootfs
 
 // setupFiles creates the pod shared files and returns the mounts that expose
 // them to the containers of the pod; CRI picks the sources up from the
@@ -107,20 +107,22 @@ func copyFile(src, dst string) error {
 }
 
 // Cleanup removes everything the sandbox shim created under bundle: it
-// detaches the mounts at their fixed paths (the namespace pins, the shm tmpfs
-// and the init rootfs) and removes the pin and shared files. It is idempotent
-// and relies on no state, so it serves create failure, StopSandbox and "shim
-// delete" alike; a mount left behind would keep containerd from deleting the
-// bundle. The init container itself is deleted through runc by its owner
-// (initProcess.stop, or the runc task cleanup of "shim delete").
+// unmounts the mounts at their fixed paths (the namespace pins and the shm
+// tmpfs) and removes the pin, container and shared files. A mount that is
+// still in use fails the cleanup, and the caller retries it; a detached mount
+// would leak.
+// It is idempotent and does not rely on any state, so it serves create
+// failure, StopSandbox and "shim delete" alike; a mount left behind would
+// keep containerd from deleting the bundle. initProcess.stop, or the runc
+// task cleanup of "shim delete", deletes the setup runc container through
+// runc.
 func Cleanup(ctx context.Context, bundle string) error {
 	var errs []error
 	for _, p := range []string{
-		filepath.Join(bundle, pinDir, ipcPin),
-		filepath.Join(bundle, pinDir, utsPin),
-		filepath.Join(bundle, pinDir, pidPin),
+		filepath.Join(bundle, pinDir, string(specs.IPCNamespace)),
+		filepath.Join(bundle, pinDir, string(specs.UTSNamespace)),
+		filepath.Join(bundle, pinDir, string(specs.PIDNamespace)),
 		filepath.Join(bundle, sandboxfiles.ShmDir),
-		filepath.Join(bundle, initRootfs),
 	} {
 		// Only a mount point is unmounted: umount(2) on a plain file needs
 		// the same privilege as on a mount, and answers EPERM before EINVAL.
@@ -134,15 +136,15 @@ func Cleanup(ctx context.Context, bundle string) error {
 		if !mounted {
 			continue
 		}
-		if err := mount.UnmountAll(p, unix.MNT_DETACH); err != nil {
-			errs = append(errs, fmt.Errorf("failed to detach %s: %w", p, err))
+		if err := mount.UnmountAll(p, 0); err != nil {
+			errs = append(errs, fmt.Errorf("failed to unmount %s: %w", p, err))
 		}
 	}
 	if len(errs) > 0 {
 		// Nothing is removed while one of the mounts is still in place.
 		return errors.Join(errs...)
 	}
-	for _, name := range []string{pinDir, sandboxfiles.ShmDir, sandboxfiles.HostnameFile, sandboxfiles.HostsFile, sandboxfiles.ResolvConfFile} {
+	for _, name := range []string{pinDir, runcDir, sandboxfiles.ShmDir, sandboxfiles.HostnameFile, sandboxfiles.HostsFile, sandboxfiles.ResolvConfFile} {
 		if err := os.RemoveAll(filepath.Join(bundle, name)); err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove %s: %w", name, err))
 		}
