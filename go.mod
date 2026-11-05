@@ -7,7 +7,7 @@ require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/Microsoft/hcsshim v0.15.0
-	github.com/checkpoint-restore/checkpointctl v1.6.0
+	github.com/checkpoint-restore/checkpointctl v1.7.0
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.1.3
