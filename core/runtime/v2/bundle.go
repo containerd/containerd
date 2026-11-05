@@ -141,9 +141,6 @@ type Bundle struct {
 var (
 	// leftoverBundles holds the paths of bundles whose Delete failed.
 	leftoverBundles sync.Map
-	// mkdirBundleMu serializes the creation of bundle directories, so that
-	// concurrent creates cannot interleave with replacing a leftover.
-	mkdirBundleMu sync.Mutex
 )
 
 // mkdirBundle creates the bundle directory. An existing one is replaced only
@@ -151,14 +148,15 @@ var (
 // being created, so a second create for the same ID fails with "file exists"
 // and leaves it alone.
 func mkdirBundle(ctx context.Context, path string) error {
-	mkdirBundleMu.Lock()
-	defer mkdirBundleMu.Unlock()
-
-	_, leftover := leftoverBundles.Load(path)
+	// Claiming the marker lets only one create replace the leftover, without
+	// a lock held across the unmount. Others fail with "file exists".
+	_, leftover := leftoverBundles.LoadAndDelete(path)
 	if err := mkdirReplace(ctx, path, 0700, leftover); err != nil {
+		if leftover && !os.IsExist(err) {
+			leftoverBundles.Store(path, struct{}{})
+		}
 		return err
 	}
-	leftoverBundles.Delete(path)
 	return nil
 }
 
