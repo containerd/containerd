@@ -424,6 +424,52 @@ func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, r
 	assert.Nil(t, writer.Close())
 }
 
+// Abort removes an ingest directory while Close may still be writing the
+// timestamp file. That race used to fail integration cleanup with ENOTEMPTY.
+func TestAbortWhileWriterCloses(t *testing.T) {
+	ctx := context.Background()
+	cs, err := NewStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 100 {
+		ref := fmt.Sprintf("ref-%d", i)
+		w, err := cs.Writer(ctx, content.WithRef(ref))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte("payload")); err != nil {
+			t.Fatal(err)
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		errCh := make(chan error, 1)
+		go func() {
+			defer wg.Done()
+			// Close rewrites updatedat. Its error is ignored: Abort may
+			// already have removed the ingest directory.
+			_ = w.Close()
+		}()
+		go func() {
+			defer wg.Done()
+			if err := cs.Abort(ctx, ref); err != nil && !errdefs.IsNotFound(err) {
+				select {
+				case errCh <- err:
+				default:
+				}
+			}
+		}()
+		wg.Wait()
+		select {
+		case err := <-errCh:
+			t.Fatalf("iteration %d: abort: %v", i, err)
+		default:
+		}
+	}
+}
+
 func TestWriteReadEmptyFileTimestamp(t *testing.T) {
 	root := t.TempDir()
 
