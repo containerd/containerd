@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	// Load packages with type registrations
@@ -54,6 +55,7 @@ func init() {
 			plugins.DiffPlugin,
 			plugins.ImageVerifierPlugin,
 			plugins.SnapshotPlugin,
+			plugins.ServicePlugin, // for the diff service sync_fs setting
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (any, error) {
@@ -107,6 +109,10 @@ func configureUnpackPlatforms(ic *plugin.InitContext, ms *metadata.DB, config *t
 	if config.UnpackConfiguration == nil {
 		config.UnpackConfiguration = defaultUnpackConfig()
 	}
+	syncFs := false
+	if p := ic.Plugins().Get(plugins.ServicePlugin, services.DiffService); p != nil {
+		syncFs = p.Meta.Exports[plugins.DiffServiceSyncFs] == "true"
+	}
 	for _, uc := range config.UnpackConfiguration {
 		p, err := platforms.Parse(uc.Platform)
 		if err != nil {
@@ -158,6 +164,9 @@ func configureUnpackPlatforms(ic *plugin.InitContext, ms *metadata.DB, config *t
 			Applier:                 applier,
 			ConfigType:              uc.ConfigType,
 			LayerTypes:              uc.LayerTypes,
+		}
+		if syncFs {
+			up.ApplyOpts = append(up.ApplyOpts, diff.WithSyncFs(true))
 		}
 		lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 	}
