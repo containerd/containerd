@@ -518,7 +518,7 @@ func (p *Init) runtimeError(rErr error, msg string) error {
 		return nil
 	}
 
-	rMsg, err := getLastRuntimeError(p.runtime)
+	rMsg, err := LastRuntimeError(p.runtime)
 	switch {
 	case err != nil:
 		return fmt.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
