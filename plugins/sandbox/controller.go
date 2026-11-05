@@ -104,10 +104,22 @@ type controllerLocal struct {
 var _ sandbox.Controller = (*controllerLocal)(nil)
 
 func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc runtimeAPI.TTRPCSandboxService) {
-	// Let the shim exit, then we can clean up the bundle after.
-	if _, sErr := svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{
+	// The caller's context may be the reason Create or Start failed, canceled
+	// or past its deadline; the cleanup must still run, so it keeps the values
+	// of that context (namespace, logger) but not its cancellation, and each
+	// step gets its own deadline instead.
+	ctx = context.WithoutCancel(ctx)
+
+	// Let the shim exit, then we can clean up the bundle after. The deadline
+	// leaves room for the shim to stop what it runs for the sandbox, which
+	// takes its own bounded wait. A closed connection means the shim exited
+	// before answering, as for Shutdown.
+	sctx, scancel := context.WithTimeout(ctx, 30*time.Second)
+	_, sErr := svc.ShutdownSandbox(sctx, &runtimeAPI.ShutdownSandboxRequest{
 		SandboxID: sandboxID,
-	}); sErr != nil {
+	})
+	scancel()
+	if sErr != nil && !errors.Is(sErr, ttrpc.ErrClosed) {
 		log.G(ctx).WithError(sErr).WithField("sandboxID", sandboxID).
 			Error("failed to shutdown sandbox")
 	}
