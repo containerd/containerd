@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -116,6 +117,9 @@ func openBind(m mount.Mount) (View, error) {
 }
 
 func openOverlay(m mount.Mount) (View, error) {
+	if err := checkOverlayOptions(m.Options); err != nil {
+		return nil, err
+	}
 	layers, err := openOverlayPaths(m.Options)
 	if err != nil {
 		return nil, err
@@ -123,10 +127,45 @@ func openOverlay(m mount.Mount) (View, error) {
 	return newOverlayView(layers)
 }
 
+// checkOverlayOptions returns ErrNotImplemented for options the view cannot handle.
+func checkOverlayOptions(options []string) error {
+	for _, o := range options {
+		var unsupported bool
+		if runtime.GOOS == "linux" && strings.ContainsAny(o, ",\\") && !strings.HasPrefix(o, "uidmap=") && !strings.HasPrefix(o, "gidmap=") {
+			// The view does not parse comma-joined options or backslash escapes,
+			// which are the Linux kernel's mount-option syntax.
+			// uidmap/gidmap entries are ignored; their commas separate ID ranges.
+			unsupported = true
+		} else if val, ok := strings.CutPrefix(o, "lowerdir="); ok {
+			// Data-only lower layers require metacopy support.
+			unsupported = strings.Contains(val, "::")
+		} else if strings.HasPrefix(o, "lowerdir+=") || strings.HasPrefix(o, "datadir+=") {
+			// The view does not parse appended layers.
+			unsupported = true
+		} else if val, ok := strings.CutPrefix(o, "metacopy="); ok {
+			// The view reads file data directly from each layer.
+			unsupported = val != "off"
+		} else if val, ok := strings.CutPrefix(o, "verity="); ok {
+			// Verity enables metacopy.
+			unsupported = val != "off"
+		} else if val, ok := strings.CutPrefix(o, "redirect_dir="); ok {
+			// Even "off" follows existing redirects by default.
+			unsupported = val != "nofollow"
+		}
+		if unsupported {
+			return fmt.Errorf("overlay option %q cannot be directly viewed: %w", o, errdefs.ErrNotImplemented)
+		}
+	}
+	return nil
+}
+
 func openFormatMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 	types := strings.Split(m.Type, "/")
 	if len(types) < 2 || types[0] != "format" || types[len(types)-1] != "overlay" {
 		return nil, errdefs.ErrNotImplemented
+	}
+	if err := checkOverlayOptions(m.Options); err != nil {
+		return nil, err
 	}
 
 	var layers []View
