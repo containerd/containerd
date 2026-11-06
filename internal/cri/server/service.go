@@ -184,6 +184,12 @@ type criService struct {
 
 	checkCriuOnce sync.Once //nolint:nolintlint,unused // Ignore on non-Linux
 	checkCriuErr  error     //nolint:nolintlint,unused // Ignore on non-Linux
+
+	// nsdelegateContainersMu prevents a container that requires nsdelegate
+	// from being added while a checkpoint runs, because CRIU can clear
+	// nsdelegate from /sys/fs/cgroup.
+	// See https://github.com/checkpoint-restore/criu/issues/3029.
+	nsdelegateContainersMu sync.RWMutex
 }
 
 type CRIServiceOptions struct {

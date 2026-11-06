@@ -451,9 +451,8 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	// Add container into container store.
-	if err := c.containerStore.Add(container); err != nil {
-		return "", fmt.Errorf("failed to add container %q into store: %w", r.containerID, err)
+	if err := c.addContainer(container); err != nil {
+		return "", err
 	}
 
 	c.generateAndSendContainerEvent(r.ctx, r.containerID, r.sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
@@ -795,6 +794,11 @@ func (c *criService) buildLinuxSpec(
 	bindMountHostSys := hostNetwork && usernsEnabled
 
 	mode := securityContext.GetCgroupMountMode()
+	if requiresNsdelegate(config) {
+		if err := c.checkWritableCgroupsSupported(); err != nil {
+			return nil, err
+		}
+	}
 	var cgroupWritable bool
 	switch mode {
 	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED:
@@ -805,9 +809,6 @@ func (c *criService) buildLinuxSpec(
 		}
 		cgroupWritable = false
 	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE:
-		if err := c.checkWritableCgroupsSupported(); err != nil {
-			return nil, err
-		}
 		if bindMountHostSys {
 			return nil, errors.New("writable cgroups are not supported for host-network containers in a user namespace")
 		}
@@ -994,6 +995,31 @@ func (c *criService) checkWritableCgroupsSupported() error {
 	// resource-control files of the namespace root (like memory.max).
 	if !slices.Contains(strings.Split(mountInfo.VFSOptions, ","), "nsdelegate") {
 		return errors.New("writable cgroups require /sys/fs/cgroup to be mounted with nsdelegate")
+	}
+	return nil
+}
+
+// requiresNsdelegate reports whether the container needs /sys/fs/cgroup to
+// stay mounted with nsdelegate while it runs. Only CGROUP_MOUNT_MODE_READ_WRITE
+// does. A writable mount from the runtime handler's cgroup_writable option
+// does not need nsdelegate.
+func requiresNsdelegate(config *runtime.ContainerConfig) bool {
+	return config.GetLinux().GetSecurityContext().GetCgroupMountMode() == runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE
+}
+
+// addContainer adds the container to the store. For a container that requires
+// nsdelegate, it rechecks nsdelegate under nsdelegateContainersMu first,
+// because a checkpoint may have cleared it since the check in buildLinuxSpec.
+func (c *criService) addContainer(container containerstore.Container) error {
+	if requiresNsdelegate(container.Config) {
+		c.nsdelegateContainersMu.Lock()
+		defer c.nsdelegateContainersMu.Unlock()
+		if err := c.checkWritableCgroupsSupported(); err != nil {
+			return err
+		}
+	}
+	if err := c.containerStore.Add(container); err != nil {
+		return fmt.Errorf("failed to add container %q into store: %w", container.ID, err)
 	}
 	return nil
 }
