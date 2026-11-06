@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -163,8 +165,20 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "failed to close client", err)
 	}
 
+	restoreCgroup2Options := func() error { return nil }
+	if supportsCriu {
+		restoreCgroup2Options = preserveCgroup2MountOptions()
+	}
+
 	// run the test
 	status := m.Run()
+
+	if err := restoreCgroup2Options(); err != nil {
+		fmt.Fprintln(os.Stderr, "failed to restore the /sys/fs/cgroup mount options:", err)
+		if status == 0 {
+			status = 1
+		}
+	}
 
 	if !noDaemon {
 		// tear down the daemon and resources created
@@ -190,6 +204,22 @@ func TestMain(m *testing.M) {
 		}
 	}
 	os.Exit(status)
+}
+
+// preserveCgroup2MountOptions records the cgroup2 options of /sys/fs/cgroup
+// (like nsdelegate) and returns a function that restores them. Each cgroup2
+// mount on the host sets these options for the whole hierarchy. CRIU mounts
+// cgroup2 without nsdelegate and memory_recursiveprot, which removes them from
+// /sys/fs/cgroup. See https://github.com/checkpoint-restore/criu/issues/3029.
+func preserveCgroup2MountOptions() func() error {
+	info, err := mount.Lookup("/sys/fs/cgroup")
+	if err != nil || info.FSType != "cgroup2" {
+		return func() error { return nil }
+	}
+	mounts := []mount.Mount{{Type: "cgroup2", Source: "cgroup2", Options: strings.Split(info.VFSOptions, ",")}}
+	return func() error {
+		return mount.WithTempMount(context.Background(), mounts, func(string) error { return nil })
+	}
 }
 
 func newClient(t testing.TB, address string, opts ...Opt) (*Client, error) {
