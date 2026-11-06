@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -64,11 +65,18 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		Path:      filepath.Join(state, ns, id),
 		Namespace: ns,
 	}
-	var paths []string
+	var (
+		paths []string
+		path  = b.Path
+		gen   uint64
+	)
 	defer func() {
 		if err != nil {
 			for _, d := range paths {
 				os.RemoveAll(d)
+			}
+			if gen != 0 {
+				bundleOwners.CompareAndDelete(path, bundleOwner{gen: gen})
 			}
 		}
 	}()
@@ -76,9 +84,10 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
 		return nil, err
 	}
-	if err := mkdirBundle(ctx, b.Path); err != nil {
+	if gen, err = mkdirBundle(ctx, b.Path); err != nil {
 		return nil, err
 	}
+	b.gen = gen
 	if typeurl.Is(spec, &specs.Spec{}) {
 		if err := prepareBundleDirectoryPermissions(b.Path, spec.GetValue()); err != nil {
 			return nil, err
@@ -137,41 +146,57 @@ type Bundle struct {
 	Path string
 	// Namespace of the bundle
 	Namespace string
+
+	// gen identifies the create of this bundle. It is zero for a loaded one.
+	gen uint64
+}
+
+// bundleOwner is the latest create of a bundle path in this process.
+type bundleOwner struct {
+	gen uint64
+	// leftover is set if the Delete of that bundle failed.
+	leftover bool
 }
 
 var (
-	// leftoverBundles holds the paths of bundles whose Delete failed.
-	leftoverBundles sync.Map
+	// bundleOwners holds a bundleOwner for each bundle path that is live or
+	// whose Delete failed.
+	bundleOwners sync.Map
+	// bundleGen generates the gen of new bundles.
+	bundleGen atomic.Uint64
 	// bundleLocks serializes create and delete of the same bundle path.
 	bundleLocks = kmutex.New()
 )
 
-// mkdirBundle creates the bundle directory. An existing one is replaced only
-// if its own Delete failed. Any other belongs to a task that is live or still
-// being created, so a second create for the same ID fails with "file exists"
-// and leaves it alone.
-func mkdirBundle(ctx context.Context, path string) error {
+// mkdirBundle creates the bundle directory and returns the gen of the new
+// bundle. An existing directory is replaced only if its own Delete failed. Any
+// other belongs to a task that is live or still being created, so a second
+// create for the same ID fails with "file exists" and leaves it alone.
+func mkdirBundle(ctx context.Context, path string) (uint64, error) {
 	if err := bundleLocks.Lock(ctx, path); err != nil {
-		return err
+		return 0, err
 	}
 	defer bundleLocks.Unlock(path)
-	// Only one create claims the marker. Others fail with "file exists".
-	_, leftover := leftoverBundles.LoadAndDelete(path)
-	if err := mkdirReplace(ctx, path, 0700, leftover); err != nil {
-		if leftover && !os.IsExist(err) {
-			leftoverBundles.Store(path, struct{}{})
-		}
-		return err
+	o, _ := bundleOwners.Load(path)
+	if err := mkdirReplace(ctx, path, 0700, o != nil && o.(bundleOwner).leftover); err != nil {
+		return 0, err
 	}
-	return nil
+	gen := bundleGen.Add(1)
+	bundleOwners.Store(path, bundleOwner{gen: gen})
+	return gen, nil
 }
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
-	// Held through the marker update, so a create never sees it stale.
+	// Held through the owner update, so a create never sees it stale.
 	// Cannot fail without a cancelable context.
 	bundleLocks.Lock(context.Background(), b.Path)
 	defer bundleLocks.Unlock(b.Path)
+	if o, ok := bundleOwners.Load(b.Path); ok && o.(bundleOwner).gen != b.gen {
+		// A newer create replaced this bundle, so the path is not ours.
+		log.L.WithField("bundle", b.Path).Warn("not deleting bundle replaced by a newer create")
+		return nil
+	}
 	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
 	err := cleanRootfs(rootfs)
@@ -179,9 +204,9 @@ func (b *Bundle) Delete() error {
 		err = b.removeDirs(work, werr)
 	}
 	if err != nil {
-		leftoverBundles.Store(b.Path, struct{}{})
+		bundleOwners.Store(b.Path, bundleOwner{gen: b.gen, leftover: true})
 	} else {
-		leftoverBundles.Delete(b.Path)
+		bundleOwners.Delete(b.Path)
 	}
 	return err
 }

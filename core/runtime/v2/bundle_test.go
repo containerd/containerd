@@ -143,6 +143,51 @@ func TestNewBundleConcurrentLeftover(t *testing.T) {
 	assert.NoError(t, err, "work link of the new bundle must be kept")
 }
 
+// TestStaleBundleDeleteKeepsReplacement verifies that a Delete from the owner of
+// a bundle that was replaced after its failed Delete leaves the replacement
+// alone, as a cleanup that runs twice can do during a failed create.
+func TestStaleBundleDeleteKeepsReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		old  func(ctx context.Context, t *testing.T, root, state, id string) *Bundle
+	}{
+		{"created", func(ctx context.Context, t *testing.T, root, state, id string) *Bundle {
+			b, err := NewBundle(ctx, root, state, id, nil)
+			require.NoError(t, err)
+			return b
+		}},
+		{"loaded", func(ctx context.Context, t *testing.T, root, state, id string) *Bundle {
+			require.NoError(t, os.MkdirAll(filepath.Join(state, namespaces.Default, id, "rootfs"), 0700))
+			b, err := LoadBundle(ctx, state, id)
+			require.NoError(t, err)
+			return b
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, root, state := bundleDirs(t)
+			const id = "stale-owner"
+
+			old := tc.old(ctx, t, root, state, id)
+			failDelete(t, old)()
+
+			repl, err := NewBundle(ctx, root, state, id, nil)
+			require.NoError(t, err)
+			live := filepath.Join(repl.Path, "live")
+			require.NoError(t, os.WriteFile(live, []byte("x"), 0600))
+
+			require.NoError(t, old.Delete())
+			assert.FileExists(t, live)
+			_, err = os.Stat(filepath.Join(repl.Path, "work"))
+			assert.NoError(t, err, "work link of the replacement must be kept")
+			_, err = NewBundle(ctx, root, state, id, nil)
+			assert.ErrorIs(t, err, os.ErrExist, "the replacement must stay live")
+
+			require.NoError(t, repl.Delete())
+			assert.NoDirExists(t, repl.Path)
+		})
+	}
+}
+
 // TestBundleLocksSamePath verifies that create and delete of one bundle path
 // wait for each other, so a Delete cannot publish a stale leftover marker after
 // a create. Other paths must not wait.
