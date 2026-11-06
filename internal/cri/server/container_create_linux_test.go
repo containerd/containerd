@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/cap"
@@ -676,6 +677,62 @@ func TestCgroupMountMode(t *testing.T) {
 			} else {
 				checkMount(t, spec.Mounts, "cgroup", "/sys/fs/cgroup", "cgroup", []string{"ro"}, []string{"rw"})
 			}
+		})
+	}
+}
+
+func TestAddContainerRechecksNsdelegate(t *testing.T) {
+	if !isUnifiedCgroupsMode() {
+		t.Skip("requires cgroups v2")
+	}
+
+	for _, tc := range []struct {
+		desc          string
+		mountMode     runtime.CgroupMountMode
+		hostMountOpts string
+		expectErr     string
+	}{
+		{
+			desc:          "read-write container should be added when the host has nsdelegate",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE,
+			hostMountOpts: "rw,nsdelegate",
+		},
+		{
+			desc:          "read-write container should be rejected when the host lost nsdelegate",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE,
+			hostMountOpts: "rw",
+			expectErr:     "nsdelegate",
+		},
+		{
+			desc:          "read-only container should be added when the host lacks nsdelegate",
+			mountMode:     runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY,
+			hostMountOpts: "rw",
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := newTestCRIService()
+			c.os.(*ostesting.FakeOS).LookupMountFn = func(string) (mount.Info, error) {
+				return mount.Info{VFSOptions: tc.hostMountOpts}, nil
+			}
+			cntr, err := containerstore.NewContainer(containerstore.Metadata{
+				ID: "test-container",
+				Config: &runtime.ContainerConfig{
+					Linux: &runtime.LinuxContainerConfig{
+						SecurityContext: &runtime.LinuxContainerSecurityContext{CgroupMountMode: tc.mountMode},
+					},
+				},
+			})
+			require.NoError(t, err)
+
+			err = c.addContainer(cntr)
+			_, getErr := c.containerStore.Get("test-container")
+			if tc.expectErr != "" {
+				require.ErrorContains(t, err, tc.expectErr)
+				require.Error(t, getErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NoError(t, getErr)
 		})
 	}
 }
