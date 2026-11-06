@@ -57,6 +57,14 @@ dnf -y install \
 	which \
 	"kernel-modules-extra-$(uname -r)" \
 	${INSTALL_PACKAGES}
+# bin/containerd-sandbox-init runs as PID 1 in an otherwise empty tmpfs, so it
+# has to be static. Build it with musl where the guest provides it (Fedora,
+# EPEL 10); elsewhere link it against the static glibc, which is in CRB
+# (PowerTools on EL 8) and is not enabled by default.
+dnf -y install musl-gcc musl-libc-static ||
+	dnf -y install glibc-static ||
+	dnf -y install --enablerepo=crb glibc-static ||
+	dnf -y install --enablerepo=powertools glibc-static
 modprobe xt_comment
 
 # Install Go

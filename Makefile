@@ -17,6 +17,29 @@
 GO ?= go
 INSTALL ?= install
 
+# C toolchain, only used for bin/containerd-sandbox-init, which is a C program
+# (cmd/containerd-sandbox-init/pause.c) rather than a Go one. Cross-compile it
+# with `make CC=<triplet>-gcc` or `make CROSS_COMPILE=<triplet>-`; set
+# SANDBOX_INIT_CC to choose the compiler for that binary alone.
+CROSS_COMPILE ?=
+ifeq ($(origin CC),default)
+CC := $(if $(CROSS_COMPILE),$(CROSS_COMPILE)gcc,cc)
+# musl-gcc links against musl instead of the libc of the build host, so the
+# resulting static binary runs on glibc- and musl-based distributions alike.
+# Use it for native builds when it is installed (Fedora, EPEL 10), and fall
+# back to the default C compiler otherwise; the fallback needs a static libc,
+# glibc-static, which is in CRB (PowerTools on EL 8) and is not enabled by
+# default. Cross builds keep $(CC), since musl-gcc only targets the build host
+# unless SANDBOX_INIT_CC names a cross musl toolchain.
+ifeq ($(CROSS_COMPILE),)
+SANDBOX_INIT_CC ?= $(shell command -v musl-gcc 2>/dev/null || echo $(CC))
+else
+SANDBOX_INIT_CC ?= $(CC)
+endif
+else
+SANDBOX_INIT_CC ?= $(CC)
+endif
+
 # Root directory of the project (absolute path).
 ROOTDIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
@@ -276,9 +299,16 @@ bin/containerd-shim-sandboxed-runc-v2: cmd/containerd-shim-sandboxed-runc-v2 FOR
 	@echo "$(WHALE) $@"
 	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-sandboxed-runc-v2
 
-bin/containerd-sandbox-init: cmd/containerd-sandbox-init FORCE # PID 1 of a shared pod PID namespace for the sandboxed shim, static like the shims
+SANDBOX_INIT_CFLAGS ?= -O2 -Wall
+ifeq ($(GOOS),linux)
+SANDBOX_INIT_LDFLAGS ?= -static
+else
+SANDBOX_INIT_LDFLAGS ?=
+endif
+
+bin/containerd-sandbox-init: cmd/containerd-sandbox-init/pause.c FORCE # PID 1 of a shared pod PID namespace for the sandboxed shim, static like the shims
 	@echo "$(WHALE) $@"
-	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-sandbox-init
+	$(SANDBOX_INIT_CC) $(SANDBOX_INIT_CFLAGS) $(CFLAGS) -DVERSION=$(or $(VERSION),dev) -o $@ $< $(SANDBOX_INIT_LDFLAGS) $(LDFLAGS)
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"

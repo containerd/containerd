@@ -27,6 +27,7 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 
 * Go compiler (download from https://go.dev/dl/). At least one of the two most recent major Go versions are supported. For example, if Go 1.26 is the latest, either 1.26 or 1.25 are supported. It is not uncommon to find issues in early days of the latest go version. The support of the non-latest version is dependant on dependencies supported versions.
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
+* A static C toolchain for `bin/containerd-sandbox-init`, the C program the sandboxed shim runs as PID 1: `musl-gcc` with `musl-libc-static` (Fedora, EPEL 10) or `glibc-static` (CRB/PowerTools on EL). The Makefile prefers `musl-gcc` and falls back to `$(CC) -static`.
 
 > *Note*: On macOS, you need a third party runtime to run containers on containerd
 
