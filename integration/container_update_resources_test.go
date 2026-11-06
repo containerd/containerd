@@ -312,9 +312,6 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 }
 
 func TestUpdateContainerResources_StatusUpdated(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not implement cgroup memory limits")
-	}
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 

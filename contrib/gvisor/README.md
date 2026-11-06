@@ -11,6 +11,7 @@ contrib/gvisor/test.sh
 
 The script builds the image, starts a container with systemd, and runs CRI
 integration tests, then critest. It stops if either test suite fails.
+Shim grouping is enabled, so containers in a pod share one shim.
 The script prints a test summary at the end.
 The container and its volumes are removed on exit.
 

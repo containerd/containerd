@@ -54,6 +54,7 @@ ${SUDO} rm -f /run/containerd/runsc/config.toml
 ${SUDO} mkdir -p /etc/containerd/runsc
 
 {
+  echo "grouping = true"
   echo ""
   echo "[runsc_config]"
   echo "  systemd-cgroup = ${systemd_cgroup}"
