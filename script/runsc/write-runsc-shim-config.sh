@@ -18,6 +18,7 @@
 # Writes /etc/containerd/runsc/config.toml for containerd-shim-runsc-v1.
 # The shim reads its own config from this path rather than from the main
 # containerd config.toml.
+# Shim grouping is always enabled, so containers in a pod share one shim.
 #
 # Usage: write-runsc-shim-config.sh <cgroup_driver> [<platform>]
 #
@@ -54,6 +55,7 @@ ${SUDO} rm -f /run/containerd/runsc/config.toml
 ${SUDO} mkdir -p /etc/containerd/runsc
 
 {
+  echo "grouping = true"
   echo ""
   echo "[runsc_config]"
   echo "  systemd-cgroup = ${systemd_cgroup}"

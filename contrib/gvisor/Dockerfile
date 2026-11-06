@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /go/src/github.com/containerd/containerd
 COPY go.mod ./
 COPY script/setup/ script/setup/
-COPY script/runsc/ script/runsc/
+COPY script/runsc/install-runsc script/runsc/runsc-version script/runsc/
 RUN script/setup/install-seccomp \
     && script/setup/install-runc \
     && script/setup/install-cni "$(awk '/github.com\/containernetworking\/plugins / {print $2}' go.mod)" \

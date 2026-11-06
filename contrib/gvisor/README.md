@@ -3,6 +3,11 @@
 Run the gVisor CI tests locally in a privileged container.
 You need Linux with cgroup v2 and a rootful Docker daemon with Buildx and BuildKit.
 
+The runsc runtime uses `privileged_without_host_devices = true` to avoid
+automatically passing host devices, including `/dev/nvidia*`, to privileged test
+containers. Privileged capabilities remain enabled. The suite does not configure
+nvproxy for GPU access.
+
 From the repository root, run:
 
 ```sh
@@ -11,6 +16,7 @@ contrib/gvisor/test.sh
 
 The script builds the image, starts a container with systemd, and runs CRI
 integration tests, then critest. It stops if either test suite fails.
+Shim grouping is enabled, so containers in a pod share one shim.
 The script prints a test summary at the end.
 The container and its anonymous volumes are removed on exit. Test output and
 critest reports, including `containerd.log`, are kept in a temporary host
