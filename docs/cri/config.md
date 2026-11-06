@@ -182,6 +182,7 @@ To configure Transfer Service, use the following settings in your config.toml:
 [plugins.'io.containerd.transfer.v1.local']
   # Transfer service specific configurations
   max_concurrent_downloads = 3
+  ignore_descriptor_urls = false
   unpack_config = { ... }
 ```
 
@@ -208,6 +209,7 @@ There are some differences in how image pull configurations are specified betwee
 | Registry Settings | ✅ All supported | ⚠️ Only ConfigPath and Headers supported<br>(Mirrors, Configs, Auths not supported, also deprecated) |
 | ImageDecryption | ❌ Disabled | ❌ Disabled |
 | MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
+| IgnoreDescriptorURLs | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
 | ImagePullWithSyncFs | ✅ Supported | ❌ Not Supported |
 | StatsCollectPeriod | ✅ Supported | ✅ Supported |
 
@@ -221,6 +223,7 @@ If you have any of the following configurations in your CRI image config, contai
 - `Registry.Configs` is configured
 - `Registry.Auths` is configured
 - `MaxConcurrentDownloads != 3`
+- `IgnoreDescriptorURLs = true`
 - `ImagePullWithSyncFs = true`
 
 The warning message will indicate which configuration option triggered the fallback and provide guidance on how to properly configure the option when using the Transfer Service.
@@ -248,6 +251,7 @@ version = 3
     disable_snapshot_annotations = true
     discard_unpacked_layers = false
     max_concurrent_downloads = 3
+    ignore_descriptor_urls = false
     image_pull_progress_timeout = '5m0s'
     image_pull_with_sync_fs = false
     stats_collect_period = 10

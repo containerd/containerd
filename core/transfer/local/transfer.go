@@ -194,6 +194,12 @@ type TransferConfig struct {
 	// big images.
 	ConcurrentLayerFetchBuffer int
 
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool
+
+	// ResolverStats holds optional metric counters for image resolver operations.
+	ResolverStats *transfer.ImageResolverStats
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int
 

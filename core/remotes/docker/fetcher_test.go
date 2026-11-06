@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -1557,4 +1558,172 @@ func TestFetcherOpenParallelWindowErrorAfterAdvance(t *testing.T) {
 	})
 	require.Error(t, err)
 	require.NoError(t, returnsWithin(t, "close", rc.Close))
+}
+
+func TestFetchDescriptorURLs(t *testing.T) {
+	ctx := t.Context()
+	payload := []byte("foreign layer content")
+	dgst := digest.FromBytes(payload)
+
+	var externalHits atomic.Int32
+	externalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		externalHits.Add(1)
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		_, _ = w.Write(payload)
+	}))
+	t.Cleanup(externalServer.Close)
+
+	var registryHits atomic.Int32
+	var serveRegistryBlob atomic.Bool
+	serveRegistryBlob.Store(true)
+	registryServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		registryHits.Add(1)
+		if !serveRegistryBlob.Load() {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Length", strconv.Itoa(len(payload)))
+		_, _ = w.Write(payload)
+	}))
+	t.Cleanup(registryServer.Close)
+
+	ref := strings.TrimPrefix(registryServer.URL, "http://") + "/image:latest"
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayerGzip,
+		Digest:    dgst,
+		Size:      int64(len(payload)),
+		URLs:      []string{externalServer.URL + "/layer?sig=secret-token"},
+	}
+
+	var logBuf bytes.Buffer
+	origOut := log.L.Logger.Out
+	origLevel := log.GetLevel()
+	log.L.Logger.SetOutput(&logBuf)
+	require.NoError(t, log.SetLevel("info"))
+	t.Cleanup(func() {
+		log.L.Logger.SetOutput(origOut)
+		_ = log.SetLevel(origLevel)
+	})
+
+	t.Run("default follows descriptor URLs with nil stats", func(t *testing.T) {
+		externalHits.Store(0)
+		registryHits.Store(0)
+		logBuf.Reset()
+
+		resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+		resolver.(remotes.ResolverWithOptions).SetOptions(transfer.WithIgnoreDescriptorURLs(false))
+		fetcher, err := resolver.Fetcher(ctx, ref)
+		require.NoError(t, err)
+
+		rc, err := fetcher.Fetch(ctx, desc)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = rc.Close() })
+
+		got, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		assert.Equal(t, payload, got)
+		assert.EqualValues(t, 1, externalHits.Load())
+		assert.EqualValues(t, 0, registryHits.Load())
+
+		logged := logBuf.String()
+		assert.Contains(t, logged, "following url in descriptor")
+		assert.Contains(t, logged, desc.Digest.String())
+		assert.Contains(t, logged, desc.MediaType)
+		assert.Contains(t, logged, ref)
+		assert.Contains(t, logged, externalServer.URL+"/layer?sig=REDACTED")
+		assert.NotContains(t, logged, "secret-token")
+	})
+
+	t.Run("follows descriptor URLs and increments stats counter", func(t *testing.T) {
+		externalHits.Store(0)
+		registryHits.Store(0)
+		logBuf.Reset()
+		var counter testCounter
+
+		resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+		resolver.(remotes.ResolverWithOptions).SetOptions(
+			transfer.WithIgnoreDescriptorURLs(false),
+			transfer.WithResolverStats(&transfer.ImageResolverStats{DescriptorURLRequests: &counter}),
+		)
+		fetcher, err := resolver.Fetcher(ctx, ref)
+		require.NoError(t, err)
+
+		rc, err := fetcher.Fetch(ctx, desc)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = rc.Close() })
+
+		got, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		assert.Equal(t, payload, got)
+		assert.EqualValues(t, 1, externalHits.Load())
+		assert.EqualValues(t, 0, registryHits.Load())
+		assert.EqualValues(t, 1, counter.Load())
+	})
+
+	t.Run("ignore skips descriptor URLs and falls back to registry", func(t *testing.T) {
+		externalHits.Store(0)
+		registryHits.Store(0)
+		serveRegistryBlob.Store(true)
+		logBuf.Reset()
+		var counter testCounter
+
+		resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+		resolver.(remotes.ResolverWithOptions).SetOptions(
+			transfer.WithIgnoreDescriptorURLs(true),
+			transfer.WithResolverStats(&transfer.ImageResolverStats{DescriptorURLRequests: &counter}),
+		)
+		fetcher, err := resolver.Fetcher(ctx, ref)
+		require.NoError(t, err)
+
+		rc, err := fetcher.Fetch(ctx, desc)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = rc.Close() })
+
+		got, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		assert.Equal(t, payload, got)
+		assert.EqualValues(t, 0, externalHits.Load())
+		assert.EqualValues(t, 1, registryHits.Load())
+		assert.EqualValues(t, 0, counter.Load())
+		assert.Contains(t, logBuf.String(), "skipping alternative urls in descriptor")
+	})
+
+	t.Run("ignore returns not found when registry lacks blob", func(t *testing.T) {
+		externalHits.Store(0)
+		registryHits.Store(0)
+		serveRegistryBlob.Store(false)
+		var counter testCounter
+
+		resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+		resolver.(remotes.ResolverWithOptions).SetOptions(
+			transfer.WithIgnoreDescriptorURLs(true),
+			transfer.WithResolverStats(&transfer.ImageResolverStats{DescriptorURLRequests: &counter}),
+		)
+		fetcher, err := resolver.Fetcher(ctx, ref)
+		require.NoError(t, err)
+
+		rc, err := fetcher.Fetch(ctx, desc)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = rc.Close() })
+
+		_, err = io.ReadAll(rc)
+		assert.ErrorIs(t, err, errdefs.ErrNotFound)
+		assert.EqualValues(t, 0, externalHits.Load())
+		assert.EqualValues(t, 1, registryHits.Load())
+		assert.EqualValues(t, 0, counter.Load())
+	})
+}
+
+type testCounter struct {
+	atomic.Int64
+}
+
+func (c *testCounter) Inc(vs ...float64) {
+	if len(vs) == 0 {
+		c.Add(1)
+		return
+	}
+	for _, v := range vs {
+		c.Add(int64(v))
+	}
 }
