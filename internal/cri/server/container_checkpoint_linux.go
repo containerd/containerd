@@ -142,8 +142,31 @@ func resolveCriuPath(customPath string) string {
 	return ""
 }
 
+// checkpointTask fails while a container that requires nsdelegate has not
+// exited, because CRIU can clear nsdelegate from /sys/fs/cgroup during a
+// checkpoint.
+func (c *criService) checkpointTask(ctx context.Context, task client.Task, opts ...client.CheckpointTaskOpts) (client.Image, error) {
+	c.nsdelegateContainersMu.RLock()
+	defer c.nsdelegateContainersMu.RUnlock()
+	if err := c.checkNoActiveNsdelegateContainers(); err != nil {
+		return nil, err
+	}
+	return task.Checkpoint(ctx, opts...)
+}
+
+func (c *criService) checkNoActiveNsdelegateContainers() error {
+	for _, cntr := range c.containerStore.List() {
+		if requiresNsdelegate(cntr.Config) && cntr.Status.Get().State() != runtime.ContainerState_CONTAINER_EXITED {
+			return fmt.Errorf("container %q with cgroup mount mode %s is active and requires nsdelegate, which a checkpoint can clear from /sys/fs/cgroup",
+				cntr.ID, cntr.Config.GetLinux().GetSecurityContext().GetCgroupMountMode())
+		}
+	}
+	return nil
+}
+
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (*runtime.CheckpointContainerResponse, error) {
 	start := time.Now()
+
 	if err := c.checkCriu(); err != nil {
 		log.G(ctx).WithError(err).Errorf("Failed to checkpoint container %q", r.GetContainerId())
 		return nil, fmt.Errorf("failed to checkpoint container %q: %w", r.GetContainerId(), err)
@@ -212,7 +235,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	// state dir. Otherwise checkpoint creation litters those files into the state
 	// dir where they are never cleaned up; here they land directly where they are
 	// archived from and are removed with cpPath.
-	img, err := task.Checkpoint(ctx, []client.CheckpointTaskOpts{withCheckpointOpts(i.Runtime.Name, cpPath)}...)
+	img, err := c.checkpointTask(ctx, task, withCheckpointOpts(i.Runtime.Name, cpPath))
 	if err != nil {
 		return nil, fmt.Errorf("checkpointing container %q failed: %w", container.ID, err)
 	}
