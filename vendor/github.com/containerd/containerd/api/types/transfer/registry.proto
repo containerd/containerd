@@ -57,6 +57,9 @@ message RegistryResolver {
   // Stream ID to use for HTTP logs (when logs are streamed to client).
   // When empty, logs are written to containerd logs.
   string logs_stream = 6;
+
+  // DNS servers used to resolve registry hostnames.
+  repeated string dns_servers = 7;
 }
 
 // AuthRequest is sent as a callback on a stream
