@@ -19,6 +19,10 @@ Filesystem-specific:
 - `zfs`: ZFS. Needs the plugin root (`/var/lib/containerd/io.containerd.snapshotter.v1.zfs`) to be mounted as ZFS. See also https://github.com/containerd/zfs .
 - `erofs`: EROFS. `OverlayFS` kernel module needs to be enabled for active snapshots. See also [`erofs.md`](./erofs.md).
 
+Windows:
+- `windows`: WCIFS snapshotter for Windows containers. The plugin root must reside on an NTFS or ReFS volume.
+- `windows-lcow`: Snapshotter for Linux containers on Windows using Hyper-V isolation. The plugin root must reside on an NTFS or ReFS volume.
+
 [Deprecated](https://github.com/containerd/containerd/blob/main/RELEASES.md#deprecated-features):
 - `aufs`: AUFS. Deprecated since containerd 1.5. Removed in containerd 2.0. See also https://github.com/containerd/aufs .
 
