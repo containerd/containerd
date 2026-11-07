@@ -7,7 +7,7 @@ The available snapshotters can be inspected by running `ctr plugins ls` or `nerd
 ## Core snapshotter plugins
 
 Generic:
-- `overlayfs` (default): OverlayFS. This driver is akin to Docker/Moby's "overlay2" storage driver, but containerd's implementation is not called "overlay2".
+- `overlayfs` (default on Linux): OverlayFS. This driver is akin to Docker/Moby's "overlay2" storage driver, but containerd's implementation is not called "overlay2".
 - `native`: Native file copying driver. Akin to Docker/Moby's "vfs" driver.
 
 Block-based:
@@ -18,6 +18,12 @@ Filesystem-specific:
 - `btrfs`: btrfs. Needs the plugin root (`/var/lib/containerd/io.containerd.snapshotter.v1.btrfs`) to be mounted as btrfs.
 - `zfs`: ZFS. Needs the plugin root (`/var/lib/containerd/io.containerd.snapshotter.v1.zfs`) to be mounted as ZFS. See also https://github.com/containerd/zfs .
 - `erofs`: EROFS. `OverlayFS` kernel module needs to be enabled for active snapshots. See also [`erofs.md`](./erofs.md).
+
+Windows (see [`windows.md`](./windows.md)):
+- `windows` (default on Windows): Windows container layers in the format the Host Compute Service uses. Needs the plugin root on an NTFS volume.
+- `cimfs`: Windows container layers stored as CimFS images. Needs Windows Server 2022 build 20348.2031 or later, or build 26100 or later (Windows Server 2025, Windows 11 24H2).
+- `blockcim`: Windows container layers stored as block CIM files.
+- `windows-lcow`: Layers for Linux containers running in a utility VM on Windows (LCOW).
 
 [Deprecated](https://github.com/containerd/containerd/blob/main/RELEASES.md#deprecated-features):
 - `aufs`: AUFS. Deprecated since containerd 1.5. Removed in containerd 2.0. See also https://github.com/containerd/aufs .
