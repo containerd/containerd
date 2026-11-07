@@ -34,6 +34,8 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/progress"
+	"github.com/containerd/containerd/v2/pkg/reference"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
@@ -52,7 +54,7 @@ command. As part of this process, we do the following:
 
 1. Fetch all resources into containerd.
 2. Prepare the snapshot filesystem with the pulled resources.
-3. Register metadata for the image.
+3. Register metadata for the image, including a digest reference.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 		&cli.StringSliceFlag{
@@ -178,7 +180,14 @@ command. As part of this process, we do the following:
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
-			return client.Transfer(ctx, reg, is, transfer.WithProgress(pf))
+			if err := client.Transfer(ctx, reg, is, transfer.WithProgress(pf)); err != nil {
+				return err
+			}
+			img, err := client.ImageService().Get(ctx, ref)
+			if err != nil {
+				return err
+			}
+			return createRepoDigestRef(ctx, client.ImageService(), img)
 		}
 
 		ctx, done, err := client.WithLease(ctx)
@@ -195,6 +204,10 @@ command. As part of this process, we do the following:
 
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
+			return err
+		}
+
+		if err := createRepoDigestRef(ctx, client.ImageService(), img); err != nil {
 			return err
 		}
 
@@ -238,6 +251,24 @@ command. As part of this process, we do the following:
 		fmt.Printf("done: %s\t\n", time.Since(start))
 		return nil
 	},
+}
+
+// createRepoDigestRef adds a <repository>@<digest> reference to the image,
+// the same as the CRI plugin does on pull.
+func createRepoDigestRef(ctx context.Context, store images.Store, img images.Image) error {
+	spec, err := reference.Parse(img.Name)
+	if err != nil {
+		return err
+	}
+	_, err = store.Create(ctx, images.Image{
+		Name:   spec.Locator + "@" + img.Target.Digest.String(),
+		Target: img.Target,
+		Labels: img.Labels,
+	})
+	if err != nil && !errdefs.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
 }
 
 type progressNode struct {
