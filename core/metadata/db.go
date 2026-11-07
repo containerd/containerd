@@ -70,10 +70,15 @@ func WithEventsPublisher(p events.Publisher) DBOpt {
 	}
 }
 
+func WithDisableSkipSnapshotPreparation(o *dbOptions) {
+	o.disableSkipSnapshotPreparation = true
+}
+
 // dbOptions configure db options.
 type dbOptions struct {
-	shared    bool
-	publisher events.Publisher
+	shared                         bool
+	publisher                      events.Publisher
+	disableSkipSnapshotPreparation bool
 }
 
 // DB represents a metadata database backed by a bolt
@@ -134,7 +139,7 @@ func NewDB(db Transactor, cs content.Store, ss map[string]snapshots.Snapshotter,
 	// Initialize data stores
 	m.cs = newContentStore(m, m.dbopts.shared, cs)
 	for name, sn := range ss {
-		m.ss[name] = newSnapshotter(m, name, sn)
+		m.ss[name] = newSnapshotter(m, name, sn, m.dbopts.disableSkipSnapshotPreparation)
 	}
 
 	return m

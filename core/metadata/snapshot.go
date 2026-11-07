@@ -46,15 +46,18 @@ type snapshotter struct {
 	name string
 	db   *DB
 	l    sync.RWMutex
+
+	disableSkipSnapshotPreparation bool
 }
 
 // newSnapshotter returns a new Snapshotter which namespaces the given snapshot
 // using the provided name and database.
-func newSnapshotter(db *DB, name string, sn snapshots.Snapshotter) *snapshotter {
+func newSnapshotter(db *DB, name string, sn snapshots.Snapshotter, disableSkipSnapshotPreparation bool) *snapshotter {
 	return &snapshotter{
-		Snapshotter: sn,
-		name:        name,
-		db:          db,
+		Snapshotter:                    sn,
+		name:                           name,
+		db:                             db,
+		disableSkipSnapshotPreparation: disableSkipSnapshotPreparation,
 	}
 }
 
@@ -330,14 +333,16 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 			return err
 		}
 
-		// Check if target exists, if so, return already exists
-		if target != "" {
-			if tbkt := bkt.Bucket([]byte(target)); tbkt != nil {
-				rerr = fmt.Errorf("target snapshot %q: %w", target, errdefs.ErrAlreadyExists)
-				if err := addSnapshotLease(ctx, tx, s.name, target); err != nil {
-					return err
+		if !s.disableSkipSnapshotPreparation {
+			// Check if target exists, if so, return already exists
+			if target != "" {
+				if tbkt := bkt.Bucket([]byte(target)); tbkt != nil {
+					rerr = fmt.Errorf("target snapshot %q: %w", target, errdefs.ErrAlreadyExists)
+					if err := addSnapshotLease(ctx, tx, s.name, target); err != nil {
+						return err
+					}
+					return nil
 				}
-				return nil
 			}
 		}
 
