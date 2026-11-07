@@ -67,6 +67,12 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			}
 			switch v := i.(type) {
 			case *transferapi.WindowUpdate:
+				// Window credit is a positive additive delta; zero or negative is malformed and would
+				// stall the stream or slice the outgoing [:max] out of range.
+				if v.Update <= 0 {
+					log.G(ctx).Errorf("ignoring non-positive window update: %d", v.Update)
+					continue
+				}
 				select {
 				case <-ctx.Done():
 					return
@@ -83,7 +89,7 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 		buf := bufPool.Get().(*[]byte)
 		defer bufPool.Put(buf)
 
-		var remaining int32
+		var remaining int64
 
 		for {
 			if remaining > 0 {
@@ -92,8 +98,12 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 				case <-ctx.Done():
 					// TODO: Send error message on stream before close to allow remote side to return error
 					return
-				case update := <-window:
-					remaining += update
+				case update, ok := <-window:
+					// A closed window means no more credit is coming; keep spending
+					// what is left rather than adding the zero value.
+					if ok {
+						remaining += int64(update)
+					}
 				default:
 				}
 			} else {
@@ -102,18 +112,21 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 				case <-ctx.Done():
 					// TODO: Send error message on stream before close to allow remote side to return error
 					return
-				case update := <-window:
-					remaining = update
+				case update, ok := <-window:
+					if !ok {
+						return
+					}
+					remaining = int64(update)
 				}
 			}
 			var max int32 = maxRead
-			if max > remaining {
-				max = remaining
+			if int64(max) > remaining {
+				max = int32(remaining)
 			}
 			b := (*buf)[:max]
 			n, readErr := r.Read(b)
 			if n > 0 {
-				remaining = remaining - int32(n)
+				remaining = remaining - int64(n)
 
 				data := &transferapi.Data{
 					Data: b[:n],
