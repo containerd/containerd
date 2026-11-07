@@ -63,6 +63,7 @@ type FlagBase[T any, C any, VC ValueCreator[T, C]] struct {
 	Sources          ValueSourceChain                         `json:"-"`                // sources to load flag value from
 	Required         bool                                     `json:"required"`         // whether the flag is required or not
 	Hidden           bool                                     `json:"hidden"`           // whether to hide the flag in help output
+	Deprecated       string                                   `json:"deprecated"`       // deprecation message, if set a warning is printed when the flag is set
 	Local            bool                                     `json:"local"`            // whether the flag needs to be applied to subcommands as well
 	Value            T                                        `json:"defaultValue"`     // default value for this flag if not set by from any source
 	Destination      *T                                       `json:"-"`                // destination pointer for value when set
@@ -75,11 +76,15 @@ type FlagBase[T any, C any, VC ValueCreator[T, C]] struct {
 	ValidateDefaults bool                                     `json:"validateDefaults"` // whether to validate defaults or not
 
 	// unexported fields for internal use
-	count      int   // number of times the flag has been set
-	hasBeenSet bool  // whether the flag has been set from env or file
-	applied    bool  // whether the flag has been applied to a flag set already
-	creator    VC    // value creator for this flag type
-	value      Value // value representing this flag's value
+	count      int            // number of times the flag has been set
+	hasBeenSet bool           // whether the flag has been set from env or file
+	fromSource bool           // whether the current value came from Sources
+	applied    bool           // whether the flag has been applied to a flag set already
+	creator    VC             // value creator for this flag type
+	value      Value          // value representing this flag's value
+	stringer   FlagStringFunc // optional per-flag override of FlagStringer
+
+	multiValueConfig *multiValueParsingConfig // last parsing config passed to value
 }
 
 // GetValue returns the flags value as string representation and an empty
@@ -130,13 +135,24 @@ func (f *FlagBase[T, C, V]) PostParse() error {
 	tracef("postparse (flag=%[1]q)", f.Name)
 
 	if !f.hasBeenSet {
-		if val, source, found := f.Sources.LookupWithSource(); found {
-			// reflect.TypeOf yields nil when T is an interface type (e.g.
-			// GenericFlag) and the value is nil, so the kind has to be
-			// derived defensively.
-			kind := reflect.Invalid
-			if ty := reflect.TypeOf(f.Value); ty != nil {
-				kind = ty.Kind()
+		// reflect.TypeOf yields nil when T is an interface type (e.g.
+		// GenericFlag) and the value is nil, so the kind has to be
+		// derived defensively.
+		kind := reflect.Invalid
+		if ty := reflect.TypeOf(f.Value); ty != nil {
+			kind = ty.Kind()
+		}
+
+		// An empty value is a value only for a string, and reads as false
+		// for a bool. Any other kind has nothing to parse from it, so an
+		// empty source is skipped: it neither marks the flag as set nor
+		// hides a later source in the chain.
+		emptyIsValue := kind == reflect.String || kind == reflect.Bool
+
+		for _, source := range f.Sources.Chain {
+			val, found := source.Lookup()
+			if !found || (val == "" && !emptyIsValue) {
+				continue
 			}
 
 			if val != "" || kind == reflect.String {
@@ -146,11 +162,13 @@ func (f *FlagBase[T, C, V]) PostParse() error {
 						val, f.Value, source, f.Name, err,
 					)
 				}
-			} else if val == "" && kind == reflect.Bool {
+			} else {
 				_ = f.Set(f.Name, "false")
 			}
 
 			f.hasBeenSet = true
+			f.fromSource = true
+			break
 		}
 	}
 
@@ -160,19 +178,22 @@ func (f *FlagBase[T, C, V]) PostParse() error {
 // pass configuration of parsing to value
 func (f *FlagBase[T, C, V]) setMultiValueParsingConfig(c multiValueParsingConfig) {
 	tracef("setMultiValueParsingConfig %T, %+v", f.value, f.value)
+	f.multiValueConfig = &c
 	if cf, ok := f.value.(multiValueParsingConfigSetter); ok {
 		cf.setMultiValueParsingConfig(c)
 	}
 }
 
-func (f *FlagBase[T, C, V]) PreParse() error {
-	newVal := f.Value
-
+// newValue creates the flag's value holding the default Value.
+func (f *FlagBase[T, C, V]) newValue() Value {
 	if f.Destination == nil {
-		f.value = f.creator.Create(newVal, new(T), f.Config)
-	} else {
-		f.value = f.creator.Create(newVal, f.Destination, f.Config)
+		return f.creator.Create(f.Value, new(T), f.Config)
 	}
+	return f.creator.Create(f.Value, f.Destination, f.Config)
+}
+
+func (f *FlagBase[T, C, V]) PreParse() error {
+	f.value = f.newValue()
 
 	// Validate the given default or values set from external sources as well
 	if f.Validator != nil && f.ValidateDefaults {
@@ -199,6 +220,19 @@ func (f *FlagBase[T, C, V]) Set(_ string, val string) error {
 			return err
 		}
 		f.applied = true
+	}
+
+	// A value from Sources is only a fallback, so a value set afterwards
+	// replaces it rather than being added to it or counted as a duplicate.
+	// This happens for a persistent flag: its command reads the Sources
+	// before a subcommand parses the flag from the command line.
+	if f.fromSource {
+		f.fromSource = false
+		f.count = 0
+		f.value = f.newValue()
+		if f.multiValueConfig != nil {
+			f.setMultiValueParsingConfig(*f.multiValueConfig)
+		}
 	}
 
 	if f.count == 1 && f.OnlyOnce {
@@ -232,7 +266,18 @@ func (f *FlagBase[T, C, V]) IsDefaultVisible() bool {
 
 // String returns a readable representation of this value (for usage defaults)
 func (f *FlagBase[T, C, V]) String() string {
+	if f.stringer != nil {
+		return f.stringer(f)
+	}
 	return FlagStringer(f)
+}
+
+// SetStringer overrides the [FlagStringFunc] used by this flag's String
+// method. Passing nil restores the default behavior of using the
+// package-level [FlagStringer]. This is used e.g. by
+// [MutuallyExclusiveFlags.Stringer].
+func (f *FlagBase[T, C, V]) SetStringer(s FlagStringFunc) {
+	f.stringer = s
 }
 
 // IsSet returns whether or not the flag has been set through env or file
@@ -253,6 +298,11 @@ func (f *FlagBase[T, C, V]) IsRequired() bool {
 // IsVisible returns true if the flag is not hidden, otherwise false
 func (f *FlagBase[T, C, V]) IsVisible() bool {
 	return !f.Hidden
+}
+
+// GetDeprecated returns the deprecation message of the flag
+func (f *FlagBase[T, C, V]) GetDeprecated() string {
+	return f.Deprecated
 }
 
 // GetCategory returns the category of the flag
