@@ -660,3 +660,39 @@ func TestReadBlob_WithDescriptorData(t *testing.T) {
 		})
 	}
 }
+
+func TestSeekReaderSectionReaderLength(t *testing.T) {
+	// Provide underlying content larger than size to verify that the SectionReader
+	// does not over-read past size - offset.
+	content := []byte("hello world containerd extra bytes")
+	offset := int64(6)
+	size := int64(23)
+	expectedLen := int(size - offset) // 17
+
+	// Wrap bytes.Reader so it implements io.Reader and io.ReaderAt, but not io.Seeker,
+	// exercising the io.ReaderAt detection in seekReader.
+	src := struct {
+		io.Reader
+		io.ReaderAt
+	}{
+		Reader:   bytes.NewReader(content),
+		ReaderAt: bytes.NewReader(content),
+	}
+
+	r, err := seekReader(src, offset, size)
+	assert.NoError(t, err)
+
+	sr, ok := r.(*io.SectionReader)
+	assert.True(t, ok, "expected returned reader to be *io.SectionReader")
+	assert.Equal(t, int64(expectedLen), sr.Size())
+
+	buf, err := io.ReadAll(r)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedLen, len(buf))
+	assert.True(t, strings.HasPrefix(string(buf), "world containerd"))
+
+	// Subsequent reads should return (0, io.EOF) without over-reading.
+	n, err := r.Read(make([]byte, 10))
+	assert.Equal(t, 0, n)
+	assert.ErrorIs(t, err, io.EOF)
+}
