@@ -17,6 +17,7 @@
 package userns
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -61,8 +62,8 @@ func TestRootPair(t *testing.T) {
 					},
 				},
 			},
-			expUID: invalidID,
-			expGID: invalidID,
+			expUID: InvalidID,
+			expGID: InvalidID,
 			expErr: true,
 		},
 	} {
@@ -488,5 +489,38 @@ func TestUnmarshal(t *testing.T) {
 		err := idmap.Unmarshal(test.uid, test.gid)
 		assert.Equal(t, test.expErr, err != nil)
 		assert.Equal(t, test.idmap, idmap)
+	}
+}
+
+// Only an absent ID in valid ranges may be treated as safely unmapped.
+func TestToHostUnmappedID(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		id                uint32
+		ranges            []specs.LinuxIDMapping
+		wantErr, unmapped bool
+	}{
+		{"identity", 42, nil, false, false},
+		{"mapped", 42, []specs.LinuxIDMapping{{HostID: 1000, Size: 100}}, false, false},
+		{"unmapped", 100, []specs.LinuxIDMapping{{HostID: 1000, Size: 100}}, true, true},
+		{"empty-map", 42, []specs.LinuxIDMapping{}, true, false},
+		{"invalid-id", InvalidID, []specs.LinuxIDMapping{{Size: InvalidID}}, true, false},
+		// Preserve successful lookups even if an unused range is invalid.
+		{"identity-sentinel", InvalidID, nil, false, false},
+		{"unused-zero-range", 42, []specs.LinuxIDMapping{{Size: 0}, {Size: 100}}, false, false},
+		{"unused-host-overflow", 42, []specs.LinuxIDMapping{{HostID: InvalidID, Size: 1}, {Size: 100}}, false, false},
+		{"mapped-before-host-overflow", 42, []specs.LinuxIDMapping{{HostID: 100, Size: InvalidID}}, false, false},
+		{"zero-size", 42, []specs.LinuxIDMapping{{Size: 0}}, true, false},
+		{"source-overflow", 42, []specs.LinuxIDMapping{{ContainerID: 1, Size: InvalidID}}, true, false},
+		{"host-overflow", 42, []specs.LinuxIDMapping{{HostID: InvalidID, Size: 2}}, true, false},
+		{"invalid-later-range", 42, []specs.LinuxIDMapping{{Size: 1}, {HostID: InvalidID, Size: 2}}, true, false},
+		{"last-valid-id", InvalidID - 1, []specs.LinuxIDMapping{{Size: InvalidID}}, false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mapping := IDMap{UidMap: tc.ranges}
+			_, err := mapping.ToHost(User{Uid: tc.id})
+			assert.Equal(t, tc.wantErr, err != nil)
+			assert.Equal(t, tc.unmapped, errors.Is(err, ErrUnmappedID), "error: %v", err)
+		})
 	}
 }
