@@ -35,6 +35,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -486,6 +487,156 @@ func TestFetcherOpenParallel(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
 	assert.Error(t, err, "this should have failed")
+}
+
+func TestFetcherOpenParallelBoundedRanges(t *testing.T) {
+	const chunkSize = 1024
+	size := int64(10*chunkSize + 100)
+	content := make([]byte, size)
+	rand.New(rand.NewSource(1)).Read(content)
+
+	for _, tc := range []struct {
+		name   string
+		offset int64
+	}{
+		{name: "from start", offset: 0},
+		{name: "from offset", offset: 3*chunkSize + 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var requested atomic.Int64
+			s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				h := r.Header.Get("Range")
+				assert.False(t, strings.HasSuffix(h, "-"), "open-ended range %q", h)
+				rng, err := parseRange(h, size)
+				if !assert.NoError(t, err) || !assert.Len(t, rng, 1) {
+					rw.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				requested.Add(rng[0].length)
+				b := content[rng[0].start : rng[0].start+rng[0].length]
+				rw.Header().Set("Content-Range", rng[0].contentRange(size))
+				rw.Header().Set("Content-Length", strconv.Itoa(len(b)))
+				rw.WriteHeader(http.StatusPartialContent)
+				_, _ = rw.Write(b)
+			}))
+			defer s.Close()
+
+			u, err := url.Parse(s.URL)
+			require.NoError(t, err)
+			f := dockerFetcher{&dockerBase{
+				repository: "nonempty",
+				performances: transfer.ImageResolverPerformanceSettings{
+					MaxConcurrentDownloads:     3,
+					ConcurrentLayerFetchBuffer: chunkSize,
+				},
+			}}
+			host := RegistryHost{
+				Client: s.Client(),
+				Host:   u.Host,
+				Scheme: u.Scheme,
+				Path:   u.Path,
+			}
+
+			rc, remaining, err := f.open(context.Background(), f.request(host, http.MethodGet), "", tc.offset, true)
+			require.NoError(t, err)
+			assert.Equal(t, size-tc.offset, remaining)
+			b, err := io.ReadAll(rc)
+			require.NoError(t, err)
+			require.NoError(t, rc.Close())
+			assert.Equal(t, content[tc.offset:], b)
+			assert.Equal(t, size-tc.offset, requested.Load(), "bytes requested from server")
+		})
+	}
+}
+
+func TestFetcherOpenZeroParallelismSize(t *testing.T) {
+	content := make([]byte, 4096)
+	rand.New(rand.NewSource(1)).Read(content)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.Header.Get("Range"))
+		rw.Header().Set("Content-Length", strconv.Itoa(len(content)))
+		_, _ = rw.Write(content)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	f := dockerFetcher{&dockerBase{
+		repository: "nonempty",
+		performances: transfer.ImageResolverPerformanceSettings{
+			ConcurrentLayerFetchBuffer: 1024,
+		},
+	}}
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	rc, remaining, err := f.open(context.Background(), f.request(host, http.MethodGet), "", 0, true)
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(content)), remaining)
+	b, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+	assert.Equal(t, content, b)
+}
+
+func TestFetcherOpenParallelUnknownSize(t *testing.T) {
+	const chunkSize = 1024
+	size := int64(10*chunkSize + 100)
+	content := make([]byte, size)
+	rand.New(rand.NewSource(1)).Read(content)
+
+	var (
+		mu     sync.Mutex
+		ranges []string
+	)
+	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		h := r.Header.Get("Range")
+		mu.Lock()
+		ranges = append(ranges, h)
+		mu.Unlock()
+		rng, err := parseRange(h, size)
+		if !assert.NoError(t, err) || !assert.Len(t, rng, 1) {
+			rw.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		b := content[rng[0].start : rng[0].start+rng[0].length]
+		rw.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", rng[0].start, rng[0].start+rng[0].length-1))
+		rw.WriteHeader(http.StatusPartialContent)
+		_, _ = rw.Write(b)
+	}))
+	defer s.Close()
+
+	u, err := url.Parse(s.URL)
+	require.NoError(t, err)
+	f := dockerFetcher{&dockerBase{
+		repository: "nonempty",
+		performances: transfer.ImageResolverPerformanceSettings{
+			MaxConcurrentDownloads:     3,
+			ConcurrentLayerFetchBuffer: chunkSize,
+		},
+	}}
+	host := RegistryHost{
+		Client: s.Client(),
+		Host:   u.Host,
+		Scheme: u.Scheme,
+		Path:   u.Path,
+	}
+
+	const offset = 5
+	rc, _, err := f.open(context.Background(), f.request(host, http.MethodGet), "", offset, true)
+	require.NoError(t, err)
+	b, err := io.ReadAll(rc)
+	require.NoError(t, err)
+	require.NoError(t, rc.Close())
+	assert.Equal(t, content[offset:], b)
+	assert.Equal(t, []string{
+		fmt.Sprintf("bytes=%d-%d", offset, offset+chunkSize-1),
+		fmt.Sprintf("bytes=%d-", offset),
+	}, ranges)
 }
 
 func TestFetcherOpenParallel_CloseAfterCopyError(t *testing.T) {

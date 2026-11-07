@@ -1801,3 +1801,24 @@ func TestResolveForbiddenGETFallbackNetworkError(t *testing.T) {
 		t.Errorf("expected 403 in error, got: %s", err.Error())
 	}
 }
+
+func TestContentRangeSize(t *testing.T) {
+	for _, tc := range []struct {
+		header string
+		size   int64
+		ok     bool
+	}{
+		{header: "bytes 0-1023/4096", size: 4096, ok: true},
+		{header: "bytes 4095-4095/4096", size: 4096, ok: true},
+		{header: "bytes */4096", size: 4096, ok: true},
+		{header: "bytes 0-1023/*", ok: false},
+		{header: "bytes 0-1023", ok: false},
+		{header: "items 0-1023/4096", ok: false},
+		{header: "bytes 0-1023/-1", ok: false},
+		{header: "", ok: false},
+	} {
+		size, ok := contentRangeSize(tc.header)
+		assert.Equal(t, tc.ok, ok, tc.header)
+		assert.Equal(t, tc.size, size, tc.header)
+	}
+}
