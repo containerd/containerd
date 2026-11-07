@@ -26,6 +26,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -63,6 +64,16 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 		ts.limiterP = semaphore.NewWeighted(int64(tc.MaxConcurrentUnpacks))
 	}
 	return ts
+}
+
+// SupportsUnpack reports whether the transfer service is configured to unpack
+// the given platform into the given snapshotter.
+func (ts *localTransferService) SupportsUnpack(ctx context.Context, platform ocispec.Platform, snapshotter string) bool {
+	matched, _ := getSupportedPlatform(ctx, transfer.UnpackConfiguration{
+		Platform:    platform,
+		Snapshotter: snapshotter,
+	}, ts.config.UnpackPlatforms)
+	return matched
 }
 
 func (ts *localTransferService) Transfer(ctx context.Context, src any, dest any, opts ...transfer.Opt) error {
@@ -182,6 +193,12 @@ type TransferConfig struct {
 	// 512 bytes, parallel layer fetch is enabled. It can accelerate pulls for
 	// big images.
 	ConcurrentLayerFetchBuffer int
+
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool
+
+	// ResolverStats holds optional metric counters for image resolver operations.
+	ResolverStats *transfer.ImageResolverStats
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int

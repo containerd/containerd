@@ -90,14 +90,19 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	runtimeSvc := criRuntimePlugin.(server.RuntimeService)
 	imageSvc := criImagePlugin.(server.ImageService)
 	runtimeConfig := runtimeSvc.Config()
+	imageConfig := imageSvc.Config()
+	if err := validateRuntimePlatforms(runtimeConfig.Runtimes, imageConfig.RuntimePlatforms); err != nil {
+		return nil, err
+	}
+	imageSvc.UpdateDefaultRuntimeName(runtimeConfig.DefaultRuntimeName)
 	for runtimeName, rt := range runtimeConfig.Runtimes {
+		var imagePlatform *images.ImagePlatform
 		if rt.Snapshotter != "" {
-			imagePlatform := images.ImagePlatform{
+			imagePlatform = &images.ImagePlatform{
 				Snapshotter: rt.Snapshotter,
-				Platform:    platforms.DefaultSpec(),
 			}
-			imageSvc.UpdateRuntimeSnapshotter(runtimeName, imagePlatform)
 		}
+		imageSvc.UpdateRuntime(runtimeName, imagePlatform)
 	}
 
 	ws, err := ic.GetSingle(plugins.WarningPlugin)
@@ -180,7 +185,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	service := &criGRPCServer{
 		RuntimeServiceServer: rs,
 		ImageServiceServer:   is,
-		Closer:               s, // TODO: Where is close run?
+		Closer:               s, // closed by Server.Stop in cmd/containerd/server
 		initializer:          s,
 	}
 
@@ -300,5 +305,15 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	}
 
 	pluginConfigs[pluginName] = dst
+	return nil
+}
+
+// validateRuntimePlatforms checks that runtime_platforms only refers to configured runtime handlers.
+func validateRuntimePlatforms(runtimes map[string]criconfig.Runtime, runtimePlatforms map[string]criconfig.ImagePlatform) error {
+	for runtimeName := range runtimePlatforms {
+		if _, ok := runtimes[runtimeName]; !ok {
+			return fmt.Errorf("invalid CRI config: runtime_platforms %q is not a configured runtime handler", runtimeName)
+		}
+	}
 	return nil
 }

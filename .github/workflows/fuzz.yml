@@ -9,7 +9,7 @@ jobs:
   ci_fuzz:
     name: CI Fuzz
     if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
     - name: Build Fuzzers
@@ -26,7 +26,7 @@ jobs:
         language: go
       continue-on-error: true
     - name: Upload Crash
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       if: failure() && steps.build.outcome == 'success'
       with:
         name: artifacts
@@ -37,7 +37,7 @@ jobs:
   go_test_fuzz:
     name : go test -fuzz
     if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,7 +46,7 @@ jobs:
       - uses: ./.github/actions/install-go
       - run: script/go-test-fuzz.sh
       - name: Upload Crash
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: go-test-fuzz-artifacts

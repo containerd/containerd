@@ -171,6 +171,74 @@ func TestCopy(t *testing.T) {
 			},
 			expected: "content to copy",
 		},
+		{
+			name: "copy fails when reader exceeds expected size",
+			source: copySource{
+				reader: strings.NewReader("this is longer than expected"),
+				size:   4,
+				digest: digest.FromBytes([]byte("this")),
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
+			expectedErr: errdefs.ErrFailedPrecondition,
+		},
+		{
+			name: "copy fails when reader exceeds remaining size from offset",
+			source: copySource{
+				reader: bytes.NewBufferString("foobarbaz"),
+				size:   6,
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+				status: Status{Offset: 3},
+			},
+			expectedErr: errdefs.ErrFailedPrecondition,
+		},
+		{
+			name:   "copy fails when writer offset exceeds expected size",
+			source: defaultSource,
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+				status: Status{Offset: int64(len("this is the source to copy")) + 1},
+			},
+			expectedErr: errdefs.ErrFailedPrecondition,
+		},
+		{
+			name: "copy with unspecified size (zero)",
+			source: copySource{
+				reader: strings.NewReader("content"),
+				size:   0,
+				digest: digest.FromString("content"),
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
+			expected: "content",
+		},
+		{
+			name: "copy with unspecified size (-1)",
+			source: copySource{
+				reader: strings.NewReader("content"),
+				size:   -1,
+				digest: digest.FromString("content"),
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
+			expected: "content",
+		},
+		{
+			name: "copy with invalid negative size",
+			source: copySource{
+				reader: strings.NewReader("content"),
+				size:   -2,
+			},
+			writer: fakeWriter{
+				Buffer: &bytes.Buffer{},
+			},
+			expectedErr: errdefs.ErrInvalidArgument,
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -186,12 +254,37 @@ func TestCopy(t *testing.T) {
 				assert.ErrorIs(t, err, testcase.expectedErr)
 				return
 			}
-
+			if testcase.source.size == -1 {
+				assert.Zero(t, testcase.writer.committedSize)
+			}
 			assert.NoError(t, err)
 			assert.Equal(t, testcase.source.digest, testcase.writer.committedDigest)
 			assert.Equal(t, testcase.expected, testcase.writer.String())
 		})
 	}
+}
+
+type endlessReader struct {
+	bytesRead int64
+}
+
+func (r *endlessReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'A'
+	}
+	r.bytesRead += int64(len(p))
+	return len(p), nil
+}
+
+func TestCopyBoundsEndlessReader(t *testing.T) {
+	const declaredSize = 121
+	er := &endlessReader{}
+	w := fakeWriter{Buffer: &bytes.Buffer{}}
+	err := Copy(context.Background(), &w, er, declaredSize, digest.FromBytes(bytes.Repeat([]byte("A"), declaredSize)))
+	assert.ErrorIs(t, err, errdefs.ErrFailedPrecondition)
+	assert.Empty(t, w.committedDigest)
+	assert.EqualValues(t, declaredSize+1, er.bytesRead)
+	assert.Equal(t, declaredSize+1, w.Len())
 }
 
 func newCopySource(raw string) copySource {
@@ -206,6 +299,7 @@ type commitFunction func() error
 
 type fakeWriter struct {
 	*bytes.Buffer
+	committedSize   int64
 	committedDigest digest.Digest
 	status          Status
 	commitFunc      commitFunction
@@ -217,6 +311,7 @@ func (f *fakeWriter) Close() error {
 }
 
 func (f *fakeWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...Opt) error {
+	f.committedSize = size
 	f.committedDigest = expected
 	if f.commitFunc == nil {
 		return nil

@@ -26,7 +26,8 @@ jobs:
         with:
           # Fail action on broken links
           fail: true
-          args: --exclude-path vendor --exclude-path releases --timeout 30 --no-progress './**/*.md'
+          # Exclude core/runtime/v2/README.md symlink, already checked in docs/runtime-v2.md
+          args: --exclude-path vendor --exclude-path releases --exclude-path core/runtime/v2/README.md --timeout 30 --no-progress './**/*.md'
           format: markdown
           # Write GitHub job summary
           jobSummary: true

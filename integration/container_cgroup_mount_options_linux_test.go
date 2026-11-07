@@ -28,6 +28,14 @@ import (
 )
 
 func TestPrivilegedContainerCgroupMountOptions(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		// This test verifies that the host /sys/fs/cgroup mount options
+		// (nsdelegate, memory_recursiveprot) are preserved after running a
+		// privileged container — a runc-specific cgroup namespace concern.
+		// gVisor containers never modify the host cgroup mount, so the test
+		// is not applicable under runsc.
+		t.Skip("host cgroup mount option test is not applicable to runsc")
+	}
 	if cgroups.Mode() != cgroups.Unified {
 		t.Skip("Requires cgroup v2")
 	}

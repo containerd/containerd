@@ -525,7 +525,7 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		ImageFSPaths: map[string]string{
 			defaults.DefaultSnapshotter: containerdRootDir,
 		},
-		RuntimePlatforms: map[string]images.ImagePlatform{},
+		RuntimePlatforms: map[string]*images.ImagePlatform{},
 		Content:          client.ContentStore(),
 		Images:           client.ImageService(),
 		Client:           client,

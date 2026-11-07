@@ -16,8 +16,30 @@
 
 package internal
 
-import "strings"
+import (
+	"net"
+	"path/filepath"
 
+	"github.com/containerd/containerd/v2/internal/localaddr"
+)
+
+// IsLocalAddress reports whether path is a named pipe or an AF_UNIX socket
+// rather than a TCP address, see localaddr.Parse. A bare path is a socket if it
+// is absolute, has a drive letter or has no port, as GetLocalListener takes it.
 func IsLocalAddress(path string) bool {
-	return strings.HasPrefix(path, `\\.\pipe\`)
+	if _, _, explicit := localaddr.Parse(path); explicit || filepath.IsAbs(path) || hasDriveLetter(path) {
+		return true
+	}
+	_, _, err := net.SplitHostPort(path)
+	return err != nil
+}
+
+// hasDriveLetter reports whether path starts with a drive letter, as in
+// "C:debug.sock", which SplitHostPort would take for a host and a port.
+func hasDriveLetter(path string) bool {
+	if len(path) < 2 || path[1] != ':' {
+		return false
+	}
+	c := path[0]
+	return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
 }

@@ -34,6 +34,9 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 		"podpid":  PodSandboxConfig("sandbox", "pod-pid-container-stop", WithPodPid),
 	} {
 		t.Run(name, func(t *testing.T) {
+			if name == "hostpid" && runtimeHandlerIsRunsc() {
+				t.Skip("runsc does not support host PID namespace")
+			}
 			t.Log("Create a shared pid sandbox")
 			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 			require.NoError(t, err)

@@ -91,7 +91,7 @@ ifdef BUILDTAGS
 	GO_BUILDTAGS = ${BUILDTAGS}
 endif
 GO_BUILDTAGS ?=
-GO_BUILDTAGS += urfave_cli_no_docs
+GO_BUILDTAGS += grpcnotrace
 GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
@@ -264,14 +264,21 @@ endef
 bin/%: cmd/% FORCE
 	$(call BUILD_BINARY)
 
-# gen-manpages must not have the urfave_cli_no_docs build-tag set
 bin/gen-manpages: cmd/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./cmd/gen-manpages
+	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS} ./cmd/gen-manpages
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
 	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
+
+bin/containerd-shim-sandboxed-runc-v2: cmd/containerd-shim-sandboxed-runc-v2 FORCE # experimental pause-less sandbox shim, static like containerd-shim-runc-v2
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-sandboxed-runc-v2
+
+bin/containerd-sandbox-init: cmd/containerd-sandbox-init FORCE # PID 1 of a shared pod PID namespace for the sandboxed shim, static like the shims
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-sandbox-init
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
