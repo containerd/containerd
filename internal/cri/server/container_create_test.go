@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/images/imagetest"
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
@@ -61,6 +62,101 @@ func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 }
 
 const testImageName = "container-image-name"
+
+func TestResolveImageManifestDigest(t *testing.T) {
+	ctx := context.Background()
+	store := imagetest.NewContentStore(ctx, t)
+	linuxConfig := store.Blob(imagespec.MediaTypeImageConfig, []byte("linux image config"))
+	windowsConfig := store.Blob(imagespec.MediaTypeImageConfig, []byte("windows image config"))
+	linuxPlatform := imagespec.Platform{OS: "linux", Architecture: "amd64"}
+	windowsPlatform := imagespec.Platform{OS: "windows", Architecture: "amd64"}
+	linuxManifest := imagetest.AddPlatform(store.Manifest(linuxConfig), linuxPlatform)
+	windowsManifest := imagetest.AddPlatform(store.Manifest(windowsConfig), windowsPlatform)
+	index := store.Index(windowsManifest, linuxManifest)
+
+	digest, err := resolveImageManifestDigest(ctx, index.Descriptor, store.Store, testImageName, platforms.Only(linuxPlatform))
+	require.NoError(t, err)
+	assert.Equal(t, linuxManifest.Descriptor.Digest.String(), digest)
+}
+
+func TestResolveImageManifestDigestUsesPlatformOrdering(t *testing.T) {
+	ctx := context.Background()
+	store := imagetest.NewContentStore(ctx, t)
+	config2022 := store.Blob(imagespec.MediaTypeImageConfig, []byte("windows server 2022 config"))
+	config2025 := store.Blob(imagespec.MediaTypeImageConfig, []byte("windows server 2025 config"))
+	platform2022 := imagespec.Platform{OS: "windows", Architecture: "amd64", OSVersion: "10.0.20348.0"}
+	platform2025 := imagespec.Platform{OS: "windows", Architecture: "amd64", OSVersion: "10.0.26100.0"}
+	manifest2022 := imagetest.AddPlatform(store.Manifest(config2022), platform2022)
+	manifest2025 := imagetest.AddPlatform(store.Manifest(config2025), platform2025)
+	index := store.Index(manifest2022, manifest2025)
+
+	digest, err := resolveImageManifestDigest(ctx, index.Descriptor, store.Store, testImageName, windowsServer2025Comparer{})
+	require.NoError(t, err)
+	assert.Equal(t, manifest2025.Descriptor.Digest.String(), digest)
+}
+
+type windowsServer2025Comparer struct{}
+
+func (windowsServer2025Comparer) Match(platform imagespec.Platform) bool {
+	return platform.OS == "windows" && platform.Architecture == "amd64" &&
+		platform.OSVersion >= "10.0.20348.0" && platform.OSVersion <= "10.0.26100.0"
+}
+
+func (windowsServer2025Comparer) Less(a, b imagespec.Platform) bool {
+	return a.OSVersion > b.OSVersion
+}
+
+func TestContainerIdentitySpecOptsDisabledByDefault(t *testing.T) {
+	opts, err := containerIdentitySpecOpts(context.Background(), nil, "container-123", imagespec.Platform{}, false)
+	require.NoError(t, err)
+	assert.Nil(t, opts)
+}
+
+func TestWithContainerIdentity(t *testing.T) {
+	spec := runtimespec.Spec{
+		Process: &runtimespec.Process{
+			Env: []string{
+				"CONTAINER_IMAGE_ID=from-image",
+				"CONTAINER_IMAGE_ID=from-request",
+				"CONTAINER_INSTANCE_ID=from-image",
+				"CONTAINER_INSTANCE_ID=from-cri",
+				"container_image_id=case-sensitive-on-linux",
+				"OTHER=value",
+			},
+		},
+	}
+
+	err := withContainerIdentity("container-123", "sha256:manifest", imagespec.Platform{OS: "linux"})(context.Background(), nil, nil, &spec)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{
+		"CONTAINER_IMAGE_ID=sha256:manifest",
+		"CONTAINER_INSTANCE_ID=container-123",
+		"container_image_id=case-sensitive-on-linux",
+		"OTHER=value",
+	}, spec.Process.Env)
+}
+
+func TestWithContainerIdentityWindowsEnvKeys(t *testing.T) {
+	spec := runtimespec.Spec{
+		Process: &runtimespec.Process{
+			Env: []string{
+				"container_image_id=from-image",
+				"Container_Image_Id=from-request",
+				"container_instance_id=from-image",
+				"Container_Instance_Id=from-cri",
+				"PATH=C:\\Windows\\System32",
+			},
+		},
+	}
+
+	err := withContainerIdentity("container-123", "sha256:manifest", imagespec.Platform{OS: "windows"})(context.Background(), nil, nil, &spec)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{
+		"CONTAINER_IMAGE_ID=sha256:manifest",
+		"CONTAINER_INSTANCE_ID=container-123",
+		"PATH=C:\\Windows\\System32",
+	}, spec.Process.Env)
+}
 
 func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
