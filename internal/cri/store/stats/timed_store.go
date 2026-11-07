@@ -136,19 +136,50 @@ func (s *TimedStore) GetLatest() *CPUSample {
 	return &sample
 }
 
-// GetLatestUsageNanoCores returns the most recent UsageNanoCores value.
-// Returns 0 and false if no samples with calculated UsageNanoCores exist.
+// usageRateWindow is how far back UsageNanoCores looks when reporting a rate.
+// Samples are taken every second, but kubelet's cAdvisor housekeeping and the
+// node conformance summary API both observe CPU over a multi-second interval
+// (the summary check repeats for 30s). Averaging only the last second reports
+// 0 as soon as a container goes briefly idle, which the conformance test
+// rejects even though the container has used CPU inside this window.
+const usageRateWindow = 30 * time.Second
+
+// GetLatestUsageNanoCores returns the CPU usage rate over usageRateWindow
+// (or the full buffered span, when that is shorter).
+// Returns 0 and false if fewer than two samples exist.
 func (s *TimedStore) GetLatestUsageNanoCores() (uint64, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// We need at least 2 samples to have a calculated UsageNanoCores
-	if len(s.buffer) < 2 {
+	n := len(s.buffer)
+	if n < 2 {
 		return 0, false
 	}
 
-	sample := s.buffer[len(s.buffer)-1]
-	return sample.UsageNanoCores, true
+	latest := s.buffer[n-1]
+	cutoff := latest.Timestamp.Add(-usageRateWindow)
+	baselineIdx := n - 2
+	for i := n - 2; i >= 0; i-- {
+		baselineIdx = i
+		if !s.buffer[i].Timestamp.After(cutoff) {
+			break
+		}
+	}
+	baseline := s.buffer[baselineIdx]
+	// A container restart resets the cumulative counter. Rate from the
+	// pre-reset sample is not meaningful; start at the reset instead.
+	if latest.UsageCoreNanoSeconds < baseline.UsageCoreNanoSeconds {
+		for i := baselineIdx + 1; i < n-1; i++ {
+			if s.buffer[i].UsageCoreNanoSeconds <= latest.UsageCoreNanoSeconds {
+				baseline = s.buffer[i]
+				break
+			}
+		}
+	}
+	if !baseline.Timestamp.Before(latest.Timestamp) {
+		return 0, false
+	}
+	return calculateUsageNanoCores(baseline, latest), true
 }
 
 // Size returns the number of samples in the store.
