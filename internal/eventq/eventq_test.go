@@ -123,6 +123,80 @@ func TestDiscardedAtShutdown(t *testing.T) {
 	assert.Equal(t, expected, discarded)
 }
 
+func TestSlowSubscriberEvicted(t *testing.T) {
+	setSlowSubscriberTimeout(t, 50*time.Millisecond)
+
+	eq := New[int](time.Second, func(int) {})
+	stuckC, stuckCloser := eq.Subscribe()
+	defer stuckCloser.Close()
+	c := newCollector(eq)
+
+	expected := make([]int, 250)
+	for i := range expected {
+		expected[i] = i
+	}
+	sent := make(chan struct{})
+	go func() {
+		defer close(sent)
+		for _, i := range expected {
+			eq.Send(i)
+		}
+	}()
+	select {
+	case <-sent:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Send blocked on a subscriber that stopped reading")
+	}
+	eq.Shutdown()
+
+	assert.Equal(t, expected, c.Collected())
+	assert.Equal(t, expected[:100], drain(t, stuckC))
+}
+
+func TestSlowSubscriberEvictedDuringReplay(t *testing.T) {
+	setSlowSubscriberTimeout(t, 50*time.Millisecond)
+
+	eq := New[int](3600*time.Second, func(int) {})
+	expected := make([]int, 150)
+	for i := range expected {
+		expected[i] = i
+		eq.Send(i)
+	}
+	stuckC, stuckCloser := eq.Subscribe()
+	defer stuckCloser.Close()
+	time.Sleep(4 * slowSubscriberTimeout)
+
+	assert.Equal(t, expected[:100], drain(t, stuckC))
+
+	c := newCollector(eq)
+	eq.Send(150)
+	eq.Shutdown()
+	assert.Equal(t, append(expected[100:], 150), c.Collected())
+}
+
+func setSlowSubscriberTimeout(t *testing.T, d time.Duration) {
+	orig := slowSubscriberTimeout
+	slowSubscriberTimeout = d
+	t.Cleanup(func() { slowSubscriberTimeout = orig })
+}
+
+func drain(t *testing.T, c <-chan int) []int {
+	var got []int
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case i, ok := <-c:
+			if !ok {
+				return got
+			}
+			got = append(got, i)
+		case <-timeout:
+			t.Fatal("evicted subscriber channel was not closed")
+			return got
+		}
+	}
+}
+
 type collector struct {
 	collected []int
 	c         <-chan int
