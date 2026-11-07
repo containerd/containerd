@@ -125,11 +125,26 @@ func remapRootFS(ctx context.Context, mounts []mount.Mount, idMap userns.IDMap) 
 }
 
 func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
+	// Hard links share ownership. Remapping an inode again would interpret
+	// its already-mapped host IDs as container IDs.
+	type inodeKey struct {
+		dev uint64
+		ino uint64
+	}
+	seen := make(map[inodeKey]struct{})
 	return func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		stat := info.Sys().(*syscall.Stat_t)
+		//nolint:unconvert // stat.Dev is int32 on Darwin and uint64 on Linux.
+		key := inodeKey{dev: uint64(stat.Dev), ino: stat.Ino}
+		hasHardlinks := !info.IsDir() && stat.Nlink > 1
+		if hasHardlinks {
+			if _, ok := seen[key]; ok {
+				return nil
+			}
+		}
 		h, cerr := idMap.ToHost(userns.User{Uid: stat.Uid, Gid: stat.Gid})
 		if cerr != nil {
 			return cerr
@@ -137,6 +152,9 @@ func chown(root string, idMap userns.IDMap) filepath.WalkFunc {
 		// be sure the lchown the path as to not de-reference the symlink to a host file
 		if cerr = os.Lchown(path, int(h.Uid), int(h.Gid)); cerr != nil {
 			return cerr
+		}
+		if hasHardlinks {
+			seen[key] = struct{}{}
 		}
 		// we must retain special permissions such as setuid, setgid and sticky bits
 		if mode := info.Mode(); mode&os.ModeSymlink == 0 && mode&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
