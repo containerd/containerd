@@ -19,11 +19,10 @@ package fsview
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"strings"
-	"text/template"
+	"text/template/parse"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
@@ -204,6 +203,11 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 
 	var layers []View
 	addLayer := func(v View) { layers = append(layers, v) }
+	closeLayers := func() {
+		for _, l := range layers {
+			_ = l.Close()
+		}
+	}
 	boundsCheck := func(i int) error {
 		if i < 0 || i >= len(preceding) {
 			return fmt.Errorf("index out of bounds: %d, has %d preceding mounts", i, len(preceding))
@@ -211,7 +215,9 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 		return nil
 	}
 
-	fm := template.FuncMap{
+	// These functions resolve mount references as side effects. Their return
+	// values are only needed to satisfy the template function signatures.
+	fm := map[string]any{
 		"source": func(i int) (string, error) {
 			if err := boundsCheck(i); err != nil {
 				return "", err
@@ -258,15 +264,26 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 		},
 	}
 
-	t, err := template.New("").Funcs(fm).Parse(tmplExpr)
+	trees, err := parse.Parse("mount", tmplExpr, "{{", "}}", fm)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := t.Execute(io.Discard, nil); err != nil {
-		for _, l := range layers {
-			l.Close()
+	if err := resolveTemplateActions(trees["mount"].Root, func(name string, args []int) error {
+		switch name {
+		case "source":
+			_, err := fm["source"].(func(int) (string, error))(args[0])
+			return err
+		case "mount":
+			_, err := fm["mount"].(func(int) (string, error))(args[0])
+			return err
+		case "overlay":
+			_, err := fm["overlay"].(func(int, int) (string, error))(args[0], args[1])
+			return err
 		}
+		return fmt.Errorf("unsupported mount template function %q: %w", name, errdefs.ErrNotImplemented)
+	}); err != nil {
+		closeLayers()
 		return nil, err
 	}
 
@@ -274,9 +291,7 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 		for i, l := range layers {
 			subFS, err := fs.Sub(l, suffix)
 			if err != nil {
-				for _, l := range layers {
-					l.Close()
-				}
+				closeLayers()
 				return nil, fmt.Errorf("failed to create sub view for path %q: %w", suffix, err)
 			}
 			layers[i] = newView(subFS, l.Close)
@@ -284,6 +299,74 @@ func resolveOverlayValue(s string, preceding []mount.Mount) ([]View, error) {
 	}
 
 	return layers, nil
+}
+
+// resolveTemplateActions evaluates mount-reference actions in a parsed template.
+// Only direct calls to source, mount, and overlay with integer arguments are
+// supported. Text is ignored, as the original template output was discarded.
+func resolveTemplateActions(root *parse.ListNode, resolve func(string, []int) error) error {
+	if root == nil {
+		return nil
+	}
+
+	for _, node := range root.Nodes {
+		switch n := node.(type) {
+		case *parse.TextNode, *parse.CommentNode:
+			continue
+
+		case *parse.ActionNode:
+			if n.Pipe == nil || len(n.Pipe.Decl) != 0 || len(n.Pipe.Cmds) != 1 {
+				return fmt.Errorf("unsupported mount template action %q: %w", n.String(), errdefs.ErrNotImplemented)
+			}
+
+			args := n.Pipe.Cmds[0].Args
+			if len(args) == 0 {
+				return fmt.Errorf("empty mount template action: %w", errdefs.ErrNotImplemented)
+			}
+
+			ident, ok := args[0].(*parse.IdentifierNode)
+			if !ok {
+				return fmt.Errorf("unsupported mount template action %q: %w", n.String(), errdefs.ErrNotImplemented)
+			}
+
+			var want int
+			switch ident.Ident {
+			case "source", "mount":
+				want = 1
+			case "overlay":
+				want = 2
+			default:
+				return fmt.Errorf("unsupported mount template function %q: %w", ident.Ident, errdefs.ErrNotImplemented)
+			}
+
+			if len(args)-1 != want {
+				return fmt.Errorf("invalid arguments for %s: expected %d, got %d", ident.Ident, want, len(args)-1)
+			}
+
+			indices := make([]int, 0, want)
+			for _, arg := range args[1:] {
+				num, ok := arg.(*parse.NumberNode)
+				if !ok || !num.IsInt {
+					return fmt.Errorf("unsupported mount template argument %q: %w", arg.String(), errdefs.ErrNotImplemented)
+				}
+
+				i := int(num.Int64)
+				if int64(i) != num.Int64 {
+					return fmt.Errorf("mount index %q overflows int", num.Text)
+				}
+				indices = append(indices, i)
+			}
+
+			if err := resolve(ident.Ident, indices); err != nil {
+				return err
+			}
+
+		default:
+			return fmt.Errorf("unsupported mount template node %T: %w", node, errdefs.ErrNotImplemented)
+		}
+	}
+
+	return nil
 }
 
 func splitTemplateSuffix(s string) (string, string) {
