@@ -22,6 +22,7 @@ import (
 	"archive/tar"
 	"errors"
 	"math"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -48,5 +49,118 @@ func TestHandleTarTypeBlockCharFifoDeviceRange(t *testing.T) {
 				t.Fatalf("expected errInvalidArchive for %d:%d, got %v", tc.devmajor, tc.devminor, err)
 			}
 		})
+	}
+}
+
+func TestLchmodPreservesSpecialBits(t *testing.T) {
+	// A directory rather than a regular file: FreeBSD rejects setting the
+	// sticky bit on non-directories for unprivileged callers with EFTYPE.
+	p := filepath.Join(t.TempDir(), "dir")
+	if err := os.Mkdir(p, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	want := os.FileMode(0o750) | os.ModeSetuid | os.ModeSticky
+	if err := lchmod(p, want); err != nil {
+		t.Fatal(err)
+	}
+
+	fi, err := os.Lstat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := fi.Mode() & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+	if got != want {
+		t.Fatalf("mode = %o, want %o", got, want)
+	}
+}
+
+func TestLchmodDoesNotFollowSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := lchmod(link, 0o777); err != nil {
+		t.Fatal(err)
+	}
+
+	fi, err := os.Lstat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Fatalf("symlink target mode changed to %o, want 0600", got)
+	}
+}
+
+func TestLchmodSymlinkSwapRace(t *testing.T) {
+	// lchmod used to lstat path and, when that said regular file, chmod it by
+	// name, so a path swapped for a symlink in between had the mode applied
+	// to the link target. Keep swapping the entry between a regular file and
+	// a symlink while lchmod runs on it and check the target is never
+	// touched. This is timing dependent, so a pass is not a proof, but the
+	// old implementation trips it within a few hundred swaps.
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	entry := filepath.Join(dir, "entry")
+	if err := os.WriteFile(entry, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Swap through rename so entry always exists.
+	link := filepath.Join(dir, "link")
+	file := filepath.Join(dir, "file")
+	var swapErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 2000; i++ {
+			if swapErr = os.Symlink(target, link); swapErr != nil {
+				return
+			}
+			if swapErr = os.Rename(link, entry); swapErr != nil {
+				return
+			}
+			if swapErr = os.WriteFile(file, nil, 0o600); swapErr != nil {
+				return
+			}
+			if swapErr = os.Rename(file, entry); swapErr != nil {
+				return
+			}
+		}
+	}()
+
+	var chmodErr error
+	for swapping := true; swapping && chmodErr == nil; {
+		select {
+		case <-done:
+			swapping = false
+		default:
+			chmodErr = lchmod(entry, 0o777)
+		}
+	}
+	<-done
+	if swapErr != nil {
+		t.Fatal(swapErr)
+	}
+	if chmodErr != nil {
+		t.Fatal(chmodErr)
+	}
+
+	fi, err := os.Lstat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fi.Mode().Perm(); got != 0o600 {
+		t.Fatalf("symlink target mode changed to %o, want 0600", got)
 	}
 }
