@@ -1054,7 +1054,9 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (any,
 		}
 		if cbkt != nil {
 			log.G(ctx).WithField("key", node.Key).Debug("remove content")
-			return nil, cbkt.DeleteBucket([]byte(node.Key))
+			return &eventstypes.ContentDelete{
+				Digest: node.Key,
+			}, cbkt.DeleteBucket([]byte(node.Key))
 		}
 	case ResourceSnapshot:
 		sbkt := nsbkt.Bucket(bucketKeyObjectSnapshots)
