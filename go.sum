@@ -177,8 +177,8 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 h1:pRhl55Yx1eC7BZ1N+BBWwn
 github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0/go.mod h1:XKMd7iuf/RGPSMJ/U4HP0zS2Z9Fh8Ps9a+6X26m/tmI=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePCEX9iuS+cneUwncnw=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
-github.com/intel/goresctrl v0.13.0 h1:5fhKjNq4V5MYDFHa//6M6x0jP6Iq5EXwZc6/eYxdEtQ=
-github.com/intel/goresctrl v0.13.0/go.mod h1:KFHS91JGOmeeuEog+nTQcsGjLC81nRqdsdhcqf69fjU=
+github.com/intel/goresctrl v0.14.0 h1:8XFCIjDGxo2atZfehrrg6JasbeSLjpxie19mxQXYONY=
+github.com/intel/goresctrl v0.14.0/go.mod h1:NwQ5romFcqqTKkUS/yxdirNdrPA+LAAHdXO+Jxb86zI=
 github.com/josharian/native v1.1.0 h1:uuaP0hAbW7Y4l0ZRQ6C9zfb7Mg1mbFKry/xzDAfmtLA=
 github.com/josharian/native v1.1.0/go.mod h1:7X/raswPFr05uY3HiLlYeyQntB6OO7E/d2Cu7qoaN2w=
 github.com/jsimonetti/rtnetlink/v2 v2.0.1 h1:xda7qaHDSVOsADNouv7ukSuicKZO7GgVUCXxpaIEIlM=

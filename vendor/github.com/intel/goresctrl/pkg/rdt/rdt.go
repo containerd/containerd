@@ -24,6 +24,15 @@ limitations under the License.
 // Bandwidth Allocation (MBA) plus Cache Monitoring (CMT) and Memory Bandwidth
 // Monitoring (MBM).
 //
+// This package bundles L3 (CMT/MBM) monitoring with its config-driven
+// allocation model: monitoring groups are created under goresctrl-managed
+// CtrlGroups and exported via the built-in Prometheus/OpenTelemetry collectors.
+// If you need per-workload monitoring group lifecycle management decoupled from
+// allocation — no Initialize/SetConfig, placement under arbitrary ctrl_groups,
+// typed counter readings across all mon_data domains (including Intel AET
+// energy and PERF_PKG counters), or crash-recovery reconciliation — see
+// pkg/monitor instead.
+//
 // Basic usage example:
 //
 //	rdt.SetLogger(slog.Default().WithGroup("rdt"))
