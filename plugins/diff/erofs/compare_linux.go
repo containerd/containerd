@@ -39,10 +39,17 @@ import (
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/labels"
+	diffmounts "github.com/containerd/containerd/v2/plugins/diff/internal/mounts"
 )
 
-func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperRoot string) error {
+func writeDiff(ctx context.Context, w io.Writer, mm mount.Manager, lower []mount.Mount, upperRoot string) error {
 	var opts []archive.ChangeWriterOpt
+
+	lower, deactivate, err := diffmounts.Activate(ctx, mm, "erofs-diff-lower", lower)
+	if err != nil {
+		return err
+	}
+	defer deactivate()
 
 	return mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		cw := archive.NewChangeWriter(w, upperRoot, opts...)
@@ -137,7 +144,7 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 				return emptyDesc, fmt.Errorf("failed to get compressed stream: %w", errOpen)
 			}
 		}
-		errOpen = writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperRoot)
+		errOpen = writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), s.mount, lower, upperRoot)
 		compressed.Close()
 		if errOpen != nil {
 			return emptyDesc, fmt.Errorf("failed to write compressed diff: %w", errOpen)
@@ -148,7 +155,7 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 		}
 		config.Labels[labels.LabelUncompressed] = dgstr.Digest().String()
 	} else {
-		err := writeDiff(ctx, cw, lower, upperRoot)
+		err := writeDiff(ctx, cw, s.mount, lower, upperRoot)
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to create diff tar stream: %w", err)
 		}

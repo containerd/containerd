@@ -17,6 +17,7 @@
 package plugin
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/containerd/platforms"
@@ -24,6 +25,7 @@ import (
 	"github.com/containerd/plugin/registry"
 
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/dmverity"
 	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/plugins"
@@ -50,6 +52,7 @@ func init() {
 		ID:   "erofs",
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
+			plugins.MountManagerPlugin,
 		},
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (any, error) {
@@ -76,6 +79,12 @@ func init() {
 			config := ic.Config.(*Config)
 
 			var opts []erofs.DifferOpt
+
+			if mountsI, err := ic.GetSingle(plugins.MountManagerPlugin); err == nil {
+				opts = append(opts, erofs.WithMountManager(mountsI.(mount.Manager)))
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
+				return nil, err
+			}
 
 			if len(config.MkfsOptions) > 0 {
 				opts = append(opts, erofs.WithMkfsOptions(config.MkfsOptions))
