@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"runtime/debug"
 	"testing"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
@@ -47,6 +48,30 @@ func TestRuntimeWithNonEmptyMaxEnvProcs(t *testing.T) {
 	var oldGoMaxProcs2 = runtime.GOMAXPROCS(0)
 	if oldGoMaxProcs2 != runtime.NumCPU() {
 		t.Fatal("the max number CPU should be equal to available CPUs")
+	}
+}
+
+func TestRuntimeWithEmptyGOGC(t *testing.T) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(0))
+	defer debug.SetGCPercent(debug.SetGCPercent(100))
+
+	t.Setenv("GOGC", "")
+	setRuntime()
+
+	if gcPercent := debug.SetGCPercent(100); gcPercent != 40 {
+		t.Fatalf("the GC percent should be 40, got %d", gcPercent)
+	}
+}
+
+func TestRuntimeWithNonEmptyGOGC(t *testing.T) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(0))
+	defer debug.SetGCPercent(debug.SetGCPercent(80))
+
+	t.Setenv("GOGC", "80")
+	setRuntime()
+
+	if gcPercent := debug.SetGCPercent(100); gcPercent != 80 {
+		t.Fatalf("the GC percent should be left at 80 from GOGC, got %d", gcPercent)
 	}
 }
 

@@ -106,7 +106,12 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
+	cmd.Env = os.Environ()
+	if os.Getenv("GOMAXPROCS") == "" {
+		// If GOMAXPROCS hasn't been set, e.g. in containerd's environment or
+		// in the shim manager's env, we default the long-running shim to 4.
+		cmd.Env = append(cmd.Env, "GOMAXPROCS=4")
+	}
 	// Preserve inherited resource attributes, but override the daemon's identity.
 	// The OpenTelemetry SDK uses the last value for duplicate resource keys.
 	var attrs []string

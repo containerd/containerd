@@ -18,6 +18,7 @@ package manager
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
@@ -79,6 +80,37 @@ func TestNewCommandTracingResource(t *testing.T) {
 					require.Equal(t, expected, value.AsString(), key)
 				}
 			}
+		})
+	}
+}
+
+func TestNewCommandGOMAXPROCS(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		inherited string // GOMAXPROCS in the shim's environment, if set
+		unset     bool
+		expected  string
+	}{
+		{name: "unset", unset: true, expected: "4"},
+		{name: "empty", expected: "4"},
+		{name: "inherited", inherited: "1", expected: "1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GOMAXPROCS", tc.inherited)
+			if tc.unset {
+				require.NoError(t, os.Unsetenv("GOMAXPROCS"))
+			}
+			ctx := namespaces.WithNamespace(context.Background(), "test-ns")
+			cmd, err := newCommand(ctx, "test-shim", "/containerd.sock", "/containerd.sock.ttrpc", false)
+			require.NoError(t, err)
+			// Environ applies exec.Cmd's duplicate-variable handling.
+			var values []string
+			for _, entry := range cmd.Environ() {
+				if value, ok := strings.CutPrefix(entry, "GOMAXPROCS="); ok {
+					values = append(values, value)
+				}
+			}
+			require.Equal(t, []string{tc.expected}, values)
 		})
 	}
 }
