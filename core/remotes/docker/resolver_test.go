@@ -1702,6 +1702,120 @@ func TestResolveForbiddenNoFallbackOnGET(t *testing.T) {
 	}
 }
 
+func TestResolveForbiddenRetriesWithAuthChallenge(t *testing.T) {
+	// Registries that deny pre-auth requests with 403 instead of a 401
+	// challenge must still get an authenticated retry when the 403 carries a
+	// WWW-Authenticate header and credentials are configured.
+	const (
+		name = "test/repo"
+		tag  = "latest"
+		user = "testuser"
+		pass = "testpass"
+	)
+
+	var anonymous403s, authedHits int
+
+	creds := func(string) (string, string, error) {
+		return user, pass, nil
+	}
+
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/" {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		u, p, ok := r.BasicAuth()
+		if !ok {
+			anonymous403s++
+			rw.Header().Set("WWW-Authenticate", `Basic realm="test"`)
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+		if u != user || p != pass {
+			rw.WriteHeader(http.StatusForbidden)
+			return
+		}
+		authedHits++
+		rw.Header().Set("Content-Type", "application/json")
+		rw.Header().Set("Docker-Content-Digest", "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fcff989c7a15a9b2b7b2b6b6b6b")
+		rw.Write([]byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fcff989c7a15a9b2b7b2b6b6b6b6b","size":2}}`))
+	})
+
+	base, options, close := tlsServer(handler)
+	defer close()
+
+	options.Hosts = ConfigureDefaultRegistries(
+		WithClient(options.Client),
+		WithAuthorizer(NewDockerAuthorizer(WithAuthCreds(creds))),
+	)
+	resolver := NewResolver(options)
+	ref := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, desc, err := resolver.Resolve(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("expected resolve to succeed after authenticated retry, got: %v", err)
+	}
+	if desc.Digest.String() == "" {
+		t.Fatal("expected a manifest digest from resolve")
+	}
+	if anonymous403s != 1 {
+		t.Errorf("expected exactly 1 anonymous request denied with 403, got %d", anonymous403s)
+	}
+	if authedHits < 1 {
+		t.Errorf("expected at least 1 authenticated retry, got %d", authedHits)
+	}
+}
+
+func TestResolveForbiddenNoRetryWithoutChallenge(t *testing.T) {
+	// A 403 with no WWW-Authenticate challenge must not trigger an auth
+	// retry: without a challenge the authorizer has nothing to act on, so
+	// the 403 must surface exactly as before (the public Authorizer
+	// contract only covers challenge-carrying responses).
+	const (
+		name = "test/repo"
+		tag  = "latest"
+		user = "testuser"
+		pass = "testpass"
+	)
+
+	var requestCount int
+
+	creds := func(string) (string, string, error) {
+		return user, pass, nil
+	}
+
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/" {
+			rw.WriteHeader(http.StatusOK)
+			return
+		}
+		requestCount++
+		// Deliberately no WWW-Authenticate header.
+		rw.WriteHeader(http.StatusForbidden)
+	})
+
+	base, options, close := tlsServer(handler)
+	defer close()
+
+	options.Hosts = ConfigureDefaultRegistries(
+		WithClient(options.Client),
+		WithAuthorizer(NewDockerAuthorizer(WithAuthCreds(creds))),
+	)
+	resolver := NewResolver(options)
+	ref := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(context.Background(), ref)
+	if err == nil {
+		t.Fatal("expected error from resolve, got nil")
+	}
+	if !strings.Contains(err.Error(), "403") {
+		t.Fatalf("expected 403 forbidden error, got: %v", err)
+	}
+	if requestCount > 2 {
+		t.Errorf("expected no auth retry loop for headerless 403, got %d manifest requests", requestCount)
+	}
+}
+
 func TestResolve404NoFallbackGET(t *testing.T) {
 	const (
 		name = "test/repo"
