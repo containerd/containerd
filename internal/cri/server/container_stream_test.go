@@ -62,6 +62,7 @@ func (f *fakeStreamServer[Res]) RecvMsg(any) error            { return nil }
 
 func TestStreamContainers(t *testing.T) {
 	c := newTestCRIService()
+	c.listStreaming.BatchSize = 2
 	sandboxesInStore := []sandboxstore.Sandbox{
 		sandboxstore.NewSandbox(
 			sandboxstore.Metadata{
@@ -222,9 +223,11 @@ func TestStreamContainers(t *testing.T) {
 			err := c.StreamContainers(&runtime.StreamContainersRequest{Filter: testdata.filter}, stream)
 			assert.NoError(t, err)
 			require.NotEmpty(t, stream.sent)
+			assert.Len(t, stream.sent, (len(testdata.expect)+c.listStreaming.BatchSize-1)/c.listStreaming.BatchSize)
 
 			var containers []*runtime.Container
-			for _, resp := range stream.sent {
+			for i, resp := range stream.sent {
+				assert.Len(t, resp.Containers, min(c.listStreaming.BatchSize, len(testdata.expect)-i*c.listStreaming.BatchSize))
 				containers = append(containers, resp.Containers...)
 			}
 			assert.Len(t, containers, len(testdata.expect))

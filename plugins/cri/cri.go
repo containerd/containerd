@@ -112,7 +112,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	warn := ws.(warning.Service)
 
 	if warnings, err := criconfig.ValidateServerConfig(ic.Context, config); err != nil {
-		return nil, fmt.Errorf("invalid cri image config: %w", err)
+		return nil, fmt.Errorf("invalid cri server config: %w", err)
 	} else if len(warnings) > 0 {
 		for _, w := range warnings {
 			warn.Emit(ic.Context, w)
@@ -157,16 +157,17 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 	}
 
 	options := &server.CRIServiceOptions{
-		RuntimeService:     runtimeSvc,
-		ImageService:       imageSvc,
-		StreamingConfig:    streamingConfig,
-		NRI:                getNRIAPI(ic),
-		Client:             client,
-		SandboxControllers: sbControllers,
-		ShimPath:           shimPath,
-		WarningService:     warn,
+		RuntimeService:      runtimeSvc,
+		ImageService:        imageSvc,
+		StreamingConfig:     streamingConfig,
+		ListStreamingConfig: config.ListStreaming,
+		NRI:                 getNRIAPI(ic),
+		Client:              client,
+		SandboxControllers:  sbControllers,
+		ShimPath:            shimPath,
+		WarningService:      warn,
 	}
-	is := criImagePlugin.(imageService).GRPCService()
+	is := criImagePlugin.(imageService).GRPCService(config.ListStreaming)
 
 	s, rs, err := server.NewCRIService(options)
 	if err != nil {
@@ -197,7 +198,7 @@ func initCRIService(ic *plugin.InitContext) (any, error) {
 }
 
 type imageService interface {
-	GRPCService() runtime.ImageServiceServer
+	GRPCService(criconfig.ListStreamingConfig) runtime.ImageServiceServer
 }
 
 type initializer interface {
@@ -298,6 +299,7 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 		"stream_idle_timeout",
 		"enable_tls_streaming",
 		"x509_key_pair_streaming",
+		"list_streaming",
 	} {
 		if val, ok := src[k]; ok {
 			dst[k] = val

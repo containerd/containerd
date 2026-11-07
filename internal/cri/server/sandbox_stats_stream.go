@@ -68,7 +68,7 @@ func (c *criService) StreamPodSandboxStats(r *runtime.StreamPodSandboxStatsReque
 		}
 	}
 
-	return criutil.SendInBatches(ctx, podSandboxStats, criutil.DefaultStreamBatchSize, func(batch []*runtime.PodSandboxStats) error {
+	return criutil.SendInBatches(ctx, podSandboxStats, c.listStreaming.BatchSize, func(batch []*runtime.PodSandboxStats) error {
 		return s.Send(&runtime.StreamPodSandboxStatsResponse{PodSandboxStats: batch})
 	})
 }
