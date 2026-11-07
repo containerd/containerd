@@ -273,15 +273,22 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 				return nonLayers, nil
 			}
 
+			var hasConfig bool
 			lock.Lock()
 			for _, nl := range nonLayers {
 				if images.IsConfigType(nl.MediaType) || configTypes[nl.MediaType] {
 					queuedLayers[nl.Digest] = append(queuedLayers[nl.Digest], manifestLayers)
+					hasConfig = true
 				}
 			}
 			lock.Unlock()
 
-			children = nonLayers
+			// Only defer layers when a recognized config will schedule them.
+			// Otherwise, keep fetching them for callers that convert the
+			// manifest and unpack it after dispatch, such as legacy Docker pulls.
+			if hasConfig {
+				children = nonLayers
+			}
 		} else if images.IsConfigType(desc.MediaType) || configTypes[desc.MediaType] {
 			lock.Lock()
 			queued := queuedLayers[desc.Digest]

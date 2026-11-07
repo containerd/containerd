@@ -445,6 +445,70 @@ func layerDesc(id string) ocispec.Descriptor {
 	return ocispec.Descriptor{MediaType: ocispec.MediaTypeImageLayerGzip, Digest: digest.FromString(id), Size: 1}
 }
 
+func TestUnpackUnrecognizedConfig(t *testing.T) {
+	const customConfig = "application/vnd.example.config.v1+json"
+	for _, tc := range []struct {
+		name       string
+		configType string
+		configured bool
+	}{
+		{name: "legacy", configType: docker.LegacyConfigMediaType},
+		{name: "unknown", configType: customConfig},
+		{name: "oci", configType: ocispec.MediaTypeImageConfig},
+		{name: "docker", configType: images.MediaTypeDockerSchema2Config},
+		{name: "custom", configType: customConfig, configured: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			cs := imagetest.NewContentStore(ctx, t)
+			config := cs.JSONObject(tc.configType, ocispec.Image{
+				Platform: platforms.DefaultSpec(),
+				RootFS: ocispec.RootFS{Type: "layers", DiffIDs: []digest.Digest{
+					digest.FromString("diff"),
+				}},
+			}).Descriptor
+			layer := layerDesc("layer")
+			manifest := manifestDesc("manifest")
+			// An unrelated octet-stream blob must not be parsed as a config.
+			blob := cs.Blob(docker.LegacyConfigMediaType, []byte("not JSON")).Descriptor
+			children := []ocispec.Descriptor{config, layer, blob}
+			var mu sync.Mutex
+			var fetched []ocispec.Descriptor
+			h := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				mu.Lock()
+				fetched = append(fetched, desc)
+				mu.Unlock()
+				if desc.Digest == manifest.Digest {
+					return children, nil
+				}
+				return nil, nil
+			})
+			platform := Platform{
+				Snapshotter: alreadyExistsSnapshotter{},
+				Applier:     failApplier{t},
+			}
+			if tc.configured {
+				platform.ConfigType = tc.configType
+			}
+			u, err := NewUnpacker(ctx, cs.Store, WithUnpackPlatform(platform))
+			require.NoError(t, err)
+			err = images.Dispatch(ctx, u.Unpack(h), nil, manifest)
+			res, waitErr := u.Wait()
+			require.NoError(t, err)
+			require.NoError(t, waitErr)
+			want := []ocispec.Descriptor{manifest, config, blob}
+			if images.IsConfigType(tc.configType) || tc.configured {
+				// Recognized configs retain lazy fetching for existing snapshots.
+				assert.Equal(t, 1, res.Unpacks)
+			} else {
+				want = append(want, layer)
+				assert.Zero(t, res.Unpacks)
+			}
+			assert.ElementsMatch(t, want, fetched)
+		})
+	}
+}
+
 func manifestDesc(id string) ocispec.Descriptor {
 	return ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromString(id), Size: 1}
 }
