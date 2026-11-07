@@ -373,6 +373,35 @@ A shorter timeout helps reduce delays when falling back to the original registry
 dial_timeout = "1s"
 ```
 
+## dial_addr field
+
+`dial_addr` makes containerd connect to this host over a local Unix domain
+socket instead of TCP, for example to reach a co-located registry proxy or
+pull-through cache without a loopback TCP listener. Only the connection is
+redirected: the request URL and `Host:` header are unchanged, so an `https://`
+host still performs TLS over the socket against the configured host name, and
+an `http://` host does not. `dial_timeout` applies to the socket dial, and the
+`HTTP_PROXY`/`HTTPS_PROXY` environment variables are ignored for this host.
+
+The value must be `unix://` followed by an absolute path (note the three
+slashes). Abstract sockets (`unix://@name`) are not supported: they have no
+filesystem permissions and are reachable from the whole network namespace (see
+[CVE-2020-15257](https://github.com/containerd/containerd/security/advisories/GHSA-36xw-fx78-c5r4)).
+`dial_addr` is not supported on Windows.
+
+```toml
+server = "https://registry-1.docker.io"
+
+[host."https://registry-1.docker.io"]
+  capabilities = ["pull", "resolve"]
+  dial_addr = "unix:///run/registry-cache.sock"
+  dial_timeout = "5s"
+```
+
+The socket is trusted as much as the `hosts.toml` file itself, so protect both.
+The parent directory's permissions control who may create the socket, and the
+socket file's own permissions control who may connect to it.
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the
