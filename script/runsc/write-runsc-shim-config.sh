@@ -33,7 +33,7 @@
 #
 set -eu -o pipefail
 
-# Keep in sync with run-runsc-tests.sh and critest-runsc.sh.
+# Keep in sync with critest-runsc.sh.
 _runsc_test_root=/run/containerd-runsc-test
 
 SUDO=''
@@ -54,6 +54,7 @@ ${SUDO} rm -f /run/containerd/runsc/config.toml
 ${SUDO} mkdir -p /etc/containerd/runsc
 
 {
+  echo "grouping = true"
   echo ""
   echo "[runsc_config]"
   echo "  systemd-cgroup = ${systemd_cgroup}"

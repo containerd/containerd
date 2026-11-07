@@ -30,9 +30,6 @@ import (
 )
 
 func TestContainerdRestartSandboxRecover(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
-	}
 	sbStatuses := map[string]runtime.PodSandboxState{
 		// Sandbox with unknown status will be NotReady when returned from ListPodSandbox
 		"sandbox_unknown":   runtime.PodSandboxState_SANDBOX_NOTREADY,
