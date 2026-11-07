@@ -18,6 +18,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 	"unsafe"
@@ -99,6 +101,42 @@ func newStatusTestCRIService() *criService {
 		client:          newFakeContainerdClient(),
 		runtimeHandlers: make(map[string]*runtime.RuntimeHandler),
 	}
+}
+
+// commonConfig is shared by all CRI container runtimes
+type commonConfig struct {
+	SandboxImage string `json:"sandboxImage,omitempty"`
+}
+
+func criConfig(sandboxImage string) (*commonConfig, error) {
+	// need Client IntrospectionService for Server Deprecations, or Status will crash
+	c := newTestCRIService(withClientIntrospectionService(&fakeIntrospectionService{}))
+	if sandboxImage != "" {
+		c.ImageService = &fakeImageService{pinnedImages: map[string]string{"sandbox": sandboxImage}}
+	}
+	resp, err := c.Status(context.Background(), &runtime.StatusRequest{Verbose: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+	config := &commonConfig{}
+	if err := json.Unmarshal([]byte(resp.Info["config"]), config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+	return config, nil
+}
+
+func TestStatusConfig(t *testing.T) {
+	// use default sandbox image from Client
+	config, err := criConfig("")
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", config.SandboxImage)
+}
+
+func TestStatusConfigSandboxImage(t *testing.T) {
+	pause := "registry.k8s.io/pause:override"
+	config, err := criConfig(pause)
+	assert.NoError(t, err)
+	assert.Equal(t, pause, config.SandboxImage)
 }
 
 // TestStatusRuntimeHandlersOrdering checks that the runtime handlers
