@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"golang.org/x/sync/errgroup"
 )
@@ -139,7 +140,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	defer cancel()
 
 	// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
-	if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(bundle.Path, shimBinaryPathFile)); err == nil {
 		runtime = string(data)
 	} else if err != nil && !os.IsNotExist(err) {
 		log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
@@ -158,7 +159,8 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		runtime = container.Runtime.Name
 	}
 
-	runtime, err := m.resolveRuntimePath(runtime)
+	_, oerr := os.Stat(filepath.Join(bundle.Path, shimBinaryOverrideFile))
+	runtime, err := m.resolveRuntimeWithFallback(ctx, runtime, id, oerr == nil)
 	if err != nil {
 		bundle.Delete()
 
@@ -223,6 +225,45 @@ func shouldCleanupShim(sgetErr, pidErr error, pInfo []runtimeapi.ProcessInfo) bo
 	return errors.Is(sgetErr, errdefs.ErrNotFound) &&
 		(errors.Is(pidErr, errdefs.ErrNotFound) ||
 			(pidErr == nil && len(pInfo) == 0))
+}
+
+// resolveRuntimeWithFallback resolves the shim binary path for runtime. If
+// runtime is a pinned absolute path that no longer resolves (e.g. an update
+// moved or replaced the binary that the path was resolved to at task start), it
+// falls back to re-resolving from the runtime name recorded in metadata for id,
+// which stays valid across such moves. The fallback is skipped for a marked
+// runtime_path override. Otherwise it only applies when the pinned binary has
+// the name that the metadata runtime maps to, so an override is never replaced
+// by a different shim. If the fallback also fails, the original resolution
+// error is returned.
+func (m *ShimManager) resolveRuntimeWithFallback(ctx context.Context, runtime, id string, override bool) (string, error) {
+	resolved, err := m.resolveRuntimePath(runtime)
+	if err == nil || override {
+		return resolved, err
+	}
+	if name := m.runtimeName(ctx, id); name != "" && name != runtime && filepath.Base(runtime) == shimbinary.BinaryName(name) {
+		if r, rerr := m.resolveRuntimePath(name); rerr == nil {
+			log.G(ctx).WithField("id", id).WithField("runtime", name).
+				Warn("pinned shim binary path is stale; re-resolved from runtime name")
+			return r, nil
+		}
+	}
+	return "", err
+}
+
+// runtimeName returns the runtime name recorded for id in metadata, trying the
+// container store first and the sandbox store second (a shim bundle is one or
+// the other). It returns "" if neither has a record.
+func (m *ShimManager) runtimeName(ctx context.Context, id string) string {
+	if c, err := m.containers.Get(ctx, id); err == nil {
+		return c.Runtime.Name
+	} else if !errdefs.IsNotFound(err) {
+		log.G(ctx).WithError(err).Errorf("failed to look up container %s runtime name while recovering stale shim path", id)
+	}
+	if sb, err := m.sandboxStore.Get(ctx, id); err == nil {
+		return sb.Runtime.Name
+	}
+	return ""
 }
 
 func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
