@@ -66,19 +66,19 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 // NOTE: Currently, kubelet creates containers in pod sequentially. It won't
 // cause multiple mountpoints on same target path.
 func ensureImageVolumeMounted(target string) (bool, error) {
-	_, err := os.Stat(target)
+	// existence check AND the symlink walk.
+	resolved, err := mount.CanonicalizePath(target)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to stat %s: %w", target, err)
+		return false, fmt.Errorf("failed to resolve %s: %w", target, err)
 	}
-	mpInfo, err := mount.Lookup(target)
+	mpInfo, err := mount.Lookup(resolved)
 	if err != nil {
-		return false, fmt.Errorf("failed to check %s mountpoint: %w", target, err)
+		return false, fmt.Errorf("failed to check %s mountpoint: %w", resolved, err)
 	}
-
-	if mpInfo.Mountpoint != target {
+	if mpInfo.Mountpoint != resolved {
 		return false, nil
 	}
 	return true, nil
