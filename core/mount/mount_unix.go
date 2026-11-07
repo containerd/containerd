@@ -28,6 +28,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// mntFlag is a typed wrapper for mount/unmount flag values.
+//
+// It helps avoid accidental misuse of plain ints (e.g., passing a loop index
+// instead of a flag). While not fully preventing such errors, it forces
+// explicit conversions at boundaries, making mistakes easier to spot.
+type mntFlag int
+
 // UnmountRecursive unmounts the target and all mounts underneath, starting
 // with the deepest mount first.
 func UnmountRecursive(target string, flags int) error {
@@ -73,7 +80,7 @@ func UnmountRecursive(target string, flags int) error {
 	return nil
 }
 
-func unmount(target string, flags int) error {
+func unmount(target string, flags mntFlag) error {
 	if isFUSE(target) {
 		// TODO: Why error is ignored?
 		// Shouldn't this just be unconditional "return unmountFUSE(target)"?
@@ -82,7 +89,7 @@ func unmount(target string, flags int) error {
 		}
 	}
 	for range 50 {
-		if err := unix.Unmount(target, flags); err != nil {
+		if err := unix.Unmount(target, int(flags)); err != nil {
 			switch err {
 			case unix.EBUSY:
 				time.Sleep(50 * time.Millisecond)
@@ -98,10 +105,11 @@ func unmount(target string, flags int) error {
 
 // Unmount the provided mount path with the flags
 func Unmount(target string, flags int) error {
-	if err := unmount(target, flags); err != nil && err != unix.EINVAL {
-		return err
+	err := unmount(target, mntFlag(flags))
+	if err == nil || err == unix.EINVAL {
+		return nil
 	}
-	return nil
+	return err
 }
 
 // UnmountAll repeatedly unmounts the given mount point until there
@@ -120,15 +128,18 @@ func UnmountAll(mount string, flags int) error {
 	}
 
 	for {
-		if err := unmount(mount, flags); err != nil {
+		err := unmount(mount, mntFlag(flags))
+		switch err {
+		case nil:
+			continue
+		case unix.EINVAL:
 			// EINVAL is returned if the target is not a
 			// mount point, indicating that we are
 			// done. It can also indicate a few other
 			// things (such as invalid flags) which we
 			// unfortunately end up squelching here too.
-			if err == unix.EINVAL {
-				return nil
-			}
+			return nil
+		default:
 			return err
 		}
 	}
