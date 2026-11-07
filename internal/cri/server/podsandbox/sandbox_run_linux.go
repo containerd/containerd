@@ -237,7 +237,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
-		c.seccompEnabled())
+		c.seccompEnabled(), c.profileLoader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 	}

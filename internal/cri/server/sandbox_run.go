@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
+
 	"github.com/containerd/errdefs"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
@@ -58,6 +60,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	defer span.End()
 
 	config := r.GetConfig()
+	securityContext := config.GetLinux().GetSecurityContext()
+	if err := sputil.ValidateSecurityProfiles(securityContext.GetSeccomp(), securityContext.GetApparmor(), securityContext.GetPrivileged()); err != nil {
+		return nil, err
+	}
 	log.G(ctx).Debugf("Sandbox config %+v", config)
 
 	// Generate unique id and name for the sandbox and reserve the name.

@@ -99,7 +99,7 @@ type ListMeta struct {
 	// Clients should not cache sharded list responses as a full representation
 	// of the collection.
 	//
-	// This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+	// This is a beta field and is enabled by default via the ShardedListAndWatch feature gate.
 	// +featureGate=ShardedListAndWatch
 	// +optional
 	ShardInfo *ShardInfo `json:"shardInfo,omitempty" protobuf:"bytes,5,opt,name=shardInfo"`
@@ -162,6 +162,8 @@ type ObjectMeta struct {
 	// Cannot be updated.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces
 	// +optional
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:immutable
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 
 	// Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.
@@ -198,6 +200,8 @@ type ObjectMeta struct {
 	// +optional
 	// +k8s:alpha(since: "1.37")=+k8s:optional
 	// +k8s:alpha(since: "1.37")=+k8s:minimum=0
+	// +k8s:alpha(since: "1.38")=+k8s:monotonic
+	// +k8s:alpha(since: "1.38")=+k8s:update=NoUnset
 	Generation int64 `json:"generation,omitempty" protobuf:"varint,7,opt,name=generation"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
@@ -493,7 +497,7 @@ type ListOptions struct {
 	//     shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')
 	//     shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')
 	//
-	// This is an alpha field and requires enabling the ShardedListAndWatch feature gate.
+	// This is a beta field and is enabled by default via the ShardedListAndWatch feature gate.
 	// +featureGate=ShardedListAndWatch
 	// +optional
 	ShardSelector string `json:"shardSelector,omitempty" protobuf:"bytes,15,opt,name=shardSelector"`
@@ -1121,10 +1125,17 @@ const (
 	// This is similar to ErrorTypeInvalid, but the error will not include the
 	// too-long value.  See TooLong().
 	CauseTypeTooLong CauseType = "FieldValueTooLong"
+	// CauseTypeTooShort is used to report that the given value is too short.
+	// This is similar to ErrorTypeInvalid. See TooShort().
+	CauseTypeTooShort CauseType = "FieldValueTooShort"
 	// CauseTypeTooMany is used to report "too many". This is used to
 	// report that a given list has too many items. This is similar to FieldValueTooLong,
 	// but the error indicates quantity instead of length.
 	CauseTypeTooMany CauseType = "FieldValueTooMany"
+	// CauseTypeTooFew is used to report "too few". This is used to
+	// report that a given list has too few items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	CauseTypeTooFew CauseType = "FieldValueTooFew"
 	// CauseTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	CauseTypeInternal CauseType = "InternalError"
@@ -1650,6 +1661,7 @@ type Condition struct {
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
 	// +k8s:alpha(since: "1.37")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:format=k8s-label-key
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 	// status of the condition, one of True, False, Unknown.
 	// +required
@@ -1684,12 +1696,15 @@ type Condition struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Pattern=`^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$`
 	// +k8s:alpha(since: "1.37")=+k8s:required
-	// +k8s:alpha(since: "1.37")=+k8s:maxBytes=1024
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=1024
 	Reason string `json:"reason" protobuf:"bytes,5,opt,name=reason"`
 	// message is a human readable message indicating details about the transition.
 	// This may be an empty string.
-	// +required
-	// +kubebuilder:validation:Required
+	// +optional
+	// +kubebuilder:validation:Optional
+	// +default=""
 	// +kubebuilder:validation:MaxLength=32768
+	// +k8s:alpha(since: "1.38")=+k8s:optional
+	// +k8s:alpha(since: "1.38")=+k8s:maxBytes=32768
 	Message string `json:"message" protobuf:"bytes,6,opt,name=message"`
 }

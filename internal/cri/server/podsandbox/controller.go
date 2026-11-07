@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -84,6 +85,7 @@ func init() {
 			}
 
 			c := Controller{
+				profileLoader:  sputil.ProfileLoaderFrom(criImagePlugin),
 				client:         client,
 				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
 				imageConfig:    criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
@@ -107,6 +109,7 @@ func init() {
 }
 
 type Controller struct {
+	profileLoader sputil.ProfileLoader
 	// config contains all configurations.
 	config criconfig.Config
 	// imageConfig contains CRI image configuration.

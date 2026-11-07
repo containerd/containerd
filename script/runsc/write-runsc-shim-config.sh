@@ -57,6 +57,8 @@ ${SUDO} mkdir -p /etc/containerd/runsc
   echo ""
   echo "[runsc_config]"
   echo "  systemd-cgroup = ${systemd_cgroup}"
+  # runsc disables OCI seccomp filters by default. Exercise profile enforcement.
+  echo '  oci-seccomp = "true"'
   echo "  root = \"${_runsc_test_root}\""
   if [[ -n "${platform}" ]]; then
     echo "  platform = \"${platform}\""
