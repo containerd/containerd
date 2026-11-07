@@ -105,7 +105,11 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	}
 	defer processor.Close()
 
-	digester := digest.Canonical.Digester()
+	algo := config.DigestAlgorithm
+	if algo == "" {
+		algo = digest.Canonical
+	}
+	digester := algo.Digester()
 	rc := &readCounter{
 		r: io.TeeReader(processor, digester.Hash()),
 	}

@@ -19,6 +19,8 @@ package metadata
 import (
 	"bytes"
 	"context"
+	_ "crypto/sha256" // required for digest package
+	_ "crypto/sha512" // required for sha384 and sha512 digest support
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -233,4 +235,44 @@ func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 
 		return nil
 	})
+}
+
+// TestContentWriterDigestAlgorithm verifies that content.WithBlobDigestAlgorithm
+// is forwarded through the metadata content store wrapper on the eager open
+// path that the walking differ uses. Without forwarding, a caller asking for
+// e.g. sha512 receives a writer that silently hashed with sha256, leading to
+// a compressed-blob digest in the wrong algorithm.
+//
+// The deferred (shared-namespace createAndCopy) path also forwards the
+// algorithm, but that is a performance fix only: the re-hash safety net in
+// the local store's Commit already preserves correctness for that flow, so it
+// is not directly exercised here.
+func TestContentWriterDigestAlgorithm(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore()
+
+	for _, algo := range []digest.Algorithm{digest.SHA256, digest.SHA384, digest.SHA512} {
+		t.Run(algo.String(), func(t *testing.T) {
+			blob := bytes.Repeat([]byte(algo.String()[0:1]), 1024)
+			expected := algo.FromBytes(blob)
+
+			cw, err := cs.Writer(ctx,
+				content.WithRef("alg-"+algo.String()),
+				content.WithBlobDigestAlgorithm(algo),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer cw.Close()
+			if _, err := cw.Write(blob); err != nil {
+				t.Fatal(err)
+			}
+			if got := cw.Digest(); got != expected {
+				t.Fatalf("metadata wrapper dropped the algorithm: got %s, want %s", got, expected)
+			}
+			if err := cw.Commit(ctx, int64(len(blob)), ""); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }
