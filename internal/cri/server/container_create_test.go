@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -763,4 +764,35 @@ func TestLinuxContainerMounts(t *testing.T) {
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
+}
+
+func TestCreateContainerIgnorePassedPodSandboxConfig(t *testing.T) {
+	c := newTestCRIService()
+	containerConfig, sandboxConfig, _, _ := getCreateContainerTestData()
+
+	testSandboxID := "sandbox-id"
+	// Pre-populate the sandbox store with the sandbox config
+	err := c.sandboxStore.Add(sandboxstore.NewSandbox(
+		sandboxstore.Metadata{
+			ID:     testSandboxID,
+			Config: sandboxConfig,
+		},
+		sandboxstore.Status{
+			State: sandboxstore.StateReady,
+		},
+	))
+	require.NoError(t, err)
+
+	// Verify that CreateContainer retrieves PodSandboxConfig from the store and doesn't fail if the request config is nil.
+	ctx := context.Background()
+	req := &runtime.CreateContainerRequest{
+		PodSandboxId:  testSandboxID,
+		Config:        containerConfig,
+		SandboxConfig: nil,
+	}
+
+	_, err = c.CreateContainer(ctx, req)
+	assert.Error(t, err)
+	// If it failed because sandboxConfig was nil, it would have returned "pod sandbox config must include metadata"
+	assert.NotContains(t, err.Error(), "pod sandbox config must include metadata")
 }
