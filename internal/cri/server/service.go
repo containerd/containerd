@@ -291,6 +291,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
 		SupplementalGroupsPolicy:  true,
 		UserNamespacesHostNetwork: goruntime.GOOS == "linux",
+		MountOptions:              goruntime.GOOS == "linux",
 	}
 
 	return c, c, nil
