@@ -642,7 +642,7 @@ func (u *Unpacker) unpack(
 				mounts = bindToOverlay(mounts)
 			}
 
-			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
+			diff, err := a.Apply(ctx, desc, mounts, applyOptsWithDefaultSync(unpack)...)
 			if err != nil {
 				cleanup.Do(ctx, abort)
 				status.err = fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
@@ -918,4 +918,9 @@ func bindToOverlay(mounts []mount.Mount) []mount.Mount {
 	m.Options = append(m.Options, "upperdir="+mounts[0].Source)
 
 	return []mount.Mount{m}
+}
+
+// applyOptsWithDefaultSync returns the apply options for a layer. By default the unpacked filesystem gets synced — the snapshot commit must not outlive its data on storage that may lose acknowledged-but-unflushed writes (consumer SD/eMMC, power loss, kernel panic). An explicit WithSyncFs opt from the caller overrides the default.
+func applyOptsWithDefaultSync(p *Platform) []diff.ApplyOpt {
+	return append([]diff.ApplyOpt{diff.WithSyncFs(true)}, p.ApplyOpts...)
 }

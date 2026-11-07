@@ -672,3 +672,21 @@ func TestUnpackStagedSequential(t *testing.T) {
 		assert.Equal(t, "", c.parent, "a sequentially staged layer is committed without WithParent")
 	}
 }
+
+// applyOptsWithDefaultSync must default to syncing the unpacked filesystem
+// while letting an explicit WithSyncFs opt from the caller win.
+func TestApplyOptsWithDefaultSync(t *testing.T) {
+	var cfg diff.ApplyConfig
+	for _, opt := range applyOptsWithDefaultSync(&Platform{}) {
+		require.NoError(t, opt(context.Background(), ocispec.Descriptor{}, &cfg))
+	}
+	assert.True(t, cfg.SyncFs, "expected sync-on-apply to default to true")
+
+	cfg = diff.ApplyConfig{}
+	for _, opt := range applyOptsWithDefaultSync(&Platform{
+		ApplyOpts: []diff.ApplyOpt{diff.WithSyncFs(false)},
+	}) {
+		require.NoError(t, opt(context.Background(), ocispec.Descriptor{}, &cfg))
+	}
+	assert.False(t, cfg.SyncFs, "expected an explicit WithSyncFs(false) to override the default")
+}
