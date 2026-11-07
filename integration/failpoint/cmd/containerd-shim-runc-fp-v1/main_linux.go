@@ -19,10 +19,54 @@ package main
 import (
 	"context"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/manager"
+	"github.com/containerd/containerd/v2/internal/failpoint"
 	"github.com/containerd/containerd/v2/pkg/shim"
 )
 
+const (
+	// beforeStartShim is evaluated by the bootstrap command before it starts
+	// the shim server.
+	beforeStartShim = "BeforeStartShim"
+
+	// afterStartShim is evaluated by the bootstrap command before it
+	// returns the server's address to containerd. An error here leaves the
+	// started shim server running.
+	afterStartShim = "AfterStartShim"
+)
+
 func main() {
-	shim.RunShim(context.Background(), manager.NewShimManager("io.containerd.runc-fp.v1"))
+	shim.RunShim(context.Background(), &shimWithStartFailpoint{
+		Shim: manager.NewShimManager("io.containerd.runc-fp.v1"),
+	})
+}
+
+type shimWithStartFailpoint struct {
+	shim.Shim
+}
+
+func (s *shimWithStartFailpoint) Start(ctx context.Context, params *bootapi.BootstrapParams) (*bootapi.BootstrapResult, error) {
+	fps, err := newFailpointFromOCIAnnotation()
+	if err != nil {
+		return nil, err
+	}
+	if err := evaluateFailpoint(fps, beforeStartShim); err != nil {
+		return nil, err
+	}
+	result, err := s.Shim.Start(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	if err := evaluateFailpoint(fps, afterStartShim); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func evaluateFailpoint(fps map[string]*failpoint.Failpoint, name string) error {
+	if fp, ok := fps[name]; ok {
+		return fp.Evaluate()
+	}
+	return nil
 }
