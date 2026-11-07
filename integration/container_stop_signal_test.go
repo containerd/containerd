@@ -173,6 +173,61 @@ func TestDefaultContainerStopSignal(t *testing.T) {
 	assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, status.GetState())
 }
 
+func TestImageContainerStopSignal(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Skipped on Windows.")
+	}
+
+	testPodLogDir := t.TempDir()
+
+	t.Log("Create a pod sandbox")
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "image-stop-signal", WithHostNetwork, WithPodLogDirectory(testPodLogDir))
+
+	var (
+		// The nginx image config declares STOPSIGNAL SIGQUIT.
+		testImage     = images.Get(images.Nginx)
+		containerName = "test-container"
+	)
+
+	EnsureImageExists(t, testImage)
+
+	t.Log("Create a container without custom stop signal")
+	scriptDir := writeStopSignalScript(t)
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "/stop-signal/stop-signal.sh", "QUIT"),
+		WithVolumeMount(scriptDir, "/stop-signal"),
+		WithLogPath(containerName),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	status, err := runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	assert.Equal(t, runtime.Signal_SIGNAL_SIGQUIT, status.GetStopSignal(), "Container status should return the stop signal from the image config")
+	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, status.GetState())
+
+	require.NoError(t, runtimeService.StopContainer(cn, 10))
+
+	status, err = runtimeService.ContainerStatus(cn)
+	require.NoError(t, err)
+	require.Equal(t, runtime.ContainerState_CONTAINER_EXITED, status.GetState())
+	assert.Equal(t, int32(0), status.GetExitCode(), "container should exit from the image stop signal trap")
+
+	t.Log("Check container log")
+	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+	require.NoError(t, err)
+	checkContainerLog(t, string(content), []string{
+		fmt.Sprintf("%s %s Received QUIT", runtime.Stdout, runtime.LogTagFull),
+	})
+}
+
 func writeStopSignalScript(t *testing.T) string {
 	t.Helper()
 
