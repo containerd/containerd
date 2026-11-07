@@ -20,6 +20,7 @@ package fs
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -47,6 +48,16 @@ func newInode(stat *syscall.Stat_t) inode {
 	}
 }
 
+func fileInfoStat(path string, fi os.FileInfo) (*syscall.Stat_t, error) {
+	sys := fi.Sys()
+	stat, ok := sys.(*syscall.Stat_t)
+	if !ok || stat == nil {
+		return nil, fmt.Errorf("failed to get stat for %q: expected *syscall.Stat_t, got %T", path, sys)
+	}
+
+	return stat, nil
+}
+
 func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 	var (
 		size   int64
@@ -56,7 +67,7 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 	for _, root := range roots {
 		if err := filepath.Walk(root, func(path string, fi os.FileInfo, err error) error {
 			if err != nil {
-				return err
+				return handleWalkError(root, path, err)
 			}
 
 			select {
@@ -65,7 +76,10 @@ func diskUsage(ctx context.Context, roots ...string) (Usage, error) {
 			default:
 			}
 
-			stat := fi.Sys().(*syscall.Stat_t)
+			stat, err := fileInfoStat(path, fi)
+			if err != nil {
+				return err
+			}
 			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}
@@ -90,13 +104,16 @@ func diffUsage(ctx context.Context, a, b string) (Usage, error) {
 		inodes = map[inode]struct{}{} // expensive!
 	)
 
-	if err := Changes(ctx, a, b, func(kind ChangeKind, _ string, fi os.FileInfo, err error) error {
+	if err := Changes(ctx, a, b, func(kind ChangeKind, path string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
 		if kind == ChangeKindAdd || kind == ChangeKindModify {
-			stat := fi.Sys().(*syscall.Stat_t)
+			stat, err := fileInfoStat(path, fi)
+			if err != nil {
+				return err
+			}
 			inoKey := newInode(stat)
 			if _, ok := inodes[inoKey]; !ok {
 				inodes[inoKey] = struct{}{}

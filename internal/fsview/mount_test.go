@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -32,6 +31,8 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
 
 	"github.com/containerd/containerd/v2/pkg/archive/tartest"
+	"github.com/containerd/continuity/tarconv"
+	goerofs "github.com/erofs/go-erofs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,47 +74,75 @@ func TestFSMountsLast(t *testing.T) {
 	}
 }
 
-func skipIfNoMkfsErofs(t *testing.T) {
-	t.Helper()
-	if _, err := exec.LookPath("mkfs.erofs"); err != nil {
-		t.Skip("mkfs.erofs not found in PATH")
-	}
-	supported, err := erofsutils.SupportGenerateFromTar()
-	if err != nil {
-		t.Skipf("failed to check mkfs.erofs tar support: %v", err)
-	}
-	if !supported {
-		t.Skip("mkfs.erofs does not support --tar= mode")
-	}
-}
-
 func makeEROFSFromTar(t *testing.T, wt tartest.WriterToTar) string {
 	t.Helper()
 	layerPath := filepath.Join(t.TempDir(), "layer.erofs")
 	rc := tartest.TarFromWriterTo(wt)
 	defer rc.Close()
-	if err := erofsutils.ConvertTarErofs(context.Background(), rc, layerPath, "", nil); err != nil {
+	if err := erofsutils.ConvertTarErofs(context.Background(), rc, layerPath, ""); err != nil {
 		t.Fatalf("ConvertTarErofs failed: %v", err)
 	}
 	return layerPath
 }
 
-func mergeEROFSLayers(t *testing.T, blobs ...string) string {
+// indexedLayer is a tar-index layer: an EROFS metadata image whose file data
+// lives in a separate data device.
+type indexedLayer struct {
+	meta string
+	data string
+}
+
+// makeIndexedLayer converts a tar into a tar-index layer. Whiteout entries are
+// kept as .wh.* files so mergeEROFSLayers can apply them.
+func makeIndexedLayer(t *testing.T, wt tartest.WriterToTar) indexedLayer {
+	t.Helper()
+	dir := t.TempDir()
+	l := indexedLayer{meta: filepath.Join(dir, "layer.erofs"), data: filepath.Join(dir, "device-0.blob")}
+	meta, err := os.Create(l.meta)
+	require.NoError(t, err)
+	defer meta.Close()
+	data, err := os.Create(l.data)
+	require.NoError(t, err)
+	defer data.Close()
+
+	rc := tartest.TarFromWriterTo(wt)
+	defer rc.Close()
+	w := goerofs.Create(meta, goerofs.WithBlockSize(512), goerofs.WithDataFile(data))
+	require.NoError(t, tarconv.Apply(w, rc, tarconv.WithPreserveWhiteouts()))
+	require.NoError(t, w.Close())
+	return l
+}
+
+// mergeEROFSLayers merges the metadata of layers, bottom first, into one image
+// that addresses each layer's data device in order. Whiteouts in an upper
+// layer remove entries of the layers below.
+func mergeEROFSLayers(t *testing.T, layers ...indexedLayer) string {
 	t.Helper()
 	output := filepath.Join(t.TempDir(), "merged.erofs")
-	args := append([]string{"--aufs", "--ovlfs-strip=1", "--quiet", output}, blobs...)
-	cmd := exec.Command("mkfs.erofs", args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("mkfs.erofs merge failed: %s: %v", string(out), err)
+	out, err := os.Create(output)
+	require.NoError(t, err)
+	defer out.Close()
+
+	w := goerofs.Create(out)
+	for _, l := range layers {
+		meta, err := os.Open(l.meta)
+		require.NoError(t, err)
+		defer meta.Close()
+		data, err := os.Open(l.data)
+		require.NoError(t, err)
+		defer data.Close()
+		img, err := goerofs.Open(meta, goerofs.WithExtraDevices(data))
+		require.NoError(t, err)
+		require.NoError(t, w.CopyFrom(img, goerofs.MetadataOnly(), goerofs.Merge()))
 	}
+	require.NoError(t, w.Close())
 	return output
 }
 
 // makeBaseErofs builds the base layer EROFS image (replaces testdata/base.erofs).
 func makeBaseErofs(t *testing.T) string {
 	t.Helper()
-	skipIfNoMkfsErofs(t)
+
 	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
 	return makeEROFSFromTar(t, tartest.TarAll(
 		tc.Dir("dir1", 0755),
@@ -130,7 +159,7 @@ func makeBaseErofs(t *testing.T) string {
 // Contains an opaque dir1 with a new file and whiteouts for file1.txt and file2.txt.
 func makeUpper1Erofs(t *testing.T) string {
 	t.Helper()
-	skipIfNoMkfsErofs(t)
+
 	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
 	return makeEROFSFromTar(t, tartest.TarAll(
 		tc.Dir("dir1", 0755),
@@ -146,7 +175,7 @@ func makeUpper1Erofs(t *testing.T) string {
 // Contains only a whiteout for dir1/file1.txt.
 func makeUpper2Erofs(t *testing.T) string {
 	t.Helper()
-	skipIfNoMkfsErofs(t)
+
 	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
 	return makeEROFSFromTar(t, tartest.TarAll(
 		tc.Dir("dir1", 0755),
@@ -155,28 +184,26 @@ func makeUpper2Erofs(t *testing.T) string {
 }
 
 func TestFSMountsEROFSWithDevices(t *testing.T) {
-	skipIfNoMkfsErofs(t)
-
 	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
 
-	layer1Path := makeEROFSFromTar(t, tartest.TarAll(
+	layer1 := makeIndexedLayer(t, tartest.TarAll(
 		tc.Dir("dir", 0755),
 		tc.File("dir/file1.txt", []byte("file1 content"), 0644),
 		tc.File("dir/file2.txt", []byte("file2 content"), 0644),
 	))
 
-	layer2Path := makeEROFSFromTar(t, tartest.TarAll(
+	layer2 := makeIndexedLayer(t, tartest.TarAll(
 		tc.Dir("dir", 0755),
 		tc.File("dir/file3.txt", []byte("file3 content"), 0644),
 	))
 
-	metaPath := mergeEROFSLayers(t, layer1Path, layer2Path)
+	metaPath := mergeEROFSLayers(t, layer1, layer2)
 
 	v, err := fsview.FSMounts([]mount.Mount{
 		{
 			Type:    "erofs",
 			Source:  metaPath,
-			Options: []string{"ro", "device=" + layer1Path, "device=" + layer2Path},
+			Options: []string{"ro", "device=" + layer1.data, "device=" + layer2.data},
 		},
 	})
 	if err != nil {
@@ -210,8 +237,6 @@ func TestFSMountsEROFSWithDevices(t *testing.T) {
 }
 
 func TestFSMountsOverlayAbsoluteSymlinkEtcGroup(t *testing.T) {
-	skipIfNoMkfsErofs(t)
-
 	expectedContent := "dummygroup:x:1001:root\n"
 	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
 	layerPath := makeEROFSFromTar(t, tartest.TarAll(
@@ -257,12 +282,10 @@ func TestFSMountsOverlayAbsoluteSymlinkEtcGroup(t *testing.T) {
 }
 
 func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
-	skipIfNoMkfsErofs(t)
-
 	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
 
 	// Layer 1 (bottom): regular files including ones that will be hidden
-	layer1Path := makeEROFSFromTar(t, tartest.TarAll(
+	layer1 := makeIndexedLayer(t, tartest.TarAll(
 		tc.Dir("dir", 0755),
 		tc.File("dir/file1.txt", []byte("file1 content"), 0644),
 		tc.File("dir/file2.txt", []byte("file2 content"), 0644),
@@ -272,9 +295,8 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 	))
 
 	// Layer 2 (top): new files, a whiteout for file5.txt, and an opaque opaquedir.
-	// AUFS-style markers (.wh.*) are converted by mkfs.erofs --aufs to
-	// overlay-native whiteouts (char dev 0:0) and opaque xattrs.
-	layer2Path := makeEROFSFromTar(t, tartest.TarAll(
+	// The AUFS-style markers (.wh.*) are applied by the merge.
+	layer2 := makeIndexedLayer(t, tartest.TarAll(
 		tc.Dir("dir", 0755),
 		tc.File("dir/file3.txt", []byte("file3 content"), 0644),
 		tc.File("dir/.wh.file5.txt", []byte{}, 0644),
@@ -285,7 +307,7 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 
 	// Merge with layer1 as lower (first arg) and layer2 as upper (last arg)
 	// so whiteouts in layer2 apply to layer1.
-	metaPath := mergeEROFSLayers(t, layer1Path, layer2Path)
+	metaPath := mergeEROFSLayers(t, layer1, layer2)
 
 	// Create upper directory with additional and override files
 	upperDir := filepath.Join(t.TempDir(), "upper")
@@ -304,7 +326,7 @@ func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
 		{
 			Type:    "erofs",
 			Source:  metaPath,
-			Options: []string{"ro", "device=" + layer1Path, "device=" + layer2Path},
+			Options: []string{"ro", "device=" + layer1.data, "device=" + layer2.data},
 		},
 		{
 			Type:   "format/overlay",

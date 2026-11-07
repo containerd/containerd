@@ -48,12 +48,24 @@ type convertOptions struct {
 	blobCompression string
 }
 
+// useMkfs reports whether the options require mkfs.erofs. The built-in Go
+// converter is used otherwise.
+func (o convertOptions) useMkfs() bool {
+	return o.compressors != "" || len(o.mkfsExtraOpts) > 0
+}
+
+// WithCompressors sets the per-file compression algorithms for the EROFS
+// image, e.g. "lz4". Setting it converts layers with mkfs.erofs from
+// erofs-utils instead of the built-in Go converter.
 func WithCompressors(compressors string) ConvertOpt {
 	return func(opts *convertOptions) {
 		opts.compressors = compressors
 	}
 }
 
+// WithMkfsOptions sets extra options for mkfs.erofs. Setting it converts
+// layers with mkfs.erofs from erofs-utils instead of the built-in Go
+// converter.
 func WithMkfsOptions(extraOpts []string) ConvertOpt {
 	return func(opts *convertOptions) {
 		opts.mkfsExtraOpts = extraOpts
@@ -197,18 +209,23 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 	defer ra.Close()
 	sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
 
-	var mkfsArgs []string
-	if copts.compressors != "" {
-		mkfsArgs = append(mkfsArgs, "-z"+copts.compressors, "-C", "65536")
-	}
-	mkfsArgs = append(mkfsArgs, copts.mkfsExtraOpts...)
-	mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
-
-	// Derive the erofs UUID from the uncompressed digest (diffID) so the blob is a
-	// deterministic function of the layer content, independent of how the source
-	// was compressed. This is also the key the layer content cache uses.
+	// The UUID is derived from the uncompressed digest (diffID), the key the
+	// layer content cache uses, so the blob does not depend on how the source
+	// was compressed. mkfs.erofs records it; go-erofs does not yet. With the
+	// Go converter the blob is a deterministic function of the layer content:
+	// go-erofs derives the image build time from the entries.
 	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+uncompressedDesc.Digest))
-	if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
+	if copts.useMkfs() {
+		var mkfsArgs []string
+		if copts.compressors != "" {
+			mkfsArgs = append(mkfsArgs, "-z"+copts.compressors, "-C", "65536")
+		}
+		mkfsArgs = append(mkfsArgs, copts.mkfsExtraOpts...)
+		mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
+		if err := erofsutils.MkfsConvertTar(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
+			return "", fmt.Errorf("failed to convert to EROFS: %w", err)
+		}
+	} else if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String()); err != nil {
 		return "", fmt.Errorf("failed to convert to EROFS: %w", err)
 	}
 	log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)

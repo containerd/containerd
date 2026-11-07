@@ -149,7 +149,9 @@ func WithBlockSize(n int) CreateOpt {
 	}
 }
 
-// WithBuildTime sets the filesystem build timestamp.
+// WithBuildTime sets the filesystem build timestamp. Without it, the build
+// time comes from the source image in CopyFrom, or else is the most common
+// whole-second mtime among the written entries (0 if there is none).
 func WithBuildTime(sec uint64, nsec uint32) CreateOpt {
 	return func(o *createOptions) {
 		o.buildTime = sec
@@ -617,13 +619,17 @@ func (fsys *Writer) Close() error {
 		fsys.devices[0] = uint64(blocks)
 	}
 
-	buildTime := fsys.buildTime
-	if !fsys.hasBuildTime {
-		buildTime = uint64(time.Now().Unix())
-	}
-
 	// Build erofsEntry tree from the fsEntry tree via BFS.
-	root := fsys.buildErofsTree()
+	var policy mtimePolicy
+	if !fsys.hasBuildTime {
+		policy = newMostCommonMtime()
+	}
+	root := fsys.buildErofsTree(policy)
+
+	buildTime, buildTimeNs := fsys.buildTime, fsys.buildTimeNs
+	if policy != nil {
+		buildTime, buildTimeNs = policy.result()
+	}
 
 	var chunkBits uint8
 	for cs := fsys.blockSize; cs < 4096; cs <<= 1 {
@@ -632,7 +638,7 @@ func (fsys *Writer) Close() error {
 
 	ew := &erofsWriter{
 		buildTime:    buildTime,
-		buildTimeNs:  fsys.buildTimeNs,
+		buildTimeNs:  buildTimeNs,
 		devices:      fsys.devices,
 		blockSize:    fsys.blockSize,
 		chunkBits:    chunkBits,
@@ -1539,7 +1545,15 @@ func unlinkInode(ino *fsInode) {
 
 // buildErofsTree converts the fsEntry tree into an erofsEntry tree via BFS.
 // Children are sorted for deterministic output. The Writer is consumed.
-func (fsys *Writer) buildErofsTree() *erofsEntry {
+// If policy is non-nil, it observes the mtime of each inode written, once
+// per inode.
+func (fsys *Writer) buildErofsTree(policy mtimePolicy) *erofsEntry {
+	countMtime := func(e *erofsEntry) {
+		if policy != nil && e.hardLinkPrimary == nil {
+			policy.observe(e.mtime, e.mtimeNs)
+		}
+	}
+
 	type pair struct {
 		fs *fsEntry
 		er *erofsEntry
@@ -1552,6 +1566,7 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 	seen := make(map[*fsInode]*erofsEntry)
 
 	rootEr := fsys.fsToErofs(fsys.root)
+	countMtime(rootEr)
 	queue := []pair{{fsys.root, rootEr}}
 
 	for len(queue) > 0 {
@@ -1582,6 +1597,7 @@ func (fsys *Writer) buildErofsTree() *erofsEntry {
 					seen[c.ino] = ent
 				}
 			}
+			countMtime(ent)
 
 			cur.er.children = append(cur.er.children, ent)
 			if c.ino.mode&disk.StatTypeMask == disk.StatTypeDir {
