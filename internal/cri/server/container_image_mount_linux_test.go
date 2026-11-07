@@ -24,10 +24,71 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func TestImageVolumeReference(t *testing.T) {
+	imageID := digest.FromString("image config").String()
+	repoDigest := "docker.io/library/alpine@" + digest.FromString("image manifest").String()
+	imageTag := "docker.io/library/alpine:latest"
+
+	for _, tc := range []struct {
+		name         string
+		requestedRef string
+		imageID      string
+		references   []string
+		expected     string
+	}{
+		{
+			name:         "preserve requested digest",
+			requestedRef: repoDigest,
+			imageID:      imageID,
+			references:   []string{imageTag, imageID, repoDigest},
+			expected:     repoDigest,
+		},
+		{
+			name:         "prefer config digest alias over mutable tag",
+			requestedRef: imageID,
+			imageID:      imageID,
+			references:   []string{imageTag, repoDigest, imageID},
+			expected:     imageID,
+		},
+		{
+			name:         "prefer config digest alias over requested tag",
+			requestedRef: imageTag,
+			imageID:      imageID,
+			references:   []string{imageTag, repoDigest, imageID},
+			expected:     imageID,
+		},
+		{
+			name:         "prefer repo digest when config digest alias is absent",
+			requestedRef: imageID,
+			imageID:      imageID,
+			references:   []string{imageTag, repoDigest},
+			expected:     repoDigest,
+		},
+		{
+			name:         "fall back to mutable ref when no digest alias exists",
+			requestedRef: imageTag,
+			imageID:      imageID,
+			references:   []string{imageTag},
+			expected:     imageTag,
+		},
+		{
+			name:         "no references",
+			requestedRef: imageID,
+			imageID:      imageID,
+			expected:     "",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, imageVolumeReference(tc.requestedRef, tc.imageID, tc.references))
+		})
+	}
+}
 
 func TestGetImageVolumeSnapshotOpts(t *testing.T) {
 	ctx := context.Background()
