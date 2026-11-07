@@ -55,6 +55,19 @@ image, err := client.Pull(context, "docker.io/library/redis:latest")
 err := client.Push(context, "docker.io/library/redis:latest", image.Target())
 ```
 
+Images can also be transferred using the transfer service:
+
+```go
+// pull an image using the transfer service
+reg, err := registry.NewOCIRegistry(context, "docker.io/library/redis:latest")
+is := image.NewStore("docker.io/library/redis:latest")
+err = client.Transfer(context, reg, is)
+img, err := client.GetImage(context, "docker.io/library/redis:latest")
+
+// push an image using the transfer service
+err = client.Transfer(context, is, reg)
+```
+
 ## Containers
 
 In containerd, a container is a metadata object. Resources such as an OCI runtime specification, image, root filesystem, and other metadata can be attached to a container.
@@ -96,6 +109,18 @@ for i := 0; i < 10; i++ {
 		containerd.WithNewSpec(oci.WithImageConfig(image)),
 	)
 }
+```
+
+Images can also be pulled and unpacked using the transfer service:
+
+```go
+reg, err := registry.NewOCIRegistry(context, "docker.io/library/redis:latest")
+is := image.NewStore("docker.io/library/redis:latest",
+	image.WithPlatforms(platforms.DefaultSpec()),
+	image.WithUnpack(platforms.DefaultSpec(), "overlayfs"),
+)
+err = client.Transfer(context, reg, is)
+img, err := client.GetImage(context, "docker.io/library/redis:latest")
 ```
 
 ## Tasks

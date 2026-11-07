@@ -265,7 +265,35 @@ We can use the redis image based on Alpine Linux from the DockerHub.
 ```
 
 The containerd client uses the `Opts` pattern for many of the method calls.
-We use the `containerd.WithPullUnpack` so that we not only fetch and download the content into containerd's content store but also unpack it into a snapshotter for use as a root filesystem.
+We use `containerd.WithPullUnpack` so that we not only fetch and download the content into containerd's content store but also unpack it into a snapshotter for use as a root filesystem.
+
+Images can also be pulled using the transfer service:
+
+```go
+	ref := "docker.io/library/redis:alpine"
+
+	reg, err := registry.NewOCIRegistry(ctx, ref)
+	if err != nil {
+		return err
+	}
+
+	platform := platforms.DefaultSpec()
+	is := image.NewStore(ref,
+		image.WithPlatforms(platform),
+		image.WithUnpack(platform, defaults.DefaultSnapshotter),
+	)
+
+	if err := client.Transfer(ctx, reg, is); err != nil {
+		return err
+	}
+
+	image, err := client.GetImage(ctx, ref)
+	if err != nil {
+		return err
+	}
+```
+
+With the transfer service, `image.WithPlatforms` restricts layers to the desired platform, and `image.WithUnpack` unpacks them into a snapshotter for use as a root filesystem.
 
 Let's put the code together that will pull the redis image based on alpine linux from Dockerhub and then print the name of the image on the console's output.
 
@@ -295,6 +323,73 @@ func redisExample() error {
 
         ctx := namespaces.WithNamespace(context.Background(), "example")
         image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
+        if err != nil {
+                return err
+        }
+        log.Printf("Successfully pulled %s image\n", image.Name())
+
+        return nil
+}
+```
+
+Let's see it in action.
+
+```bash
+> go build main.go
+> sudo ./main
+
+2017/08/13 17:43:21 Successfully pulled docker.io/library/redis:alpine image
+```
+
+Here is the same example using the transfer service:
+
+```go
+package main
+
+import (
+        "context"
+        "log"
+
+        containerd "github.com/containerd/containerd/v2/client"
+        "github.com/containerd/containerd/v2/core/transfer/image"
+        "github.com/containerd/containerd/v2/core/transfer/registry"
+        "github.com/containerd/containerd/v2/defaults"
+        "github.com/containerd/containerd/v2/pkg/namespaces"
+        "github.com/containerd/platforms"
+)
+
+func main() {
+        if err := redisExample(); err != nil {
+                log.Fatal(err)
+        }
+}
+
+func redisExample() error {
+        client, err := containerd.New("/run/containerd/containerd.sock")
+        if err != nil {
+                return err
+        }
+        defer client.Close()
+
+        ctx := namespaces.WithNamespace(context.Background(), "example")
+        ref := "docker.io/library/redis:alpine"
+
+        reg, err := registry.NewOCIRegistry(ctx, ref)
+        if err != nil {
+                return err
+        }
+
+        platform := platforms.DefaultSpec()
+        is := image.NewStore(ref,
+                image.WithPlatforms(platform),
+                image.WithUnpack(platform, defaults.DefaultSnapshotter),
+        )
+
+        if err := client.Transfer(ctx, reg, is); err != nil {
+                return err
+        }
+
+        image, err := client.GetImage(ctx, ref)
         if err != nil {
                 return err
         }
