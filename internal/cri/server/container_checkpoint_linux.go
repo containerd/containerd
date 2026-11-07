@@ -302,24 +302,46 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	// write final tarball of all content
 	tar := archive.Diff(ctx, "", cpPath)
 
-	outFile, err := os.OpenFile(r.Location, os.O_RDWR|os.O_CREATE, 0o600)
-	if err != nil {
+	if err = writeCheckpointArchive(r.Location, tar); err != nil {
+		// Close to unblock the goroutine writing the archive into the pipe
+		_ = tar.Close()
 		return nil, err
 	}
-	defer outFile.Close()
-	_, err = io.Copy(outFile, tar)
-	if err != nil {
-		return nil, err
-	}
-	if err := tar.Close(); err != nil {
+	if err = tar.Close(); err != nil {
 		return nil, err
 	}
 
 	containerCheckpointTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
-	log.G(ctx).Infof("Wrote checkpoint archive to %s for %s", outFile.Name(), container.ID)
+	log.G(ctx).Infof("Wrote checkpoint archive to %s for %s", r.Location, container.ID)
 
 	return &runtime.CheckpointContainerResponse{}, nil
+}
+
+// writeCheckpointArchive writes the checkpoint archive read from content to
+// location.
+//
+// location is created exclusively, so an existing file is never overwritten.
+// A partial archive is removed when the write fails, so a retry is not blocked
+// by the remains of the attempt that failed.
+func writeCheckpointArchive(location string, content io.Reader) (retErr error) {
+	outFile, err := os.OpenFile(location, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("failed to create checkpoint archive: %w", err)
+	}
+	defer func() {
+		if err := outFile.Close(); err != nil && retErr == nil {
+			retErr = fmt.Errorf("failed to close checkpoint archive %s: %w", location, err)
+		}
+		if retErr != nil {
+			_ = os.Remove(location)
+		}
+	}()
+
+	if _, err = io.Copy(outFile, content); err != nil {
+		return fmt.Errorf("failed to write checkpoint archive %s: %w", location, err)
+	}
+	return nil
 }
 
 func withCheckpointOpts(rt, rootDir string) client.CheckpointTaskOpts {

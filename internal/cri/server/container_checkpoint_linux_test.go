@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -221,4 +222,66 @@ func TestCheckpointContainerDisabled(t *testing.T) {
 	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
 		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
 	}
+}
+
+func TestWriteCheckpointArchive(t *testing.T) {
+	dir := t.TempDir()
+	location := filepath.Join(dir, "checkpoint.tar")
+
+	require.NoError(t, writeCheckpointArchive(location, strings.NewReader("archive")))
+
+	data, err := os.ReadFile(location)
+	require.NoError(t, err)
+	assert.Equal(t, "archive", string(data))
+
+	info, err := os.Stat(location)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+}
+
+// A location that is already taken is left untouched. Overwriting it would
+// destroy an archive that is still wanted, and the leftover tail of a larger
+// one would ride along in the export unnoticed.
+func TestWriteCheckpointArchiveRefusesExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	location := filepath.Join(dir, "checkpoint.tar")
+	require.NoError(t, os.WriteFile(location, []byte("a previous archive"), 0o600))
+
+	err := writeCheckpointArchive(location, strings.NewReader("archive"))
+	assert.ErrorIs(t, err, os.ErrExist)
+
+	data, err := os.ReadFile(location)
+	require.NoError(t, err)
+	assert.Equal(t, "a previous archive", string(data))
+}
+
+// containerd writes this file as root, so a symlink at location must not be
+// followed to its target.
+func TestWriteCheckpointArchiveRefusesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target")
+	location := filepath.Join(dir, "checkpoint.tar")
+	require.NoError(t, os.WriteFile(target, []byte("not the checkpoint"), 0o600))
+	require.NoError(t, os.Symlink(target, location))
+
+	err := writeCheckpointArchive(location, strings.NewReader("archive"))
+	assert.ErrorIs(t, err, os.ErrExist)
+
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "not the checkpoint", string(data))
+}
+
+// A failed write must not leave a partial archive behind: with exclusive
+// creation it would block every later attempt at the same location.
+func TestWriteCheckpointArchiveRemovesPartialArchive(t *testing.T) {
+	dir := t.TempDir()
+	location := filepath.Join(dir, "checkpoint.tar")
+
+	readErr := errors.New("read failed")
+	err := writeCheckpointArchive(location, iotest.ErrReader(readErr))
+	assert.ErrorIs(t, err, readErr)
+
+	_, statErr := os.Stat(location)
+	assert.ErrorIs(t, statErr, os.ErrNotExist, "partial archive should be removed")
 }
