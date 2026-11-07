@@ -85,8 +85,8 @@ require (
 	google.golang.org/protobuf v1.36.12
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1
-	k8s.io/cri-api v0.37.2
-	k8s.io/cri-client v0.37.1
+	k8s.io/cri-api v0.38.0-alpha.3.0.20261103220019-c905c2ece198
+	k8s.io/cri-client v0.31.0-alpha.0.0.20261103220222-2c1d91fccd6b
 	k8s.io/cri-streaming v0.37.1
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.37.2
@@ -143,11 +143,11 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/term v0.46.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.37.1 // indirect
