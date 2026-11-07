@@ -352,10 +352,11 @@ type unpackStatus struct {
 	startAt time.Time
 }
 
-// layerSnapshotLabels filters out containerd.io/snapshot/uidmapping and
-// .../gidmapping annotations from the (untrusted) image manifest to prevent
-// snapshotters from incorrectly chowning the extracted layer to the supplied
-// mapped host uid/gid.
+// layerSnapshotLabels filters out containerd.io/snapshot/uidmapping,
+// .../gidmapping, and .../max-size annotations from the (untrusted) image
+// manifest to prevent snapshotters from incorrectly chowning the extracted
+// layer to the supplied mapped host uid/gid, and from sizing the writable
+// layer from an image-supplied value.
 func layerSnapshotLabels(annotations map[string]string) map[string]string {
 	labels := snapshots.FilterInheritedLabels(annotations)
 	if labels == nil {
@@ -363,6 +364,7 @@ func layerSnapshotLabels(annotations map[string]string) map[string]string {
 	}
 	delete(labels, snapshots.LabelSnapshotUIDMapping)
 	delete(labels, snapshots.LabelSnapshotGIDMapping)
+	delete(labels, snapshots.LabelSnapshotMaxSize)
 	return labels
 }
 

@@ -116,10 +116,12 @@ func BenchmarkUnpackWithChainIDs(b *testing.B) {
 func TestLayerSnapshotLabels(t *testing.T) {
 	// Layer annotations come from the (untrusted) image manifest. The id-mapping
 	// labels drive a host-side chown of the extracted layer in the snapshotter's
-	// Prepare, so they must be filtered out.
+	// Prepare, and the max-size label sizes the writable layer of an active
+	// snapshot (e.g. the erofs block image), so they must be filtered out.
 	got := layerSnapshotLabels(map[string]string{
 		snapshots.LabelSnapshotUIDMapping: "0:1000:1",
 		snapshots.LabelSnapshotGIDMapping: "0:1000:1",
+		snapshots.LabelSnapshotMaxSize:    "1073741824",
 		"containerd.io/snapshot/remote":   "keep",
 		"unrelated":                       "drop",
 	})
@@ -129,6 +131,9 @@ func TestLayerSnapshotLabels(t *testing.T) {
 	}
 	if _, ok := got[snapshots.LabelSnapshotGIDMapping]; ok {
 		t.Errorf("gid mapping label from image annotations must be dropped, got %q", got[snapshots.LabelSnapshotGIDMapping])
+	}
+	if _, ok := got[snapshots.LabelSnapshotMaxSize]; ok {
+		t.Errorf("max-size label from image annotations must be dropped, got %q", got[snapshots.LabelSnapshotMaxSize])
 	}
 	if got["containerd.io/snapshot/remote"] != "keep" {
 		t.Errorf("inherited snapshot label must be preserved, got %q", got["containerd.io/snapshot/remote"])
