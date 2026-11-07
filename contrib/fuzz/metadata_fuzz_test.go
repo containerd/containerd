@@ -303,7 +303,7 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *metadata.DB, func()
 		snapshotters[name] = snapshotter
 	}
 
-	cs, err := local.NewStore(filepath.Join(dirname, "content"))
+	cs, err := local.NewStore(filepath.Join(dirname, "content"), nil)
 	if err != nil {
 		return ctx, nil, func() { cancel() }, err
 	}
