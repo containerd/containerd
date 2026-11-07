@@ -7,7 +7,7 @@ The available snapshotters can be inspected by running `ctr plugins ls` or `nerd
 ## Core snapshotter plugins
 
 Generic:
-- `overlayfs` (default): OverlayFS. This driver is akin to Docker/Moby's "overlay2" storage driver, but containerd's implementation is not called "overlay2".
+- `overlayfs` (default): OverlayFS. This driver is akin to Docker/Moby's "overlay2" storage driver, but containerd's implementation is not called "overlay2". See also [`overlayfs.md`](./overlayfs.md).
 - `native`: Native file copying driver. Akin to Docker/Moby's "vfs" driver.
 
 Block-based:
