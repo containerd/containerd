@@ -42,6 +42,7 @@ import (
 )
 
 const snapshotTempDirPrefix = "new-"
+const upperdirKey = "containerd.io/snapshot/overlay.upperdir"
 
 // SnapshotterConfig is used to configure the erofs snapshotter instance
 type SnapshotterConfig struct {
@@ -64,6 +65,7 @@ type SnapshotterConfig struct {
 	// doesn't exist is treated as a cache miss. Layers missing from all of them
 	// are converted normally.
 	layerContentCaches []string
+	upperdirLabel      bool
 }
 
 // Opt is an option to configure the erofs snapshotter
@@ -128,6 +130,14 @@ func WithLayerContentCaches(paths ...string) Opt {
 	}
 }
 
+// WithUpperdirLabel adds as an optional label
+// "containerd.io/snapshot/overlay.upperdir". This stores the location
+// of the upperdir that contains the changeset between the labelled
+// snapshot and its parent.
+func WithUpperdirLabel(config *SnapshotterConfig) {
+	config.upperdirLabel = true
+}
+
 type MetaStore interface {
 	TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error)
 	WithTransaction(ctx context.Context, writable bool, fn storage.TransactionCallback) error
@@ -146,6 +156,7 @@ type snapshotter struct {
 	remapIDs           bool
 	dmverityMode       string
 	layerContentCaches []string
+	upperdirLabel      bool
 }
 
 // NewSnapshotter returns a Snapshotter which uses EROFS+OverlayFS. The layers
@@ -250,6 +261,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		remapIDs:           config.remapIDs,
 		dmverityMode:       config.dmverityMode,
 		layerContentCaches: config.layerContentCaches,
+		upperdirLabel:      config.upperdirLabel,
 	}, nil
 }
 
@@ -1152,10 +1164,17 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 }
 
 func (s *snapshotter) Stat(ctx context.Context, key string) (info snapshots.Info, err error) {
+	var id string
 	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
-		_, info, _, err = storage.GetInfo(ctx, key)
+		id, info, _, err = storage.GetInfo(ctx, key)
 		return err
 	})
+	if s.upperdirLabel && info.Kind != snapshots.KindView {
+		if info.Labels == nil {
+			info.Labels = make(map[string]string)
+		}
+		info.Labels[upperdirKey] = s.upperPath(id)
+	}
 	if err != nil {
 		return snapshots.Info{}, err
 	}
@@ -1181,7 +1200,20 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		}
 
 		info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
-		return err
+		if err != nil {
+			return err
+		}
+		if s.upperdirLabel && info.Kind != snapshots.KindView {
+			id, _, _, err := storage.GetInfo(ctx, info.Name)
+			if err != nil {
+				return err
+			}
+			if info.Labels == nil {
+				info.Labels = make(map[string]string)
+			}
+			info.Labels[upperdirKey] = s.upperPath(id)
+		}
+		return nil
 	})
 	if err != nil {
 		return snapshots.Info{}, err
@@ -1192,7 +1224,22 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 	return s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
-		return storage.WalkInfo(ctx, fn, fs...)
+		if !s.upperdirLabel {
+			return storage.WalkInfo(ctx, fn, fs...)
+		}
+		return storage.WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
+			if info.Kind != snapshots.KindView {
+				id, _, _, err := storage.GetInfo(ctx, info.Name)
+				if err != nil {
+					return err
+				}
+				if info.Labels == nil {
+					info.Labels = make(map[string]string)
+				}
+				info.Labels[upperdirKey] = s.upperPath(id)
+			}
+			return fn(ctx, info)
+		}, fs...)
 	})
 }
 
