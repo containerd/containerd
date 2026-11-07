@@ -1034,7 +1034,7 @@ func (c *criContainer) GetPid() uint32 {
 }
 
 func (c *criContainer) GetRlimits() []*api.POSIXRlimit {
-	if c.spec == nil {
+	if c.spec == nil || c.spec.Process == nil {
 		return nil
 	}
 
