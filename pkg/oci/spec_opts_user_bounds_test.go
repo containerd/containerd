@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"io/fs"
+	"strconv"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -27,6 +28,78 @@ import (
 	"github.com/moby/sys/user"
 	"github.com/stretchr/testify/assert"
 )
+
+// TestUserIDBoundsFromFS asserts that a UID/GID read from an image's
+// /etc/passwd or /etc/group is rejected when it falls outside the range
+// OCI accepts ([0, MaxUint32-1]), instead of wrapping when narrowed to the
+// spec's uint32 fields (for example 1<<32 -> 0, i.e. root).
+func TestUserIDBoundsFromFS(t *testing.T) {
+	t.Parallel()
+
+	// MaxUint32 is the first value past the bound; 1<<32 additionally wraps
+	// to 0 (root) when cast to uint32.
+	overflows := []string{"4294967295", "4294967296"}
+
+	t.Run("passwd uid past bound is rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, overflow := range overflows {
+			fsys := fstest.MapFS{
+				"etc/passwd": &fstest.MapFile{Data: []byte("evil:x:" + overflow + ":10::/:/bin/sh\n"), Mode: 0o644},
+			}
+			_, err := UserFromFS(fsys, func(u user.User) bool { return u.Name == "evil" })
+			assert.ErrorContains(t, err, "out of range", "uid %s", overflow)
+		}
+	})
+
+	t.Run("passwd gid past bound is rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, overflow := range overflows {
+			fsys := fstest.MapFS{
+				"etc/passwd": &fstest.MapFile{Data: []byte("evil:x:10:" + overflow + "::/:/bin/sh\n"), Mode: 0o644},
+			}
+			_, err := UserFromFS(fsys, func(u user.User) bool { return u.Name == "evil" })
+			assert.ErrorContains(t, err, "out of range", "gid %s", overflow)
+		}
+	})
+
+	t.Run("group gid past bound is rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, overflow := range overflows {
+			fsys := fstest.MapFS{
+				"etc/group": &fstest.MapFile{Data: []byte("evil:x:" + overflow + ":\n"), Mode: 0o644},
+			}
+			_, err := GIDFromFS(fsys, func(g user.Group) bool { return g.Name == "evil" })
+			assert.ErrorContains(t, err, "out of range", "gid %s", overflow)
+
+			_, err = getSupplementalGroupsFromFS(fsys, func(g user.Group) bool { return g.Name == "evil" })
+			assert.ErrorContains(t, err, "out of range", "gid %s", overflow)
+		}
+	})
+
+	t.Run("in-range ids are accepted", func(t *testing.T) {
+		t.Parallel()
+
+		// user.User and user.Group keep ids in an int, so the largest id OCI
+		// accepts is not representable on a 32-bit platform and is refused
+		// there as out of range.
+		if strconv.IntSize == 32 {
+			t.Skip("ids above MaxInt32 do not fit in user.User.Uid on 32-bit platforms")
+		}
+
+		const maxValid = "4294967294" // MaxUint32-1, the largest id OCI accepts
+		fsys := fstest.MapFS{
+			"etc/passwd": &fstest.MapFile{Data: []byte("app:x:" + maxValid + ":" + maxValid + "::/:/bin/sh\n"), Mode: 0o644},
+			"etc/group":  &fstest.MapFile{Data: []byte("app:x:" + maxValid + ":\n"), Mode: 0o644},
+		}
+		usr, err := UserFromFS(fsys, func(u user.User) bool { return u.Name == "app" })
+		assert.NoError(t, err)
+		assert.Equal(t, int64(4294967294), int64(usr.Uid))
+
+		gid, err := GIDFromFS(fsys, func(g user.Group) bool { return g.Name == "app" })
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(4294967294), gid)
+	})
+}
 
 // TestOpenUserFileCapsReads asserts the boundary behavior of the read cap:
 // well below, ending exactly at, and past maxUserFileBytes.
@@ -151,4 +224,71 @@ func (s singleFileFS) Open(name string) (fs.File, error) {
 		return s.file, nil
 	}
 	return nil, fs.ErrNotExist
+}
+
+// TestMalformedUserIDFromFS asserts that an entry whose uid or gid field is
+// not a number is not treated as a usable entry. The parser in
+// github.com/moby/sys/user discards the conversion error, so such a field
+// arrives as 0, which a bound check cannot tell from a real id: a malformed
+// entry would otherwise resolve to root.
+func TestMalformedUserIDFromFS(t *testing.T) {
+	t.Parallel()
+
+	malformed := []string{"not-a-uid", "", "-1", "0x10"}
+
+	t.Run("passwd uid", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range malformed {
+			fsys := fstest.MapFS{
+				"etc/passwd": &fstest.MapFile{Data: []byte("evil:x:" + id + ":10::/:/bin/sh\n"), Mode: 0o644},
+			}
+			usr, err := UserFromFS(fsys, func(u user.User) bool { return u.Name == "evil" })
+			assert.Error(t, err, "uid %q resolved to uid %d", id, usr.Uid)
+		}
+	})
+
+	t.Run("passwd gid", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range malformed {
+			fsys := fstest.MapFS{
+				"etc/passwd": &fstest.MapFile{Data: []byte("evil:x:10:" + id + "::/:/bin/sh\n"), Mode: 0o644},
+			}
+			usr, err := UserFromFS(fsys, func(u user.User) bool { return u.Name == "evil" })
+			assert.Error(t, err, "gid %q resolved to gid %d", id, usr.Gid)
+		}
+	})
+
+	t.Run("group gid", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range malformed {
+			fsys := fstest.MapFS{
+				"etc/group": &fstest.MapFile{Data: []byte("evilgrp:x:" + id + ":\n"), Mode: 0o644},
+			}
+			gid, err := GIDFromFS(fsys, func(g user.Group) bool { return g.Name == "evilgrp" })
+			assert.Error(t, err, "gid %q resolved to gid %d", id, gid)
+
+			gids, err := getSupplementalGroupsFromFS(fsys, func(g user.Group) bool { return g.Name == "evilgrp" })
+			assert.NoError(t, err)
+			assert.Empty(t, gids, "gid %q resolved to %v", id, gids)
+		}
+	})
+
+	// A line the parser cannot read an id from parses as id 0, so skipping it
+	// also keeps it from matching a lookup for root ahead of the real entry.
+	t.Run("does not shadow a well-formed entry", func(t *testing.T) {
+		t.Parallel()
+
+		fsys := fstest.MapFS{
+			"etc/passwd": &fstest.MapFile{Data: []byte("# comment\nroot:x:0:0:root:/root:/bin/sh\n"), Mode: 0o644},
+			"etc/group":  &fstest.MapFile{Data: []byte("broken:x::\nroot:x:0:\n"), Mode: 0o644},
+		}
+
+		usr, err := UserFromFS(fsys, func(u user.User) bool { return u.Uid == 0 })
+		assert.NoError(t, err)
+		assert.Equal(t, "root", usr.Name)
+
+		gids, err := getSupplementalGroupsFromFS(fsys, func(g user.Group) bool { return g.Gid == 0 })
+		assert.NoError(t, err)
+		assert.Equal(t, []uint32{0}, gids)
+	})
 }
