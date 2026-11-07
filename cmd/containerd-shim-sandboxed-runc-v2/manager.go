@@ -246,8 +246,8 @@ func (m *manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *
 		return nil, fmt.Errorf("failed to fetch runc options: %w", err)
 	} else if found {
 		// The runc options are persisted in the bundle. The sandbox service
-		// reads them to run containerd-sandbox-init through the same runc,
-		// root and cgroup driver as the containers of the pod, and Stop
+		// reads them to create the sandbox runc container through the same
+		// runc, root and cgroup driver as the containers of the pod, and Stop
 		// reads them to delete that container once the shim is gone.
 		if err := runc.WriteOptions(cwd, &runcOpts); err != nil {
 			return nil, fmt.Errorf("failed to persist the runc options: %w", err)
@@ -279,11 +279,11 @@ func (m *manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *
 // container task that joined the shim. Stop does not tell the two apart and
 // runs both cleanups every time:
 //   - The runc task cleanup of containerd-shim-runc-v2 force-deletes the runc
-//     container of that id and detaches its rootfs. In the sandbox bundle of a
-//     shared-PID pod that deletes containerd-sandbox-init; in any other
-//     sandbox bundle it does nothing.
-//   - The sandbox cleanup detaches every mount under the bundle and removes
-//     the pod files. In a task bundle it does nothing.
+//     container of that id and detaches its rootfs. In a sandbox bundle that
+//     deletes the setup runc container, which a shared-PID pod or a failed
+//     setup leaves behind.
+//   - The sandbox cleanup unmounts the namespace pins and the shm tmpfs and
+//     removes the pod files. In a task bundle it does nothing.
 func (m *manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	status, err := m.legacy.Stop(ctx, id)
 	cwd, cwdErr := os.Getwd()

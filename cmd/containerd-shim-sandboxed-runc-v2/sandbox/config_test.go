@@ -20,6 +20,8 @@ package sandbox
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
@@ -171,6 +173,12 @@ func TestConfigFromRequest(t *testing.T) {
 		_, err = ConfigFromRequest(createRequest(t, pc, testNetNS))
 		require.Error(t, err, "an IPC sysctl would change the host, however it is spelled")
 		assert.True(t, errdefs.IsInvalidArgument(err))
+
+		// One sysctl under both spellings does not have a single value to apply.
+		pc = testPodConfig()
+		pc.Linux.Sysctls = map[string]string{"net.ipv4.ip_forward": "1", "net/ipv4/ip_forward": "0"}
+		_, err = ConfigFromRequest(createRequest(t, pc, testNetNS))
+		assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
 	})
 
 	t.Run("shared pid namespace is accepted but not shared", func(t *testing.T) {
@@ -237,31 +245,49 @@ func TestConfigFromRequest(t *testing.T) {
 	})
 }
 
-func TestSysctlPath(t *testing.T) {
+func TestSysctlKey(t *testing.T) {
 	// Either separator, as in sysctl.d(5): the first one separates the
-	// components and the other character is literal, which is how a dotted
-	// interface name is spelled. The dotted form is what gets classified.
-	for key, want := range map[string][2]string{
-		"net.ipv4.ip_unprivileged_port_start": {"/proc/sys/net/ipv4/ip_unprivileged_port_start", "net.ipv4.ip_unprivileged_port_start"},
-		"net/ipv4/ip_unprivileged_port_start": {"/proc/sys/net/ipv4/ip_unprivileged_port_start", "net.ipv4.ip_unprivileged_port_start"},
-		"net.ipv4.conf.eth0/100.rp_filter":    {"/proc/sys/net/ipv4/conf/eth0.100/rp_filter", "net.ipv4.conf.eth0/100.rp_filter"},
-		"net/ipv4/conf/eth0.100/rp_filter":    {"/proc/sys/net/ipv4/conf/eth0.100/rp_filter", "net.ipv4.conf.eth0/100.rp_filter"},
-		"kernel/shm_rmid_forced":              {"/proc/sys/kernel/shm_rmid_forced", "kernel.shm_rmid_forced"},
+	// components. The dotted form is what runc applies.
+	for key, want := range map[string]string{
+		"net.ipv4.ip_unprivileged_port_start": "net.ipv4.ip_unprivileged_port_start",
+		"net/ipv4/ip_unprivileged_port_start": "net.ipv4.ip_unprivileged_port_start",
+		"kernel/shm_rmid_forced":              "kernel.shm_rmid_forced",
 	} {
-		p, dotted, err := sysctlPath(key)
+		dotted, err := sysctlKey(key)
 		require.NoError(t, err, "key %q", key)
-		assert.Equal(t, want[0], p, "key %q", key)
-		assert.Equal(t, want[1], dotted, "key %q", key)
+		assert.Equal(t, want, dotted, "key %q", key)
 	}
 
-	// No component may be empty, "." or "..": the file would not be under
-	// the directory the dotted form names. "net.//.kernel.shm_rmid_forced"
-	// (net/../kernel/shm_rmid_forced with slashes) is an IPC sysctl spelled
-	// as a net one. A NUL byte cannot be part of a path either.
-	for _, key := range []string{"", ".", "..", "/", "net.", ".net.ipv4.ip_forward", "net..ipv4.ip_forward", "net.//.kernel.shm_rmid_forced", "net/../kernel/shm_rmid_forced", "net./../kernel.shm_rmid_forced", "net.\x00"} {
-		_, _, err := sysctlPath(key)
+	// A name containing the other character, such as a VLAN interface,
+	// would make runc set the wrong file.
+	for _, key := range []string{"net.ipv4.conf.eth0/100.rp_filter", "net/ipv4/conf/eth0.100/rp_filter"} {
+		_, err := sysctlKey(key)
+		assert.ErrorIs(t, err, errdefs.ErrNotImplemented, "key %q", key)
+	}
+
+	// No component may be empty, "." or "..", nor hold a NUL byte.
+	for _, key := range []string{"", ".", "..", "/", "net.", ".net.ipv4.ip_forward", "net..ipv4.ip_forward", "net/../kernel/shm_rmid_forced", "net.\x00"} {
+		_, err := sysctlKey(key)
 		assert.ErrorIs(t, err, errdefs.ErrInvalidArgument, "key %q", key)
 	}
+}
+
+// FuzzSysctlKey checks that an accepted key names a plain path under
+// /proc/sys once runc maps its dots to slashes.
+func FuzzSysctlKey(f *testing.F) {
+	for _, key := range []string{"net.ipv4.ip_forward", "net/ipv4/ip_forward", "net/ipv4/conf/eth0.100/rp_filter", "net./../kernel.shm_rmid_forced", "kernel.shm_rmid_forced"} {
+		f.Add(key)
+	}
+	f.Fuzz(func(t *testing.T, key string) {
+		dotted, err := sysctlKey(key)
+		if err != nil {
+			return
+		}
+		p := "/proc/sys/" + strings.ReplaceAll(dotted, ".", "/")
+		if filepath.Clean(p) != p || strings.ContainsRune(p, 0) {
+			t.Fatalf("key %q is accepted as %q, which names %q", key, dotted, p)
+		}
+	})
 }
 
 func TestValidateSysctl(t *testing.T) {
@@ -274,9 +300,10 @@ func TestValidateSysctl(t *testing.T) {
 		{key: "kernel.shm_rmid_forced", dotted: "kernel.shm_rmid_forced"},
 		{key: "kernel.sem", dotted: "kernel.sem"},
 		{key: "fs.mqueue.msg_max", dotted: "fs.mqueue.msg_max"},
-		{key: "kernel.hostname", dotted: "kernel.hostname"},
+		{key: "kernel.msgmax", dotted: "kernel.msgmax"},
+		{key: "kernel.shmmax", dotted: "kernel.shmmax"},
+		{key: "kernel.domainname", dotted: "kernel.domainname"},
 		{key: "kernel/shm_rmid_forced", dotted: "kernel.shm_rmid_forced"},
-		{key: "net/ipv4/conf/eth0.100/rp_filter", dotted: "net.ipv4.conf.eth0/100.rp_filter"},
 		// IPC sysctls are fine with the host network, net sysctls with the
 		// host IPC namespace.
 		{key: "kernel.shm_rmid_forced", hostNetwork: true, dotted: "kernel.shm_rmid_forced"},
@@ -295,14 +322,18 @@ func TestValidateSysctl(t *testing.T) {
 		{key: "net.ipv4.ip_forward", hostNetwork: true, wantErr: errdefs.ErrInvalidArgument},
 		{key: "net/ipv4/ip_forward", hostNetwork: true, wantErr: errdefs.ErrInvalidArgument},
 		// The UTS namespace is shared with the host along with the network one.
-		{key: "kernel.hostname", hostNetwork: true, wantErr: errdefs.ErrInvalidArgument},
 		{key: "kernel.domainname", hostNetwork: true, wantErr: errdefs.ErrInvalidArgument},
+		// The pod hostname sets it; runc rejects the sysctl as conflicting.
+		{key: "kernel.hostname", wantErr: errdefs.ErrInvalidArgument},
 		{key: "kernel.shm_rmid_forced", hostIPC: true, wantErr: errdefs.ErrInvalidArgument},
 		{key: "kernel/shm_rmid_forced", hostIPC: true, wantErr: errdefs.ErrInvalidArgument},
 		{key: "kernel.msgmax", hostIPC: true, wantErr: errdefs.ErrInvalidArgument},
 		{key: "fs.mqueue.msg_max", hostIPC: true, wantErr: errdefs.ErrInvalidArgument},
-		// Like runc, only kernel.sem itself counts as an IPC sysctl.
+		// Only the IPC sysctls runc lists are accepted.
 		{key: "kernel.sem_next_id", wantErr: errdefs.ErrInvalidArgument},
+		{key: "kernel.shm_next_id", wantErr: errdefs.ErrInvalidArgument},
+		{key: "kernel.msg_next_id", wantErr: errdefs.ErrInvalidArgument},
+		{key: "net/ipv4/conf/eth0.100/rp_filter", wantErr: errdefs.ErrNotImplemented},
 		{key: "user.max_user_namespaces", wantErr: errdefs.ErrNotImplemented},
 		{key: "vm.swappiness", wantErr: errdefs.ErrInvalidArgument},
 		{key: "net.\x00", wantErr: errdefs.ErrInvalidArgument},
@@ -312,7 +343,7 @@ func TestValidateSysctl(t *testing.T) {
 	}
 }
 
-func TestBuildSpec(t *testing.T) {
+func TestSandboxSpec(t *testing.T) {
 	pins := Pins{IPC: "/bundle/ns/ipc", UTS: "/bundle/ns/uts"}
 	mounts := []specs.Mount{{Destination: "/etc/hosts", Type: "bind", Source: "/bundle/hosts", Options: []string{"rbind"}}}
 	sysctls := map[string]string{"net.ipv4.ip_forward": "1"}
@@ -320,7 +351,7 @@ func TestBuildSpec(t *testing.T) {
 
 	t.Run("pod namespaces", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS, Sysctls: sysctls, Annotations: annots}
-		spec := buildSpec(cfg, pins, mounts, "")
+		spec := sandboxSpec(cfg, pins, mounts)
 		assert.Equal(t, specs.Version, spec.Version)
 		assert.Equal(t, "pod", spec.Hostname)
 		assert.Equal(t, annots, spec.Annotations)
@@ -337,7 +368,9 @@ func TestBuildSpec(t *testing.T) {
 
 	t.Run("shared PID namespace", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS, SharedPID: true}
-		spec := buildSpec(cfg, pins, nil, "/proc/42/ns/pid")
+		shared := pins
+		shared.PID = "/proc/42/ns/pid"
+		spec := sandboxSpec(cfg, shared, nil)
 		assert.Equal(t, []specs.LinuxNamespace{
 			{Type: specs.NetworkNamespace, Path: testNetNS},
 			{Type: specs.IPCNamespace, Path: pins.IPC},
@@ -348,13 +381,13 @@ func TestBuildSpec(t *testing.T) {
 
 	t.Run("host network keeps only the IPC namespace", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "node", HostNetwork: true}
-		spec := buildSpec(cfg, Pins{IPC: pins.IPC}, nil, "")
+		spec := sandboxSpec(cfg, Pins{IPC: pins.IPC}, nil)
 		assert.Equal(t, []specs.LinuxNamespace{{Type: specs.IPCNamespace, Path: pins.IPC}, {Type: specs.PIDNamespace}}, spec.Linux.Namespaces)
 	})
 
 	t.Run("host ipc keeps the network and UTS namespaces", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "pod", HostIPC: true, NetNSPath: testNetNS}
-		spec := buildSpec(cfg, Pins{UTS: pins.UTS}, nil, "")
+		spec := sandboxSpec(cfg, Pins{UTS: pins.UTS}, nil)
 		assert.Equal(t, []specs.LinuxNamespace{
 			{Type: specs.NetworkNamespace, Path: testNetNS},
 			{Type: specs.UTSNamespace, Path: pins.UTS},
@@ -364,7 +397,7 @@ func TestBuildSpec(t *testing.T) {
 
 	t.Run("all host namespaces still carry a Linux section", func(t *testing.T) {
 		cfg := &Config{ID: testID, Hostname: "node", HostNetwork: true, HostIPC: true, HostPID: true}
-		spec := buildSpec(cfg, Pins{}, nil, "")
+		spec := sandboxSpec(cfg, Pins{}, nil)
 		require.NotNil(t, spec.Linux, "CRI tells a processless sandbox by the Linux section")
 		assert.Empty(t, spec.Linux.Namespaces, "no PID namespace declaration for a host PID pod")
 	})

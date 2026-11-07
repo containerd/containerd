@@ -158,6 +158,44 @@ func (m *Monitor) WaitTimeout(c *exec.Cmd, ec chan runc.Exit, timeout time.Durat
 	}
 }
 
+// WaitPid waits on ec for the exit of the process whose pid arrives on pidCh.
+// ec must be subscribed before the process is created. The process can exit
+// and be reaped before its creator learns the pid, for example from the pid
+// file of a process another program forked, so WaitPid keeps the exits it
+// receives before the pid arrives. reaped reports whether the process has
+// been reaped, through a pidfd for example. WaitPid ignores an exit of the
+// pid while reaped reports false: that exit belongs to an earlier process
+// that had the same pid. WaitPid reads ec throughout so that it does
+// not hold up the notifications of the reaper. It unsubscribes ec when done,
+// and returns false if pidCh or ec is closed before the exit arrives.
+func (m *Monitor) WaitPid(ec chan runc.Exit, pidCh <-chan int, reaped func() bool) (runc.Exit, bool) {
+	defer m.Unsubscribe(ec)
+	pid := -1
+	seen := map[int]runc.Exit{}
+	for {
+		select {
+		case p, ok := <-pidCh:
+			if !ok {
+				return runc.Exit{}, false
+			}
+			if e, ok := seen[p]; ok && reaped() {
+				return e, true
+			}
+			pid, seen = p, nil
+		case e, ok := <-ec:
+			if !ok {
+				return runc.Exit{}, false
+			}
+			switch {
+			case pid < 0:
+				seen[e.Pid] = e
+			case e.Pid == pid && reaped():
+				return e, true
+			}
+		}
+	}
+}
+
 // Subscribe to process exit changes
 func (m *Monitor) Subscribe() chan runc.Exit {
 	c := make(chan runc.Exit, bufferSize)
