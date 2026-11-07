@@ -362,13 +362,20 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("upper mount invalid: %w", err)
 	}
+	if upperLayer == "" {
+		return nil, fmt.Errorf("windowsDiff cannot diff a null upper layer: %w", errdefs.ErrInvalidArgument)
+	}
 
-	lowerLayer, lowerParentLayerPaths, err := mountsToLayerAndParents(lower)
-	if errdefs.IsNotImplemented(err) {
-		// Upper was a windows-layer, lower is not. We can't handle that.
-		return nil, fmt.Errorf("windowsDiff cannot diff a windows-layer against a non-windows-layer: %w", errdefs.ErrInvalidArgument)
-	} else if err != nil {
-		return nil, fmt.Errorf("lower mount invalid: %w", err)
+	var lowerLayer string
+	var lowerParentLayerPaths []string
+	if len(lower) != 0 {
+		lowerLayer, lowerParentLayerPaths, err = mountsToLayerAndParents(lower)
+		if errdefs.IsNotImplemented(err) {
+			// Upper was a windows-layer, lower is not. We can't handle that.
+			return nil, fmt.Errorf("windowsDiff cannot diff a windows-layer against a non-windows-layer: %w", errdefs.ErrInvalidArgument)
+		} else if err != nil {
+			return nil, fmt.Errorf("lower mount invalid: %w", err)
+		}
 	}
 
 	// Trivial case, diff-against-nothing
