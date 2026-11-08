@@ -43,11 +43,21 @@ func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Bundle{
+	b := &Bundle{
 		ID:        id,
 		Path:      filepath.Join(root, ns, id),
 		Namespace: ns,
-	}, nil
+	}
+	// Adopt the gen tracked for the path, so that a bundle created in this
+	// process can be deleted through the loaded handle.
+	if err := bundleLocks.Lock(ctx, b.Path); err != nil {
+		return nil, err
+	}
+	defer bundleLocks.Unlock(b.Path)
+	if o, ok := bundleOwners.Load(b.Path); ok {
+		b.gen = o.(bundleOwner).gen
+	}
+	return b, nil
 }
 
 // NewBundle returns a new bundle on disk
@@ -153,7 +163,8 @@ type Bundle struct {
 	// Namespace of the bundle
 	Namespace string
 
-	// gen identifies the create of this bundle. It is zero for a loaded one.
+	// gen identifies the create of this bundle. A loaded one takes the gen
+	// tracked for its path, or zero if there is none.
 	gen uint64
 }
 

@@ -163,6 +163,13 @@ func TestStaleBundleDeleteKeepsReplacement(t *testing.T) {
 			require.NoError(t, err)
 			return b
 		}},
+		{"created then loaded", func(ctx context.Context, t *testing.T, root, state, id string) *Bundle {
+			_, err := NewBundle(ctx, root, state, id, nil)
+			require.NoError(t, err)
+			b, err := LoadBundle(ctx, state, id)
+			require.NoError(t, err)
+			return b
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, root, state := bundleDirs(t)
@@ -187,6 +194,24 @@ func TestStaleBundleDeleteKeepsReplacement(t *testing.T) {
 			assert.NoDirExists(t, repl.Path)
 		})
 	}
+}
+
+// TestLoadedBundleDeletesCreatedBundle verifies that a bundle created in this
+// process can be deleted through a handle loaded afterwards.
+func TestLoadedBundleDeletesCreatedBundle(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "create-load-delete"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	loaded, err := LoadBundle(ctx, state, id)
+	require.NoError(t, err)
+
+	require.NoError(t, loaded.Delete())
+	assert.NoDirExists(t, b.Path)
+	assert.NoDirExists(t, filepath.Join(root, namespaces.Default, id))
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.NoError(t, err, "ID must be reusable once the bundle is deleted")
 }
 
 // TestBundleLocksSamePath verifies that create and delete of one bundle path
