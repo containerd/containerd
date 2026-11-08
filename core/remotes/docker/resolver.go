@@ -964,7 +964,8 @@ func requestFields(req *http.Request) log.Fields {
 	}
 	for k, vals := range req.Header {
 		k = strings.ToLower(k)
-		if k == "authorization" {
+		switch k {
+		case "authorization", "proxy-authorization", "cookie", "cookie2":
 			continue
 		}
 		for i, v := range vals {
@@ -985,6 +986,10 @@ func responseFields(resp *http.Response) log.Fields {
 	}
 	for k, vals := range resp.Header {
 		k = strings.ToLower(k)
+		switch k {
+		case "set-cookie", "set-cookie2":
+			continue
+		}
 		for i, v := range vals {
 			field := "response.header." + k
 			if i > 0 {

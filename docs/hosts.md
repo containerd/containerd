@@ -152,6 +152,10 @@ OPTIONS:
    --max-concurrent-downloads value  Set the max concurrent downloads for each pull (default: 0)
 ```
 
+Structured registry debug logs omit the `Authorization`, `Proxy-Authorization`,
+`Cookie`, and `Cookie2` request headers, and the `Set-Cookie` and `Set-Cookie2`
+response headers. The raw output from `--http-dump` can contain these headers.
+
 ### CRI
 
 Although we have deprecated the old CRI config pattern for specifying registry.mirrors
