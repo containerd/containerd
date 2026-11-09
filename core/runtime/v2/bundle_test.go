@@ -41,6 +41,13 @@ func bundleDirs(t *testing.T) (context.Context, string, string) {
 	return ctx, filepath.Join(dir, "root"), filepath.Join(dir, "state")
 }
 
+// setReclaimLeftover sets reclaimLeftover for the test. True is how Windows runs.
+func setReclaimLeftover(t *testing.T, v bool) {
+	old := reclaimLeftover
+	reclaimLeftover = v
+	t.Cleanup(func() { reclaimLeftover = old })
+}
+
 // failDelete makes b.Delete fail, as it does on Windows when a shim that is
 // still exiting holds files in the bundle, and returns a function that undoes
 // that. A rootfs with content cannot be removed, but is not a live mount.
@@ -64,6 +71,7 @@ func TestNewBundleRejectsExistingBundle(t *testing.T) {
 
 	_, err = NewBundle(ctx, root, state, id, nil)
 	require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+	require.ErrorContains(t, err, "bundle for "+id)
 	assert.FileExists(t, live)
 	_, err = os.Stat(filepath.Join(b.Path, "work"))
 	assert.NoError(t, err, "work link of the live bundle must be kept")
@@ -78,6 +86,7 @@ func TestNewBundleRejectsExistingBundle(t *testing.T) {
 // atomicDelete's os.Rename can fail while a still-exiting shim holds files in
 // the bundle, and the next NewTask must not fail with "file already exists".
 func TestNewBundleReplacesLeftoverBundle(t *testing.T) {
+	setReclaimLeftover(t, true)
 	ctx, root, state := bundleDirs(t)
 	const id = "leftover"
 
@@ -96,9 +105,28 @@ func TestNewBundleReplacesLeftoverBundle(t *testing.T) {
 	assert.ErrorIs(t, err, errdefs.ErrAlreadyExists, "the new bundle is live and must not be replaced")
 }
 
+// TestNewBundleKeepsLeftoverOffWindows verifies that without reclaiming, a
+// leftover bundle keeps failing with "file exists" and is left alone.
+func TestNewBundleKeepsLeftoverOffWindows(t *testing.T) {
+	setReclaimLeftover(t, false)
+	ctx, root, state := bundleDirs(t)
+	const id = "no-reclaim"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	failDelete(t, b)()
+	stale := filepath.Join(b.Path, "stale")
+	require.NoError(t, os.WriteFile(stale, []byte("x"), 0600))
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+	assert.FileExists(t, stale)
+}
+
 // TestNewBundleKeepsBusyLeftover verifies that a leftover bundle is not removed
 // through a rootfs that is still in use, and can be replaced once it is not.
 func TestNewBundleKeepsBusyLeftover(t *testing.T) {
+	setReclaimLeftover(t, true)
 	ctx, root, state := bundleDirs(t)
 	const id = "busy-leftover"
 
@@ -118,6 +146,7 @@ func TestNewBundleKeepsBusyLeftover(t *testing.T) {
 // TestNewBundleConcurrentLeftover verifies that of several creates racing for a
 // leftover bundle, exactly one replaces it.
 func TestNewBundleConcurrentLeftover(t *testing.T) {
+	setReclaimLeftover(t, true)
 	ctx, root, state := bundleDirs(t)
 	const id = "concurrent-leftover"
 
@@ -172,6 +201,7 @@ func TestStaleBundleDeleteKeepsReplacement(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			setReclaimLeftover(t, true)
 			ctx, root, state := bundleDirs(t)
 			const id = "stale-owner"
 

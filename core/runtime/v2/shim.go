@@ -202,10 +202,10 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 // which by then may be cancelled or out of budget.
 //
 // A failed delete returns before shutting the shim down and closing its client,
-// so both are done here, including waiting for the on-close callback. It also leaves the bundle in place (only a successful
-// delete removes it), so callers that own one must remove it on error. The shim
-// map is untouched: callers reach this having already removed the task, or never
-// added it.
+// so both are done here, including waiting for the on-close callback. It also
+// leaves the bundle in place (only a successful delete removes it), so callers
+// that own one must remove it on error. The shim map is untouched: callers reach
+// this having already removed the task, or never added it.
 func cleanupShimTask(ctx context.Context, st *shimTask) error {
 	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()

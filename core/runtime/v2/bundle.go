@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -185,17 +186,21 @@ var (
 	bundleLocks = kmutex.New()
 )
 
+// reclaimLeftover enables replacing a bundle whose Delete failed. Only Windows
+// needs it, where a shim that is still exiting holds files in the bundle.
+var reclaimLeftover = runtime.GOOS == "windows"
+
 // mkdirBundle creates the bundle directory and returns the gen of the new
-// bundle. An existing directory is replaced only if its own Delete failed. Any
-// other belongs to a task that is live or still being created, so a second
-// create for the same ID fails with "file exists" and leaves it alone.
+// bundle. On Windows an existing directory is replaced only if its own Delete
+// failed. Any other belongs to a task that is live or still being created, so a
+// second create for the same ID fails with "file exists" and leaves it alone.
 func mkdirBundle(ctx context.Context, path string) (uint64, error) {
 	if err := bundleLocks.Lock(ctx, path); err != nil {
 		return 0, err
 	}
 	defer bundleLocks.Unlock(path)
 	o, _ := bundleOwners.Load(path)
-	if err := mkdirReplace(ctx, path, 0700, o != nil && o.(bundleOwner).leftover); err != nil {
+	if err := mkdirReplace(ctx, path, 0700, reclaimLeftover && o != nil && o.(bundleOwner).leftover); err != nil {
 		return 0, err
 	}
 	gen := bundleGen.Add(1)
