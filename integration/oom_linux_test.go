@@ -32,9 +32,6 @@ import (
 )
 
 func TestOOMEventMonitor(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not implement cgroup memory limits; OOMKilled reporting requires host cgroup enforcement")
-	}
 	workDir := t.TempDir()
 
 	rawCfg := fmt.Sprintf(`

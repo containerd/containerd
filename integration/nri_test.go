@@ -796,9 +796,6 @@ func TestNriLinuxMemsetAdjustmentUpdate(t *testing.T) {
 
 // Test pod sandbox updates received by NRI plugins.
 func TestNriUpdatePodSandbox(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not implement cgroup memory limits")
-	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that NRI plugins receive pod sandbox updates.")
@@ -841,9 +838,6 @@ func TestNriUpdatePodSandbox(t *testing.T) {
 
 // Test pod sandbox resource updates persist across containerd restarts.
 func TestUpdatePodSandboxWithRestart(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
-	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that pod sandbox resource updates persist across containerd restarts.")
@@ -883,9 +877,6 @@ func TestUpdatePodSandboxWithRestart(t *testing.T) {
 
 // Test NRI vs. containerd restart.
 func TestNriPluginContainerdRestart(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
-	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test NRI plugins vs. containerd restart.")
