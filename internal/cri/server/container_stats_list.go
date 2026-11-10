@@ -531,7 +531,6 @@ func (c *criService) cpuContainerStats(stats cgroupMetrics, timestamp time.Time)
 	switch {
 	case stats.v1 != nil:
 		metrics := stats.v1
-		metrics.GetCPU().GetUsage()
 		if metrics.CPU != nil && metrics.CPU.Usage != nil {
 			return &runtime.CpuUsage{
 				Timestamp:            timestamp.UnixNano(),
