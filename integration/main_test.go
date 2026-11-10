@@ -86,6 +86,22 @@ func runtimeHandlerIsRunsc() bool {
 	return strings.HasPrefix(*runtimeHandler, "runsc-")
 }
 
+// runtimeHandlerIsKata reports whether the runtime handler is Kata Containers.
+//
+// TODO: Replace the runsc/kata helpers with capability helpers (e.g. host
+// namespaces, shim socket access) so a new sandboxed runtime only declares
+// what it lacks.
+func runtimeHandlerIsKata() bool {
+	if *runtimeType == "io.containerd.kata.v2" {
+		return true
+	}
+	switch *runtimeHandler {
+	case "kata":
+		return true
+	}
+	return strings.HasPrefix(*runtimeHandler, "kata-")
+}
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if err := ConnectDaemons(); err != nil {

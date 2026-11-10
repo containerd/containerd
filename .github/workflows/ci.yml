@@ -864,6 +864,125 @@ jobs:
             ${{github.workspace}}/report/*.xml
             ${{github.workspace}}/report/*.log
 
+  # Pods run in a VM, so this needs /dev/kvm.
+  # Non-blocking: not in the `needs` of the `results` job.
+  # TODO: Make it required once stable.
+  integration-kata:
+    name: Kata Containers integration (non-blocking) ${{ matrix.cgroup_driver }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    continue-on-error: true
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cgroup_driver: [systemd, cgroupfs]
+
+    env:
+      CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-go
+
+      # /dev/kvm is root:kvm only on hosted runners, see
+      # https://github.blog/changelog/2024-04-02-github-actions-hardware-accelerated-android-virtualization-now-available/
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm --settle
+          ls -l /dev/kvm
+          test -w /dev/kvm || { echo "::error::/dev/kvm is not usable on this runner"; exit 1; }
+
+      - name: Install containerd dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf dmsetup strace xfsprogs zstd
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
+
+      - name: Install Kata Containers
+        run: script/kata/install-kata
+
+      - name: Kata Containers sanity check
+        run: |
+          containerd-shim-kata-v2 --version
+          ls -l /opt/kata/share/defaults/kata-containers/
+          test -w /dev/kvm
+
+      - name: Build containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+
+      - name: CRI integration (kata)
+        id: cri
+        run: |
+          cfg=$(mktemp /tmp/containerd-config-kata-XXXXXX.toml)
+          trap 'rm -f "$cfg"' EXIT
+          script/kata/write-containerd-kata-config.sh "$cfg" "$CGROUP_DRIVER"
+          # empty CGROUP_DRIVER: the config file already sets the cgroup driver
+          CGROUP_DRIVER= CONTAINERD_CONFIG_FILE="$cfg" RUNTIME=kata RUNTIME_TYPE=io.containerd.kata.v2 make cri-integration
+
+      - name: critest (kata)
+        # run even if CRI integration failed, so one failure doesn't hide the rest
+        if: ${{ !cancelled() && steps.cri.conclusion != 'skipped' }}
+        env:
+          GINKGO_NODES: "2"
+        run: |
+          mkdir -p "${{github.workspace}}/report"
+          # critest overwrites report/containerd.log; keep the CRI integration one
+          if [[ -f "${{github.workspace}}/report/containerd.log" ]]; then
+            mv "${{github.workspace}}/report/containerd.log" "${{github.workspace}}/report/cri-integration-containerd.log"
+          fi
+          cfg=$(mktemp /tmp/containerd-config-kata-XXXXXX.toml)
+          trap 'rm -f "$cfg"' EXIT
+          script/kata/write-containerd-kata-config.sh "$cfg" "$CGROUP_DRIVER"
+          sudo \
+            CGROUP_DRIVER="$CGROUP_DRIVER" \
+            CONTAINERD_CONFIG_FILE="$cfg" \
+            GINKGO_NODES="$GINKGO_NODES" \
+            PATH="$PATH" \
+            script/kata/critest-kata.sh "${{github.workspace}}/report"
+
+      - name: Host Status
+        if: always()
+        run: |
+          free -h
+          df -h
+          ps aux --sort=-%mem | head -n 30
+          sudo dmesg -T | grep -iE 'oom|out of memory|killed process|kvm' || true
+
+      - name: Kata logs
+        if: always()
+        run: |
+          mkdir -p "${{github.workspace}}/report"
+          sudo journalctl -t kata --no-pager -o short-iso > "${{github.workspace}}/report/kata-journal.log" || true
+
+      - name: Kernel Message
+        if: failure()
+        run: |
+          sudo dmesg -T | tail -n 200 || true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: TestResults-kata-${{ matrix.cgroup_driver }}
+          path: |
+            *-junit.xml
+            *-gotest.json
+            ${{github.workspace}}/report/*.xml
+            ${{github.workspace}}/report/*.log
+
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"

@@ -34,8 +34,8 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 		"podpid":  PodSandboxConfig("sandbox", "pod-pid-container-stop", WithPodPid),
 	} {
 		t.Run(name, func(t *testing.T) {
-			if name == "hostpid" && runtimeHandlerIsRunsc() {
-				t.Skip("runsc does not support host PID namespace")
+			if name == "hostpid" && (runtimeHandlerIsRunsc() || runtimeHandlerIsKata()) {
+				t.Skip("this runtime does not support host PID namespace")
 			}
 			t.Log("Create a shared pid sandbox")
 			sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
@@ -78,6 +78,12 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 func TestContainerStopCancellation(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows.")
+	}
+	if runtimeHandlerIsKata() {
+		// The kata agent sends SIGKILL instead of SIGTERM if the init process
+		// has not installed a SIGTERM handler yet (agent rpc.rs, signal_process).
+		// Stopping right after start races with the shell running its trap.
+		t.Skip("kata agent may turn SIGTERM into SIGKILL before the trap is installed")
 	}
 	t.Log("Create a pod sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "cancel-container-stop")

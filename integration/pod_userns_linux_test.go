@@ -127,8 +127,8 @@ func traversePath(tPath string) error {
 }
 
 func TestPodUserNS(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not support host user namespaces")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not support host user namespaces")
 	}
 	containerID := uint32(0)
 	hostID := uint32(65536)
@@ -353,8 +353,8 @@ func TestPodUserNS(t *testing.T) {
 // [1]: https://github.com/containerd/containerd/issues/10598
 // [2]: https://github.com/anakryiko/retsnoop
 func TestIssue10598(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not support host user namespaces")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not support host user namespaces")
 	}
 	if !supportsUserNS() {
 		t.Skip("User namespaces are not supported")
@@ -453,8 +453,8 @@ func TestIssue10598(t *testing.T) {
 //
 //	https://github.com/containerd/containerd/issues/11852
 func TestUsernsVolumeCopyUp(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not support host user namespaces")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not support host user namespaces")
 	}
 	if !supportsUserNS() {
 		t.Skip("User namespaces are not supported")

@@ -33,10 +33,10 @@ func TestContainerIOLeakAfterStartFailed(t *testing.T) {
 	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
 		t.Skip("test requires runc")
 	}
-	if runtimeHandlerIsRunsc() {
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
 		// getShimPid connects to the per-sandbox shim ttrpc socket, which is
 		// a runc-shim implementation detail not available under runsc.
-		t.Skip("getShimPid introspection is runc-shim-specific, not applicable to runsc")
+		t.Skip("getShimPid is runc-shim-specific, not applicable to this runtime")
 	}
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-io-leak-after-start-failed")
