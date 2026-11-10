@@ -101,8 +101,10 @@ highlights:
 
 ### Ensure that EROFS filesystem is available
 
-On newer Ubuntu/Debian systems, erofs-utils can be installed directly using the
-apt command, and on Fedora it can be installed directly using the dnf command.
+containerd builds EROFS images itself, so erofs-utils is not required. It is
+needed only when the differ is configured to use mkfs.erofs (see
+_[Using mkfs.erofs](#using-mkfserofs)_). On newer Ubuntu/Debian systems it can
+be installed with apt, and on Fedora with dnf:
 
 ```bash
 # Debian/Ubuntu
@@ -113,7 +115,7 @@ $ dnf install erofs-utils
 
 Make sure that erofs-utils version is 1.7 or higher.
 
-When using the EROFS snapshotter, before starting containerd, also make sure
+When using the EROFS snapshotter, before starting containerd, make sure
 the _EROFS kernel module_ is loaded (Linux 5.4 or later is required): it can be
 loaded with `modprobe erofs`.
 
@@ -152,9 +154,19 @@ forget to restart containerd after changing the configuration.
     default = ["erofs","walking"]
 ```
 
-Note that if erofs-utils is version 1.8 or higher, you can add
-`-T0 --mkfs-time` to the differ's `mkfs_options` to enable reproducible
-builds, as shown below:
+Conversion is reproducible: the same layer always produces the same EROFS
+image.
+
+### Using mkfs.erofs
+
+The differ can build layers with mkfs.erofs from erofs-utils instead of the
+built-in converter, for example to use mkfs.erofs options such as per-file
+compression. Set `use_mkfs`, or set `mkfs_options` to pass extra options to
+mkfs.erofs, which also selects it. The differ is disabled when mkfs.erofs is
+missing or does not support tar mode.
+
+If erofs-utils is version 1.8 or higher, add `-T0 --mkfs-time` to
+`mkfs_options` to enable reproducible builds:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
@@ -162,13 +174,16 @@ builds, as shown below:
 ```
 
 If erofs-utils is 1.8.2 or higher, it's preferred to append `--sort=none` to
-the differ's `mkfs_options` to avoid unnecessary tar data reordering for
-improved performance, as shown below:
+avoid unnecessary tar data reordering for improved performance:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
     mkfs_options = ["-T0", "--mkfs-time", "--sort=none"]
 ```
+
+With mkfs.erofs selected and `enable_tar_index`, mkfs.erofs writes a single layer file
+with the tar index followed by the original tar, rather than a separate data
+device.
 
 ### Running a container
 
@@ -319,6 +334,9 @@ If dm-verity is enabled, a `.dmverity` metadata file will also be present:
   work
 ```
 
+In tar index mode, the layer also has a `device-0.blob` data device (see
+_the [Tar Index Mode](#tar-index-mode) section_).
+
 Then the EROFS snapshotter will check for the existence of `layer.erofs`: it
 will mount the EROFS layer blob to `fs/` and return a valid overlayfs mount
 with all parent layers. If dm-verity is enabled and the `.dmverity` file exists,
@@ -333,30 +351,33 @@ with or without the EROFS differ.
 
 ## Tar Index Mode
 
-The EROFS differ also supports a "tar index" mode that offers a unique approach
-to handling OCI image layers:
+The EROFS differ also supports a "tar index" mode. Instead of building one
+EROFS image that holds both the filesystem metadata and the file contents, the
+tar index mode writes two files into the snapshot directory:
 
-Instead of extracting the entire tar archive to create an EROFS filesystem, the
-tar index mode:
-1. Generates a tar index for the tar content
-2. Appends the original tar content to the index
-3. Creates a combined file: `[Tar index][Original tar content]`
+```
+  layer.erofs      EROFS metadata image: superblock, inodes, and a chunk
+                   index for each regular file
+  device-0.blob    data device: the file contents, each starting on a
+                   512-byte boundary
+```
 
-The tar index can be stored in a registry alongside image layers, allowing nodes
-to fetch it directly when needed. Typically, the tar index is much smaller than
-a full EROFS blob, making it more efficient to store and transfer. If the tar
-index is not available in the registry, it can be generated on the node as a
-fallback. When integrating with dm-verity, the registry can also store the
-dm-verity Merkle tree and root hash signature together with the tar index,
-enabling nodes to retrieve all necessary artifacts without redundant
-computation.
+`layer.erofs` is a complete EROFS image that uses 512-byte blocks and declares
+one extra device. The snapshotter mounts it with the data device attached as
+`device=<path>/device-0.blob`. A data device is a raw byte source, not an EROFS
+image. Devices are numbered from 0 in the order they are attached.
 
-In addition, we have a tar diffID for each layer according to the OCI image
-spec, so we don't need to reinvent a new way to verify the image layer content
-for confidential containers but just calculate the sha256 of the original tar
-data (because erofs could just reuse the tar data with 512-byte fs block size
-and build a minimal index for direct mounting of tar) out of the tar index mode
-in the guest and compare it with each diffID.
+When dm-verity is enabled, the differ formats `layer.erofs` and each data device
+separately, and each gets its own `.dmverity` metadata file
+(`device-0.blob.dmverity`). The mount handler opens a dm-verity device for each
+of them. With `dmverity_mode = "on"`, a layer is only mounted if the image and
+every data device have dm-verity metadata.
+
+A layer with data devices has to be mounted through the mount manager's EROFS
+mount handler. It uses a file-backed mount where the kernel supports one
+(Linux 6.12 and later) and otherwise attaches loop devices for both the image
+and its data devices. The kernel does not accept a regular file as a data device
+of a loop-backed mount.
 
 ### Configuration
 

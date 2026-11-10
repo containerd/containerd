@@ -324,10 +324,27 @@ func (s *snapshotter) fsMetaPath(id string) string {
 }
 
 // lowerPath returns the path to mount a snapshot's layer blob from, wherever it
-// is stored (see resolveBlob).
-func (s *snapshotter) lowerPath(id string, info snapshots.Info) (string, error) {
-	path, _, err := s.resolveBlob(id, info)
-	return path, err
+// is stored (see resolveBlob), together with the blob's data devices.
+func (s *snapshotter) lowerPath(id string, info snapshots.Info) (string, []string, error) {
+	path, src, err := s.resolveBlob(id, info)
+	if err != nil {
+		return "", nil, err
+	}
+	devices, err := s.layerDevices(id, src)
+	if err != nil {
+		return "", nil, err
+	}
+	return path, devices, nil
+}
+
+// layerDevices returns the data devices a snapshot's layer blob addresses, in
+// device order. Only a blob this snapshot owns has them: a differ writes them
+// next to the blob in the snapshot directory.
+func (s *snapshotter) layerDevices(id string, src blobSource) ([]string, error) {
+	if !src.owned() {
+		return nil, nil
+	}
+	return erofsutils.LayerDevices(filepath.Dir(s.layerBlobPath(id)))
 }
 
 // parentInfos returns the info of every ancestor of the snapshot described by
@@ -386,9 +403,15 @@ func (s *snapshotter) mountFsMeta(snap storage.Snapshot, parents []snapshots.Inf
 	for j := len(snap.ParentIDs) - 1; j >= id; j-- {
 		// The flattened layers are addressed by device. Each device path has to
 		// be resolved to where that layer's blob is stored.
-		path, _, err := s.resolveBlob(snap.ParentIDs[j], parents[j])
+		path, devices, err := s.lowerPath(snap.ParentIDs[j], parents[j])
 		if err != nil {
 			return mount.Mount{}, false, err
+		}
+		// The merged fsmeta addresses each layer as a single device. A layer
+		// whose blob has data devices of its own does not fit that numbering,
+		// so the layers are mounted one by one instead.
+		if len(devices) > 0 {
+			return mount.Mount{}, false, nil
 		}
 		m.Options = append(m.Options, "device="+path)
 	}
@@ -427,21 +450,32 @@ func (s *snapshotter) applyDmverityPolicy(layerBlob string) (string, error) {
 	// If metadata exists, return the metadata path to a mount option.
 	// The format is: X-containerd.dmverity=<metadata-path>
 	if metadataExists {
-		return "X-containerd.dmverity=" + metadataPath, nil
+		return dmverity.MountOption + metadataPath, nil
 	}
 
 	return "", nil
 }
 
-// createErofsMount creates a mount specification for an EROFS layer.
-// Applies dmverityMode policy and passes it to the mount handler.
-func (s *snapshotter) createErofsMount(layerBlob string) (mount.Mount, error) {
+// createErofsMount creates a mount specification for an EROFS layer and the
+// data devices its blob addresses, in device order. Applies dmverityMode policy
+// to the blob and to each device and passes it to the mount handler.
+func (s *snapshotter) createErofsMount(layerBlob string, devices []string) (mount.Mount, error) {
 	options := []string{"ro", "loop"}
 
 	if dmverityOpt, err := s.applyDmverityPolicy(layerBlob); err != nil {
 		return mount.Mount{}, err
 	} else if dmverityOpt != "" {
 		options = append(options, dmverityOpt)
+	}
+	for i, device := range devices {
+		options = append(options, "device="+device)
+		dmverityOpt, err := s.applyDmverityPolicy(device)
+		if err != nil {
+			return mount.Mount{}, err
+		}
+		if metadataPath, ok := strings.CutPrefix(dmverityOpt, dmverity.MountOption); ok {
+			options = append(options, fmt.Sprintf("%s%d=%s", dmverity.DeviceMountOption, i, metadataPath))
+		}
 	}
 
 	return mount.Mount{
@@ -470,12 +504,12 @@ func (s *snapshotter) parentMounts(snap storage.Snapshot, parents []snapshots.In
 			return append(mounts, m), nil
 		}
 
-		layerBlob, err := s.lowerPath(snap.ParentIDs[i], parents[i])
+		layerBlob, devices, err := s.lowerPath(snap.ParentIDs[i], parents[i])
 		if err != nil {
 			return nil, err
 		}
 
-		if m, err = s.createErofsMount(layerBlob); err != nil {
+		if m, err = s.createErofsMount(layerBlob, devices); err != nil {
 			return nil, fmt.Errorf("failed to create erofs mount for parent %s: %w", snap.ParentIDs[i], err)
 		}
 
@@ -514,7 +548,8 @@ func (s *snapshotter) overlayMounts(snap storage.Snapshot, info snapshots.Info, 
 			return nil, err
 		}
 		if err == nil && src.populated() {
-			m, err := s.createErofsMount(layerBlob)
+			// A populated blob is shared and never has data devices.
+			m, err := s.createErofsMount(layerBlob, nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create erofs mount: %w", err)
 			}
@@ -602,14 +637,20 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info, parents
 			return nil, err
 		}
 		if err == nil {
+			devices, err := s.layerDevices(snap.ID, src)
+			if err != nil {
+				return nil, err
+			}
 			// Only a blob this snapshot owns can carry fsverity because only
 			// such a blob is one this snapshotter wrote.
 			if s.enableFsverity && src.owned() {
-				if err := s.verifyFsverity(layerBlob); err != nil {
-					return nil, err
+				for _, p := range append([]string{layerBlob}, devices...) {
+					if err := s.verifyFsverity(p); err != nil {
+						return nil, err
+					}
 				}
 			}
-			m, err := s.createErofsMount(layerBlob)
+			m, err := s.createErofsMount(layerBlob, devices)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create erofs mount: %w", err)
 			}
@@ -660,11 +701,11 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info, parents
 			return nil, fmt.Errorf("got %d parent infos for 1 parent of snapshot %s: %w",
 				len(parents), snap.ID, errdefs.ErrInvalidArgument)
 		}
-		layerBlob, err := s.lowerPath(snap.ParentIDs[0], parents[0])
+		layerBlob, devices, err := s.lowerPath(snap.ParentIDs[0], parents[0])
 		if err != nil {
 			return nil, err
 		}
-		m, err := s.createErofsMount(layerBlob)
+		m, err := s.createErofsMount(layerBlob, devices)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create erofs mount: %w", err)
 		}
@@ -981,18 +1022,26 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 	// is using it. Neither can be configured together with the layer content
 	// cache (see NewSnapshotter); this states the requirement where it
 	// applies.
+	devices, err := s.layerDevices(id, src)
+	if err != nil {
+		return err
+	}
 	if src.owned() {
-		// Enable fsverity on the EROFS layer if configured
-		if s.enableFsverity {
-			if err := fsverity.Enable(layerBlob); err != nil {
-				return fmt.Errorf("failed to enable fsverity: %w", err)
+		// The data devices hold the layer's file contents and get the same
+		// protection as the blob.
+		for _, p := range append([]string{layerBlob}, devices...) {
+			// Enable fsverity on the EROFS layer if configured
+			if s.enableFsverity {
+				if err := fsverity.Enable(p); err != nil {
+					return fmt.Errorf("failed to enable fsverity: %w", err)
+				}
 			}
-		}
 
-		// Set IMMUTABLE_FL on the EROFS layer to avoid artificial data loss
-		if s.setImmutable {
-			if err := setImmutable(layerBlob, true); err != nil {
-				log.G(ctx).WithError(err).Warnf("failed to set IMMUTABLE_FL for %s", layerBlob)
+			// Set IMMUTABLE_FL on the EROFS layer to avoid artificial data loss
+			if s.setImmutable {
+				if err := setImmutable(p, true); err != nil {
+					log.G(ctx).WithError(err).Warnf("failed to set IMMUTABLE_FL for %s", p)
+				}
 			}
 		}
 	}
@@ -1014,7 +1063,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		// though removing the snapshot does not reclaim any of it. Usage has
 		// several meanings: bytes on disk, bytes a deletion would free, and
 		// attribution of shared bytes. Choosing one needs its own design.
-		usage, err := fs.DiskUsage(ctx, layerBlob)
+		usage, err := fs.DiskUsage(ctx, append([]string{layerBlob}, devices...)...)
 		if err != nil {
 			return err
 		}
@@ -1133,6 +1182,18 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 			if fi, serr := os.Lstat(layerBlob); serr == nil && fi.Mode().IsRegular() {
 				// Clear IMMUTABLE_FL before removal, since this flag avoids it.
 				err = setImmutable(layerBlob, false)
+				if err != nil && !errdefs.IsNotImplemented(err) {
+					return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
+				}
+			}
+			// LayerDevices only returns regular files in the snapshot
+			// directory, so the flag is never cleared through a link.
+			devices, derr := erofsutils.LayerDevices(filepath.Dir(layerBlob))
+			if derr != nil {
+				return derr
+			}
+			for _, device := range devices {
+				err = setImmutable(device, false)
 				if err != nil && !errdefs.IsNotImplemented(err) {
 					return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
 				}

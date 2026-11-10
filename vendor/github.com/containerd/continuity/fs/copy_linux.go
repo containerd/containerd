@@ -34,7 +34,7 @@ const maxCopyChunk = 1 << 30 // 1 GiB
 //
 // If the filesystem does not support SEEK_DATA/SEEK_HOLE, it falls back
 // to a plain io.Copy.
-func copyFile(target, source string) error {
+func copyFile(target, source string, sync bool) error {
 	src, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to open source %s: %w", source, err)
@@ -72,7 +72,7 @@ func copyFile(target, source string) error {
 			// Filesystem doesn't support SEEK_DATA/SEEK_HOLE. Fall back to a plain copy.
 			src.Close()
 			tgt.Close()
-			return openAndCopyFile(target, source)
+			return openAndCopyFile(target, source, sync)
 		}
 
 		return fmt.Errorf("failed to seek data in source %s: %w", source, err)
@@ -122,7 +122,7 @@ func copyFile(target, source string) error {
 				if errors.Is(err, syscall.EXDEV) || errors.Is(err, syscall.ENOSYS) || errors.Is(err, syscall.EOPNOTSUPP) {
 					src.Close()
 					tgt.Close()
-					return openAndCopyFile(target, source)
+					return openAndCopyFile(target, source, sync)
 				}
 				return fmt.Errorf("copy_file_range failed: %w", err)
 			}
@@ -135,8 +135,10 @@ func copyFile(target, source string) error {
 		offset = holeStart
 	}
 
-	if err := tgt.Sync(); err != nil {
-		return fmt.Errorf("failed to sync target %s: %w", target, err)
+	if sync {
+		if err := tgt.Sync(); err != nil {
+			return fmt.Errorf("failed to sync target %s: %w", target, err)
+		}
 	}
 
 	return nil

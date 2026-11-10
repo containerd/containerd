@@ -46,7 +46,8 @@ diffID-keyed erofs blobs (<cache_dir>/<algorithm>/<xx>/<hex>.erofs, where <xx> i
 the first two characters of <hex>) for the erofs
 snapshotter's layer_content_caches. Layers are read from the content store; no
 converted image is produced. The directory can then be synced to the read-only
-location the fleet mounts. Requires mkfs.erofs.
+location the fleet mounts. --compressors and --mkfs-options convert with
+mkfs.erofs, which must then be installed.
 
 Pass --dmverity to also generate a dm-verity hash tree and .dmverity sidecar for
 each blob (Linux only); this is required when the snapshotter runs with
@@ -54,11 +55,11 @@ dmverity_mode=on, which rejects cache hits that lack a sidecar.`,
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "compressors",
-			Usage: "EROFS per-block compression algorithm(s), e.g. 'lz4', 'deflate', 'zstd'; empty means uncompressed",
+			Usage: "EROFS per-block compression algorithm(s), e.g. 'lz4', 'deflate', 'zstd'; empty means uncompressed (uses mkfs.erofs)",
 		},
 		&cli.StringFlag{
 			Name:  "mkfs-options",
-			Usage: "Extra mkfs.erofs options (e.g. '-Efragments,dedupe')",
+			Usage: "Extra mkfs.erofs options (e.g. '-Efragments,dedupe'); converts with mkfs.erofs",
 		},
 		&cli.StringFlag{
 			Name:  "platform",
