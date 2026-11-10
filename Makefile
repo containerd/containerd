@@ -158,7 +158,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos check-gosocialcheck coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -197,6 +197,15 @@ check-protos: ## check if protobufs needs to be generated again
 	@(cd api && buf format --diff --exit-code --exclude-path vendor \
 		$(if $(GITHUB_ACTIONS),--error-format github-actions)) || \
 		(echo "$(ONI) please run 'make proto-fmt' to fix formatting or 'make protos' to regenerate proto files" && false)
+
+# gosocialcheck reports dependencies that do not appear to be adopted by a trusted project
+# (CNCF Graduated). Modules that are trusted anyway are annotated `gosocialcheck:trusted` in go.mod.
+# https://github.com/AkihiroSuda/gosocialcheck
+# Not part of `make check`: the verdict is advisory. On GitHub Actions, `--gha` reports the findings
+# as workflow annotations and always exits 0.
+check-gosocialcheck: ## check if dependencies are adopted by a trusted project (advisory)
+	@echo "$(WHALE) $@"
+	gosocialcheck run $(if $(GITHUB_ACTIONS),--gha) ./...
 
 proto-fmt: ## format proto files
 	@echo "$(WHALE) $@"

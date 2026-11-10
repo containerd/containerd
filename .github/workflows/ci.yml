@@ -109,6 +109,31 @@ jobs:
       - run: script/setup/install-dev-tools
       - run: make check-protos
 
+  #
+  # Dependency checks
+  #
+  # gosocialcheck reports the dependencies which do not appear to be adopted by a trusted
+  # project (CNCF Graduated).
+  # This is advisory, not a gate: `--gha` reports the findings as annotations on the run and
+  # on the PR, and always exits 0. So this job is intentionally not listed in `results`.
+  deps:
+    name: Dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gosocialcheck's `--gha` fetches the base branch on demand to rank the findings whose
+          # go.sum line changed in the PR first, so a shallow checkout is enough.
+          persist-credentials: false
+      - uses: ./.github/actions/install-go
+      - run: script/setup/install-dev-tools
+      - run: make check-gosocialcheck
+        env:
+          # gosocialcheck queries the GitHub API, which is heavily rate-limited when anonymous
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   man:
     name: Manpages
     runs-on: ubuntu-24.04
