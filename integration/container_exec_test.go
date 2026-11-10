@@ -28,8 +28,8 @@ import (
 )
 
 func TestContainerDrainExecIOAfterExit(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not support draining exec IO for background processes")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not support draining exec IO for background processes")
 	}
 	// FIXME(fuweid): support it for windows container.
 	if runtime.GOOS == "windows" {
