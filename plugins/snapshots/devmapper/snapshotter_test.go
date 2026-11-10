@@ -23,6 +23,7 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -31,10 +32,12 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper/dmsetup"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 
@@ -183,6 +186,32 @@ func TestMultipleXfsMounts(t *testing.T) {
 	}()
 	err = mount.All(mounts, root2)
 	assert.NoError(t, err)
+}
+
+func TestMountsCommitted(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "testsuite")
+
+	store, err := storage.NewMetaStore(filepath.Join(t.TempDir(), metadataFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	err = store.WithTransaction(ctx, true, func(ctx context.Context) error {
+		if _, err := storage.CreateSnapshot(ctx, snapshots.KindActive, "active", ""); err != nil {
+			return err
+		}
+		_, err := storage.CommitActive(ctx, "active", "committed", snapshots.Usage{})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := &Snapshotter{store: store, config: &Config{PoolName: "test-pool"}}
+	if _, err := s.Mounts(ctx, "committed"); !errdefs.IsFailedPrecondition(err) {
+		t.Errorf("Mounts(%q) error = %v, want failed precondition", "committed", err)
+	}
 }
 
 func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snapshots.Snapshotter, func() error, error) {
