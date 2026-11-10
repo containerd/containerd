@@ -35,6 +35,18 @@ message TransferOptions {
 
 ## Transfer Objects (Sources and Destinations)
 
+### Registry host configuration
+
+Registry objects accept multiple `registry.WithHostDir` options. Each value is a
+literal directory; empty values are ignored. Directories are searched in option
+order, including each directory's `_default` entry before searching the next
+directory. Callers with a platform-specific path list, such as CRI's
+`registry.config_path`, split that list before passing individual directories.
+
+The transfer protocol preserves the first directory in `RegistryResolver.host_dir`
+and carries additional directories in `host_dirs`. Receivers supporting both fields
+restore the full search order. Older receivers only use the first directory.
+
 ## Transfer Operations
 
 |   Source    | Destination | Description | Local Implementation Version |
