@@ -51,18 +51,11 @@ func open(p string) (*os.File, error) {
 	return os.OpenFile(p, os.O_RDONLY|windows.O_FILE_FLAG_SEQUENTIAL_SCAN, 0)
 }
 
-func openFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	// Source is regular file. We use sequential file access to avoid depleting
-	// the standby list on Windows.
-	//
-	// Refer to the [Win32 API documentation] for details on sequential file access.
-	//
-	// [Win32 API documentation]: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea#FILE_FLAG_SEQUENTIAL_SCAN
-	return os.OpenFile(name, flag|windows.O_FILE_FLAG_SEQUENTIAL_SCAN, perm)
-}
-
-func mkdir(path string, perm os.FileMode) error {
-	return os.Mkdir(path, perm)
+// openFileFlags returns the flags to pass to Root.OpenFile while applying
+// an archive. The sequential scan hint is retained to avoid depleting the
+// standby list on Windows.
+func openFileFlags(flag int) int {
+	return flag | windows.O_FILE_FLAG_SEQUENTIAL_SCAN
 }
 
 func skipFile(hdr *tar.Header) bool {
