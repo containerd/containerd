@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/gc"
@@ -598,6 +599,65 @@ func TestActivateConcurrentSameName(t *testing.T) {
 	}
 
 	assert.NoError(t, m.Deactivate(ctx, "task1"))
+}
+
+// failHandler fails every mount. A mount with source "block" first
+// closes started, then waits for release.
+type failHandler struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (h *failHandler) Mount(_ context.Context, m mount.Mount, _ string, _ []mount.ActiveMount) (mount.ActiveMount, error) {
+	if m.Source == "block" {
+		close(h.started)
+		<-h.release
+	}
+	return mount.ActiveMount{}, fmt.Errorf("mount %s failed", m.Source)
+}
+
+func (h *failHandler) Unmount(context.Context, string) error {
+	return nil
+}
+
+// TestActivateRollbackDeletedLease checks that a failed activation does
+// not panic in its rollback when the lease bucket it was recorded in has
+// already been removed.
+func TestActivateRollbackDeletedLease(t *testing.T) {
+	td := t.TempDir()
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	ctx := leases.WithLease(namespaces.WithNamespace(context.Background(), "test"), "lease1")
+
+	h := &failHandler{started: make(chan struct{}), release: make(chan struct{})}
+	m, err := NewManager(db, filepath.Join(td, "m"), WithMountHandler("fail", h))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	var (
+		blockedErr error
+		panicked   any
+		done       = make(chan struct{})
+	)
+	go func() {
+		defer func() {
+			panicked = recover()
+			close(done)
+		}()
+		_, blockedErr = m.Activate(ctx, "blocked", []mount.Mount{{Type: "fail", Source: "block"}})
+	}()
+	<-h.started
+
+	// Deactivate leaves the lease bucket empty, and the failed activation
+	// of "other" then removes that bucket in its rollback.
+	require.NoError(t, m.Deactivate(ctx, "blocked"))
+	_, err = m.Activate(ctx, "other", []mount.Mount{{Type: "fail", Source: "other"}})
+	assert.Error(t, err, "Activate(other)")
+
+	close(h.release)
+	<-done
+	require.Nil(t, panicked, "Activate(blocked) panicked")
+	assert.Error(t, blockedErr, "Activate(blocked)")
 }
 
 // TODO: Test deactivate
