@@ -959,13 +959,20 @@ func (r *request) setOffset(offset int64) {
 }
 
 func requestFields(req *http.Request) log.Fields {
+	const (
+		authorization      = "authorization"
+		proxyAuthorization = "proxy-authorization"
+		cookie             = "cookie"
+		cookie2            = "cookie2"
+	)
+
 	fields := map[string]any{
 		"request.method": req.Method,
 	}
 	for k, vals := range req.Header {
 		k = strings.ToLower(k)
 		switch k {
-		case "authorization", "proxy-authorization", "cookie", "cookie2":
+		case authorization, proxyAuthorization, cookie, cookie2:
 			continue
 		}
 		for i, v := range vals {
@@ -981,13 +988,18 @@ func requestFields(req *http.Request) log.Fields {
 }
 
 func responseFields(resp *http.Response) log.Fields {
+	const (
+		setCookie  = "set-cookie"
+		setCookie2 = "set-cookie2"
+	)
+
 	fields := map[string]any{
 		"response.status": resp.Status,
 	}
 	for k, vals := range resp.Header {
 		k = strings.ToLower(k)
 		switch k {
-		case "set-cookie", "set-cookie2":
+		case setCookie, setCookie2:
 			continue
 		}
 		for i, v := range vals {
