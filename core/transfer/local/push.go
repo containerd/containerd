@@ -25,8 +25,10 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -77,6 +79,34 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 	}
 	defer cancel()
 
+	var (
+		appendDistSrcLabel images.HandlerFunc
+		mu                 sync.Mutex
+		pushed             []ocispec.Descriptor
+	)
+	if named, ok := p.(interface{ Image() string }); ok {
+		appendDistSrcLabel, err = docker.AppendDistributionSourceLabel(ts.content, named.Image())
+		if err != nil {
+			log.G(ctx).WithError(err).Warn("failed to prepare distribution source labels")
+		}
+	}
+	if appendDistSrcLabel != nil {
+		collect := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			mu.Lock()
+			pushed = append(pushed, desc)
+			mu.Unlock()
+			return nil, nil
+		})
+		previousWrapper := wrapper
+		wrapper = func(h images.Handler) images.Handler {
+			h = images.Handlers(h, collect)
+			if previousWrapper != nil {
+				h = previousWrapper(h)
+			}
+			return h
+		}
+	}
+
 	// TODO: Add handler to track parents
 	/*
 		// TODO: Add handlers
@@ -94,6 +124,14 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 	*/
 	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper); err != nil {
 		return err
+	}
+	// Do not retain a source for blobs until the registry accepts the whole image.
+	for _, desc := range pushed {
+		// Blobs already present remotely may not exist in the local store.
+		if _, err := appendDistSrcLabel(ctx, desc); err != nil && !errdefs.IsNotFound(err) {
+			log.G(ctx).WithError(err).WithField("digest", desc.Digest).Warn("failed to append distribution source label to pushed content")
+			break
+		}
 	}
 	if tops.Progress != nil {
 		tops.Progress(transfer.Progress{

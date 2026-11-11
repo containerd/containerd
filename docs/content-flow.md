@@ -260,7 +260,11 @@ This is not intended to be a comprehensive overview of labels.
 
 #### Common Labels
 For images pulled from remotes, the `containerd.io.distribution.source.<registry>=[<repo/1>,<repo/2>]` label
-is added to each blob of the image to indicate its source.
+is added to each blob of the image to indicate its source. A successful push to a registry
+also records the destination repository on the pushed content. These labels are updated
+only after the entire push succeeds, including the manifests and indexes, so a failed push
+does not record a source that the registry might discard.
+Failures to update this metadata are logged without failing an otherwise successful push.
 ```
 containerd.io/distribution.source.docker.io=library/redis
 ```
