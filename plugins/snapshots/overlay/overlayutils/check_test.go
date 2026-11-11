@@ -19,12 +19,111 @@
 package overlayutils
 
 import (
+	"errors"
 	"os/exec"
 	"testing"
 
+	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
 )
+
+func stubProbeUserXattr(t *testing.T, probe func(string) (bool, error)) {
+	t.Helper()
+	orig := probeUserXattr
+	probeUserXattr = probe
+	t.Cleanup(func() {
+		probeUserXattr = orig
+	})
+}
+
+// stubNeedsUserXAttrDeps makes NeedsUserXAttr behave as if it runs in a user namespace
+// (or not) with the directory on tmpfs (or not), on a kernel >= 5.11.
+func stubNeedsUserXAttrDeps(t *testing.T, inUserNS, onTmpfs bool, probe func(string) (bool, error)) {
+	t.Helper()
+	origUserNS, origTmpfs, origKernel := usernsRunningInUserNS, isPathOnTmpfs, kernelGreaterEqualThan
+	usernsRunningInUserNS = func() bool { return inUserNS }
+	isPathOnTmpfs = func(string) bool { return onTmpfs }
+	kernelGreaterEqualThan = func(kernel.KernelVersion) (bool, error) { return true, nil }
+	t.Cleanup(func() {
+		usernsRunningInUserNS, isPathOnTmpfs, kernelGreaterEqualThan = origUserNS, origTmpfs, origKernel
+	})
+	stubProbeUserXattr(t, probe)
+}
+
+func TestNeedsUserXAttr(t *testing.T) {
+	errProbe := errors.New("probe failed")
+
+	for _, tc := range []struct {
+		name        string
+		inUserNS    bool
+		onTmpfs     bool
+		probe       func(string) (bool, error)
+		expected    bool
+		expectedErr error
+		probeCalls  int
+	}{
+		{
+			name:     "initial user namespace",
+			inUserNS: false,
+			onTmpfs:  true,
+			expected: false,
+		},
+		{
+			name:     "not on tmpfs",
+			inUserNS: true,
+			onTmpfs:  false,
+			expected: true,
+		},
+		{
+			name:       "tmpfs with user xattr support",
+			inUserNS:   true,
+			onTmpfs:    true,
+			probe:      func(string) (bool, error) { return true, nil },
+			expected:   true,
+			probeCalls: 1,
+		},
+		{
+			name:       "tmpfs without user xattr support",
+			inUserNS:   true,
+			onTmpfs:    true,
+			probe:      func(string) (bool, error) { return false, nil },
+			expected:   false,
+			probeCalls: 1,
+		},
+		{
+			name:        "tmpfs probe error",
+			inUserNS:    true,
+			onTmpfs:     true,
+			probe:       func(string) (bool, error) { return false, errProbe },
+			expected:    false,
+			expectedErr: errProbe,
+			probeCalls:  1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			probeCalls := 0
+			stubNeedsUserXAttrDeps(t, tc.inUserNS, tc.onTmpfs, func(d string) (bool, error) {
+				probeCalls++
+				if tc.probe == nil {
+					t.Fatal("unexpected probe")
+				}
+				return tc.probe(d)
+			})
+
+			userxattr, err := NeedsUserXAttr(t.TempDir())
+			if !errors.Is(err, tc.expectedErr) {
+				t.Fatalf("expected error %v, got %v", tc.expectedErr, err)
+			}
+			if userxattr != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, userxattr)
+			}
+			if probeCalls != tc.probeCalls {
+				t.Errorf("expected %d probe calls, got %d", tc.probeCalls, probeCalls)
+			}
+		})
+	}
+}
 
 func testOverlaySupported(t testing.TB, expected bool, mkfs ...string) {
 	testutil.RequiresRoot(t)
