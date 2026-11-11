@@ -1,5 +1,23 @@
 CHANGES
 
+v2.0.3:
+  - Updated various dependencies
+  - ctr-enc: Synchronize with more recent version of ctr from containerd v2.3.0
+  - tests: Use container images from quai rather than docker hub
+  - tests: Set OCICRYPT_CONFIG=internal when starting containerd
+  - tests: Use remove_all_snapshots in local keys tests to clear cache
+
+v2.0.2:
+  - Updated various dependencies
+  - Fixed an error message to start with small letter
+
+v2.0.1:
+  - Updated various dependencies
+
+v2.0.0:
+  - Updated to containerd v2.0.0 and other dependencies
+  - Use golang v1.23 ditching v1.21
+
 v1.2.0-rc1:
   - Updated to ocicrypt v1.2.0
   - Updated to containerd v2.0.0-rc.3
