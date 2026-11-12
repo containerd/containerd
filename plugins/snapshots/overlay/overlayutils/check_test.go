@@ -32,9 +32,59 @@ func stubProbeUserXattr(t *testing.T, probe func(string) (bool, error)) {
 	t.Helper()
 	orig := probeUserXattr
 	probeUserXattr = probe
+	userXattrSupport.Clear()
 	t.Cleanup(func() {
 		probeUserXattr = orig
+		userXattrSupport.Clear()
 	})
+}
+
+func TestSupportsUserXattrCached(t *testing.T) {
+	calls := 0
+	stubProbeUserXattr(t, func(string) (bool, error) {
+		calls++
+		return true, nil
+	})
+
+	// Both directories are on the same filesystem.
+	for _, d := range []string{t.TempDir(), t.TempDir()} {
+		supported, err := supportsUserXattr(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !supported {
+			t.Error("expected user xattrs to be supported")
+		}
+	}
+	if calls != 1 {
+		t.Errorf("expected the probe to run once, got %d", calls)
+	}
+}
+
+func TestSupportsUserXattrErrorNotCached(t *testing.T) {
+	calls := 0
+	stubProbeUserXattr(t, func(string) (bool, error) {
+		calls++
+		if calls == 1 {
+			return false, errors.New("probe failed")
+		}
+		return true, nil
+	})
+
+	d := t.TempDir()
+	if _, err := supportsUserXattr(d); err == nil {
+		t.Fatal("expected an error")
+	}
+	supported, err := supportsUserXattr(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !supported {
+		t.Error("expected user xattrs to be supported")
+	}
+	if calls != 2 {
+		t.Errorf("expected the probe to run twice, got %d", calls)
+	}
 }
 
 // stubNeedsUserXAttrDeps makes NeedsUserXAttr behave as if it runs in a user namespace

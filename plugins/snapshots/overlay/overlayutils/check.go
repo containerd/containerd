@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/moby/sys/userns"
@@ -46,6 +47,9 @@ var (
 	kernelGreaterEqualThan = kernel.GreaterEqualThan
 	probeUserXattr         = probeUserXattrOnFile
 )
+
+// userXattrSupport caches the result of probeUserXattr by filesystem ID.
+var userXattrSupport sync.Map // map[unix.Fsid]bool
 
 // SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,
 // which is required for the overlay snapshotter. On 4.x kernels, multiple lowerdirs
@@ -119,6 +123,32 @@ func IsPathOnTmpfs(d string) bool {
 	return stat.Type == tmpfsMagic
 }
 
+// supportsUserXattr returns whether the filesystem of d allows setting extended
+// attributes in the "user." namespace.
+//
+// The result is cached by the filesystem ID rather than the device number, as the
+// anonymous device numbers of tmpfs are reused after unmounting, while tmpfs
+// generates a new filesystem ID for each mount. Kernels before 5.13 report a zero
+// filesystem ID for tmpfs, so all tmpfs mounts share the same cache entry there,
+// which is fine as the support does not differ between tmpfs mounts.
+// Errors are not cached.
+func supportsUserXattr(d string) (bool, error) {
+	var stat unix.Statfs_t
+	if err := unix.Statfs(d, &stat); err != nil {
+		return false, fmt.Errorf("failed to statfs %s: %w", d, err)
+	}
+	if supported, ok := userXattrSupport.Load(stat.Fsid); ok {
+		return supported.(bool), nil
+	}
+
+	supported, err := probeUserXattr(d)
+	if err != nil {
+		return false, err
+	}
+	userXattrSupport.Store(stat.Fsid, supported)
+	return supported, nil
+}
+
 // probeUserXattrOnFile returns whether the filesystem of d allows setting extended
 // attributes in the "user." namespace, by trying to set one on a temporary file in d.
 func probeUserXattrOnFile(d string) (bool, error) {
@@ -176,7 +206,7 @@ func NeedsUserXAttr(d string) (bool, error) {
 	// Probe instead of comparing the kernel version, as the support may be backported
 	// or disabled (CONFIG_TMPFS_XATTR).
 	if isPathOnTmpfs(d) {
-		supported, err := probeUserXattr(d)
+		supported, err := supportsUserXattr(d)
 		if err != nil || !supported {
 			return false, err
 		}
