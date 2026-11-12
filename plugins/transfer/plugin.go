@@ -88,6 +88,8 @@ func init() {
 			// Set configuration based on default or user input
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
 			lc.ConcurrentLayerFetchBuffer = config.ConcurrentLayerFetchBuffer
+			lc.IgnoreDescriptorURLs = config.IgnoreDescriptorURLs
+			lc.ResolverStats = resolverStats
 
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
 			lc.MaxConcurrentUnpacks = config.MaxConcurrentUnpacks
@@ -264,6 +266,9 @@ type transferConfig struct {
 
 	// MaxConcurrentUnpacks controls the number of concurrent layer unpack operations.
 	MaxConcurrentUnpacks int `toml:"max_concurrent_unpacks"`
+
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool `toml:"ignore_descriptor_urls"`
 }
 
 type unpackConfiguration struct {

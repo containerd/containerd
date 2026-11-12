@@ -156,6 +156,9 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 		// into the content store. Error out here otherwise the error sent back is confusing
 		return fmt.Errorf("unable to fetch descriptor (%s) which reports content size of zero: %w", desc.Digest, errdefs.ErrInvalidArgument)
 	}
+	if desc.Size < 0 {
+		return fmt.Errorf("unable to fetch descriptor (%s) which reports negative content size (%d): %w", desc.Digest, desc.Size, errdefs.ErrInvalidArgument)
+	}
 	if ws.Offset == desc.Size {
 		// If writer is already complete, commit and return
 		err := cw.Commit(ctx, desc.Size, desc.Digest)
@@ -197,6 +200,9 @@ func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 }
 
 func push(ctx context.Context, provider content.Provider, pusher Pusher, desc ocispec.Descriptor) error {
+	if desc.Size < 0 {
+		return fmt.Errorf("invalid descriptor size %d: %w", desc.Size, errdefs.ErrInvalidArgument)
+	}
 	log.G(ctx).Debug("push")
 
 	var (

@@ -49,24 +49,20 @@ type differ interface {
 
 // erofsDiff does erofs comparison and application
 type erofsDiff struct {
-	store         content.Store
-	mkfsExtraOpts []string
+	store content.Store
 	// enableTarIndex enables generating tar index for tar content
 	// instead of fully converting the tar to EROFS format
 	enableTarIndex bool
 	// enableDmverity enables formatting layers with dm-verity after creation
 	enableDmverity bool
+	// useMkfs builds layers with mkfs.erofs instead of the Go converter
+	useMkfs bool
+	// mkfsExtraOpts are extra options for mkfs.erofs, used with useMkfs
+	mkfsExtraOpts []string
 }
 
 // DifferOpt is an option for configuring the erofs differ
 type DifferOpt func(d *erofsDiff)
-
-// WithMkfsOptions sets extra options for mkfs.erofs
-func WithMkfsOptions(opts []string) DifferOpt {
-	return func(d *erofsDiff) {
-		d.mkfsExtraOpts = opts
-	}
-}
 
 // WithTarIndexMode enables tar index mode for EROFS layers
 func WithTarIndexMode() DifferOpt {
@@ -82,6 +78,25 @@ func WithDmverity() DifferOpt {
 	}
 }
 
+// WithMkfs builds EROFS layers with mkfs.erofs from erofs-utils instead of
+// the built-in Go converter.
+func WithMkfs() DifferOpt {
+	return func(d *erofsDiff) {
+		d.useMkfs = true
+	}
+}
+
+// WithMkfsOptions sets extra options for mkfs.erofs. Non-empty options also
+// select mkfs.erofs, as WithMkfs does.
+func WithMkfsOptions(opts []string) DifferOpt {
+	return func(d *erofsDiff) {
+		d.mkfsExtraOpts = opts
+		if len(opts) > 0 {
+			d.useMkfs = true
+		}
+	}
+}
+
 // NewErofsDiffer creates a new EROFS differ with the provided options
 func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 	d := &erofsDiff{
@@ -93,8 +108,9 @@ func NewErofsDiffer(store content.Store, opts ...DifferOpt) differ {
 		opt(d)
 	}
 
-	// Add default block size on darwin if not already specified
-	d.mkfsExtraOpts = erofsutils.AddDefaultMkfsOpts(d.mkfsExtraOpts)
+	if d.useMkfs {
+		d.mkfsExtraOpts = erofsutils.AddDefaultMkfsOpts(d.mkfsExtraOpts)
+	}
 
 	return d
 }
@@ -244,16 +260,28 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 			return emptyDesc, err
 		}
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer with compressed EROFS blob")
-	} else if s.enableTarIndex {
+	} else if s.enableTarIndex && s.useMkfs {
 		// Use the tar index method: generate tar index and append tar
-		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		err = erofsutils.MkfsGenerateTarIndex(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		if err != nil {
+			return emptyDesc, fmt.Errorf("failed to generate tar index: %w", err)
+		}
+		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar index mode")
+	} else if s.enableTarIndex {
+		// Use the tar index method: a metadata image whose file data lives in
+		// a separate data device
+		err = erofsutils.ConvertTarErofsIndex(ctx, rc, layerBlobPath, erofsutils.DevicePath(layer, 0), u.String())
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to generate tar index: %w", err)
 		}
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar index mode")
 	} else {
 		// Use the tar method: fully convert tar to EROFS
-		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		if s.useMkfs {
+			err = erofsutils.MkfsConvertTar(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
+		} else {
+			err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String())
+		}
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to convert tar to erofs: %w", err)
 		}
@@ -267,8 +295,14 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 
 	// Format with dm-verity if enabled
 	if s.enableDmverity {
-		if err := s.formatDmverityLayer(ctx, layerBlobPath); err != nil {
-			return emptyDesc, fmt.Errorf("failed to format dm-verity layer: %w", err)
+		devices, err := erofsutils.LayerDevices(layer)
+		if err != nil {
+			return emptyDesc, err
+		}
+		for _, p := range append([]string{layerBlobPath}, devices...) {
+			if err := s.formatDmverityLayer(ctx, p); err != nil {
+				return emptyDesc, fmt.Errorf("failed to format dm-verity layer: %w", err)
+			}
 		}
 	}
 

@@ -51,6 +51,9 @@ type Config struct {
 	// If `SetImmutable` is enabled, IMMUTABLE_FL will be set on layer blobs.
 	SetImmutable bool `toml:"set_immutable"`
 
+	// FsyncOnCommit enables fsyncing a snapshot's directory before the snapshot is committed
+	FsyncOnCommit bool `toml:"fsync_on_commit"`
+
 	// DefaultSize is the default size of a writable layer in string
 	DefaultSize string `toml:"default_size"`
 
@@ -112,6 +115,10 @@ func init() {
 
 			if config.SetImmutable {
 				opts = append(opts, erofs.WithImmutable())
+			}
+
+			if config.FsyncOnCommit {
+				opts = append(opts, erofs.WithFsyncOnCommit())
 			}
 
 			if config.DefaultSize != "" {

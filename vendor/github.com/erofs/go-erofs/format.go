@@ -14,8 +14,8 @@ var xattrPrefixes = [...]struct {
 	prefix string
 }{
 	{1, "user."},
-	{2, "system.posix_acl_access."},
-	{3, "system.posix_acl_default."},
+	{2, "system.posix_acl_access"},
+	{3, "system.posix_acl_default"},
 	{4, "trusted."},
 	{5, "lustre."},
 	{6, "security."},

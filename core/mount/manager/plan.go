@@ -88,9 +88,14 @@ func planActivation(ctx context.Context, mounts []mount.Mount, config mount.Acti
 
 		// Check is the source needs transformation, any transform operation requires
 		// mounting with the mount manager.
-		for transformType, mt, ok := strings.Cut(mountType, "/"); ok; transformType, mt, ok = strings.Cut(mountType, "/") {
-			tr, ok := transforms[transformType]
+		for {
+			transformType, mt, ok := strings.Cut(mountType, "/")
 			if !ok {
+				break
+			}
+
+			tr, found := transforms[transformType]
+			if !found {
 				log.G(ctx).Warnf("unknown transform %q for mount %v", transformType, mounts[i]) //nolint:gosec // G602: i is bounded by range mounts
 				break
 			}

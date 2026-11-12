@@ -1,0 +1,3 @@
+# Local build and test output must not invalidate the image cache.
+/bin/
+/_output/

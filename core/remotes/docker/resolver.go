@@ -533,13 +533,15 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
-	refspec        reference.Spec
-	repository     string
-	hosts          []RegistryHost
-	header         http.Header
-	performances   transfer.ImageResolverPerformanceSettings
-	limiter        *semaphore.Weighted
-	warningHandler WarningHandler
+	refspec              reference.Spec
+	repository           string
+	hosts                []RegistryHost
+	header               http.Header
+	performances         transfer.ImageResolverPerformanceSettings
+	limiter              *semaphore.Weighted
+	ignoreDescriptorURLs bool
+	stats                *transfer.ImageResolverStats
+	warningHandler       WarningHandler
 }
 
 func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
@@ -562,13 +564,15 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:        refspec,
-		repository:     strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:          hosts,
-		header:         r.header,
-		performances:   r.config.Performances,
-		limiter:        r.config.DownloadLimiter,
-		warningHandler: r.warningHandler,
+		refspec:              refspec,
+		repository:           strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:                hosts,
+		header:               r.header,
+		performances:         r.config.Performances,
+		limiter:              r.config.DownloadLimiter,
+		ignoreDescriptorURLs: r.config.IgnoreDescriptorURLs,
+		stats:                r.config.Stats,
+		warningHandler:       r.warningHandler,
 	}, nil
 }
 
@@ -693,6 +697,13 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", r.sanitizedURL()))
 	log.G(ctx).WithFields(requestFields(req)).Debug("do request")
 	if err := r.authorize(ctx, req); err != nil {
+		// Authorization failed before the request was handed to the HTTP
+		// client, which would otherwise own and close the body. Close it
+		// here, otherwise the producer of a streaming body (e.g. the
+		// pusher's pipe) is never unblocked.
+		if req.Body != nil {
+			req.Body.Close()
+		}
 		return nil, fmt.Errorf("failed to authorize: %w", err)
 	}
 

@@ -104,6 +104,9 @@ func TestIssue7496_ShouldRetryShutdown(t *testing.T) {
 }
 
 func TestKillShimPublishesTaskExitAndDeleteEvents(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc uses grouped shims; direct shim socket connection is not supported")
+	}
 	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
 
 	sbConfig := PodSandboxConfig("sandbox", t.Name(), WithHostNetwork)
@@ -156,6 +159,9 @@ func TestKillShimPublishesTaskExitAndDeleteEvents(t *testing.T) {
 // Regression test for https://github.com/containerd/containerd/issues/13293 (orphaned shim state after shim SIGKILL).
 // This test asserts that containerd publishes task exit and delete events for a container when the shim disconnects.
 func TestKillShimPublishesTaskExitAndDeleteEventsForContainer(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc uses grouped shims; direct shim socket connection is not supported")
+	}
 	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
 
 	sbConfig := PodSandboxConfig("sandbox", t.Name(), WithHostNetwork)
@@ -429,6 +435,9 @@ func countTaskExitDeleteEventsUntilBarrier(t *testing.T, id, barrierTopic string
 }
 
 func TestShutdownShimWhenPauseExitsBeforeWorkload(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc uses grouped shims; direct shim socket connection is not supported")
+	}
 	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
 
 	t.Logf("RunPodSandbox")

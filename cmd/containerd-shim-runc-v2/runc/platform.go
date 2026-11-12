@@ -67,8 +67,15 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 
 	epollConsole, err := p.epoller.Add(console)
 	if err != nil {
+		console.Close()
 		return nil, err
 	}
+	cc := &closingConsole{EpollConsole: epollConsole, epoller: p.epoller}
+	defer func() {
+		if retErr != nil {
+			cc.Close()
+		}
+	}()
 
 	var cwg sync.WaitGroup
 	if stdin != "" {
@@ -76,16 +83,14 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		if err != nil {
 			return nil, err
 		}
+		cc.stdinReader = in
 		cwg.Add(1)
 		go func() {
 			cwg.Done()
 			bp := bufPool.Get().(*[]byte)
 			defer bufPool.Put(bp)
 			io.CopyBuffer(epollConsole, in, *bp)
-			// we need to shutdown epollConsole when pipe broken
-			epollConsole.Shutdown(p.epoller.CloseConsole)
-			epollConsole.Close()
-			in.Close()
+			cc.closeStdin()
 		}()
 	}
 
@@ -173,6 +178,7 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		}
 		outr, err := fifo.OpenFifo(ctx, stdout, syscall.O_RDONLY, 0)
 		if err != nil {
+			outw.Close()
 			return nil, err
 		}
 		wg.Add(1)
@@ -190,18 +196,71 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		cwg.Wait()
 	}
 
-	return epollConsole, nil
+	return cc, nil
 }
 
 func (p *linuxPlatform) ShutdownConsole(ctx context.Context, cons console.Console) error {
 	if p.epoller == nil {
 		return errors.New("uninitialized epoller")
 	}
-	epollConsole, ok := cons.(*console.EpollConsole)
+	cc, ok := cons.(*closingConsole)
 	if !ok {
-		return fmt.Errorf("expected EpollConsole, got %#v", cons)
+		return fmt.Errorf("expected closingConsole, got %#v", cons)
 	}
-	return epollConsole.Shutdown(p.epoller.CloseConsole)
+	return cc.shutdown()
+}
+
+// closingConsole is what CopyConsole returns: the epoll console plus the stdin
+// FIFO reader, so the teardown lives in one place.
+//
+// shutdown removes the console from the epoller, once, and only while the
+// fd is still open. After the fd is closed its number can belong to another
+// console, and removing it again would hit that one.
+//
+// Close runs shutdown, closes the master, and closes the stdin FIFO reader,
+// once. Its closeStdin, shutdown, and Close methods are idempotent and safe
+// for concurrent calls. The stdin copier, CopyConsole's error path,
+// ShutdownConsole and delete all release through these methods.
+type closingConsole struct {
+	*console.EpollConsole
+	epoller      *console.Epoller
+	stdinReader  io.Closer
+	stdinOnce    sync.Once
+	stdinErr     error
+	shutdownOnce sync.Once
+	shutdownErr  error
+	closeOnce    sync.Once
+	closeErr     error
+}
+
+func (c *closingConsole) closeStdin() error {
+	c.stdinOnce.Do(func() {
+		if c.stdinReader != nil {
+			c.stdinErr = c.stdinReader.Close()
+		}
+	})
+	return c.stdinErr
+}
+
+func (c *closingConsole) shutdown() error {
+	c.shutdownOnce.Do(func() {
+		c.shutdownErr = c.Shutdown(c.epoller.CloseConsole)
+	})
+	return c.shutdownErr
+}
+
+func (c *closingConsole) Close() error {
+	c.closeOnce.Do(func() {
+		c.shutdown()
+		c.closeErr = c.EpollConsole.Close()
+		// a writer parked on the master before it closed retries on this
+		// wake and sees the closed file instead of another hangup
+		c.Shutdown(func(int) error { return nil })
+		if err := c.closeStdin(); err != nil && c.closeErr == nil {
+			c.closeErr = err
+		}
+	})
+	return c.closeErr
 }
 
 func (p *linuxPlatform) Close() error {

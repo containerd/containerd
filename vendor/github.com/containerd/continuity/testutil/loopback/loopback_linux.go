@@ -64,7 +64,7 @@ func New(size int64) (*Loopback, error) {
 		log.L.Debugf("Removing loop device %s", deviceName)
 		losetup := exec.Command("losetup", "--detach", deviceName)
 		if out, err := losetup.CombinedOutput(); err != nil {
-			return fmt.Errorf("Could not remove loop device %s (%v): %q: %w", deviceName, losetup.Args, string(out), err)
+			return fmt.Errorf("could not remove loop device %s (%v): %q: %w", deviceName, losetup.Args, string(out), err)
 		}
 
 		// remove file

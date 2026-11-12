@@ -113,7 +113,7 @@ The following syscalls (`io_uring_enter`, `io_uring_register`, and `io_uring_set
 
 Additional context:
 
-- <https://security.googleblog.com/2023/06/learnings-from-kctf-vrps-42-linux.html>
+- [#9048](https://github.com/containerd/containerd/issues/9048)
 
 ### `LimitNOFILE` configuration has been removed
 

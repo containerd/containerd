@@ -383,7 +383,12 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 			if err != nil {
 				return err
 			}
-			container.Runtime.Options = o
+			// Avoid assigning a typed-nil (*anypb.Any)(nil) to the typeurl.Any
+			// interface, which would produce a non-nil interface value that
+			// fails type-URL lookup.
+			if o != nil {
+				container.Runtime.Options = o
+			}
 		case string(bucketKeySpec):
 			var spec types.Any
 			if err := proto.Unmarshal(v, &spec); err != nil {

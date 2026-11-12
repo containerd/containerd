@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -96,7 +95,7 @@ version = 3
 			wg.Go(func() {
 
 				cntrID := podCtx.createContainer(fmt.Sprintf("round-%d-running", round), busyboxImage,
-					criruntime.ContainerState_CONTAINER_RUNNING,
+					runtimeapi.ContainerState_CONTAINER_RUNNING,
 					WithCommand(
 						"sh",
 						"-c",
@@ -117,7 +116,7 @@ version = 3
 					}
 
 					state := status.GetState()
-					if state != criruntime.ContainerState_CONTAINER_EXITED {
+					if state != runtimeapi.ContainerState_CONTAINER_EXITED {
 						return false, nil
 					}
 

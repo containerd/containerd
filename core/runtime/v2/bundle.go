@@ -19,10 +19,12 @@ package v2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -75,6 +77,9 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		return nil, err
 	}
 	if err := os.Mkdir(b.Path, 0700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, fmt.Errorf("bundle for %s: %w", id, errdefs.ErrAlreadyExists)
+		}
 		return nil, err
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {
@@ -102,8 +107,8 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		}
 	}
 	paths = append(paths, work)
-	// symlink workdir
-	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
+	// create work link (symlink on unix, junction on windows)
+	if err := createWorkLink(work, b.Path); err != nil {
 		return nil, err
 	}
 	// Spec may be nil for some sandboxers that do not initialize the spec, for
@@ -144,7 +149,7 @@ type Bundle struct {
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
-	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
+	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
 		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)

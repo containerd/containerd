@@ -556,6 +556,9 @@ var (
 			if err != nil {
 				return err
 			}
+			if info.Size < 0 {
+				return fmt.Errorf("invalid content size %d: %w", info.Size, errdefs.ErrInvalidArgument)
+			}
 			desc := ocispec.Descriptor{
 				MediaType: media,
 				Digest:    dgst,

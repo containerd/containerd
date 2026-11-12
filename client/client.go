@@ -457,6 +457,9 @@ type RemoteContext struct {
 	// big images.
 	ConcurrentLayerFetchBuffer int
 
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int
 

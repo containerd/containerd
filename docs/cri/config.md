@@ -49,7 +49,7 @@ apiVersion: kubelet.config.k8s.io/v1beta1
 cgroupDriver: "systemd"
 ```
 
-kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/).
+kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#configuring-a-cgroup-driver).
 
 > Note: Kubernetes v1.28 supports automatic detection of the cgroup driver as
 > an alpha feature. With the `KubeletCgroupDriverFromCRI` kubelet feature gate
@@ -57,12 +57,22 @@ kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/
 > runtime and the `KubeletConfiguration` configuration step above is not
 > needed.
 >
-> When determining the cgroup driver, containerd uses the `SystemdCgroup`
-> setting from runc-based runtime classes, starting from the default runtime
-> class. If no runc-based runtime classes have been configured containerd
-> relies on auto-detection based on determining if systemd is running.
-> Note that all runc-based runtime classes should be configured to have the
-> same `SystemdCgroup` setting in order to avoid unexpected behavior.
+> When determining the cgroup driver, containerd inspects the runtime classes
+> in order, starting from the default runtime class:
+>
+> - For runc-based runtime classes (`io.containerd.runc.v2`), containerd reads
+>   the `SystemdCgroup` field from the runtime's `options` block.
+> - For generic shims that use `runtimeoptions/v1` (e.g. `io.containerd.runsc.v1`
+>   for gVisor), containerd reads the cgroup driver from the shim's config file
+>   (`ConfigPath`) or inline config body (`ConfigBody`). It first looks for a
+>   top-level `SystemdCgroup` key (boolean), then for
+>   `[runsc_config] systemd-cgroup` which the runsc shim stores as a TOML string
+>   (`"true"` or `"false"`).
+> - If no runtime class provides cgroup driver information, containerd falls back
+>   to auto-detection based on whether systemd is running.
+>
+> Note that all runtime classes should be configured with the same cgroup driver
+> setting in order to avoid unexpected behavior.
 >
 > The automatic cgroup driver configuration for kubelet feature is supported in
 > containerd v2.0 and later.
@@ -172,6 +182,7 @@ To configure Transfer Service, use the following settings in your config.toml:
 [plugins.'io.containerd.transfer.v1.local']
   # Transfer service specific configurations
   max_concurrent_downloads = 3
+  ignore_descriptor_urls = false
   unpack_config = { ... }
 ```
 
@@ -198,6 +209,7 @@ There are some differences in how image pull configurations are specified betwee
 | Registry Settings | ✅ All supported | ⚠️ Only ConfigPath and Headers supported<br>(Mirrors, Configs, Auths not supported, also deprecated) |
 | ImageDecryption | ❌ Disabled | ❌ Disabled |
 | MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
+| IgnoreDescriptorURLs | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
 | ImagePullWithSyncFs | ✅ Supported | ⚠️ Must be configured in diff service plugin:<br>`[plugins."io.containerd.service.v1.diff-service"]`<br>`sync_fs = true` |
 | StatsCollectPeriod | ✅ Supported | ✅ Supported |
 
@@ -211,6 +223,7 @@ If you have any of the following configurations in your CRI image config, contai
 - `Registry.Configs` is configured
 - `Registry.Auths` is configured
 - `MaxConcurrentDownloads != 3`
+- `IgnoreDescriptorURLs = true`
 - `ImagePullWithSyncFs = true`
 
 The warning message will indicate which configuration option triggered the fallback and provide guidance on how to properly configure the option when using the Transfer Service.
@@ -238,6 +251,7 @@ version = 3
     disable_snapshot_annotations = true
     discard_unpacked_layers = false
     max_concurrent_downloads = 3
+    ignore_descriptor_urls = false
     image_pull_progress_timeout = '5m0s'
     image_pull_with_sync_fs = false
     stats_collect_period = 10

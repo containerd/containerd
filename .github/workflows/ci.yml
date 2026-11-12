@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
           - os: ${{ github.event.repository.private && 'macos-latest' || '' }}
@@ -43,7 +43,7 @@ jobs:
       - uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee  # v9.2.1
         if: ${{ !github.event.repository.private }}
         with:
-          version: v2.13.2
+          version: v2.14.0
           skip-cache: true
           args: --timeout=8m
 
@@ -52,7 +52,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -85,7 +85,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     defaults:
@@ -111,7 +111,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -127,7 +127,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -205,8 +205,8 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
-        go-version: ["1.27.1"] # 1.26 is not supported due to k8s 1.38 requiring 1.27
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+        go-version: ["1.27.4"] # 1.26 is not supported due to k8s 1.38 requiring 1.27
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
     steps:
@@ -388,7 +388,7 @@ jobs:
           Write-Host "Skip parameters: $skip"
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' --ginkgo.skip="$skip"
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults ${{ matrix.os }} ${{ matrix.cgroup_driver }}
@@ -408,17 +408,34 @@ jobs:
       matrix:
         runtime:
           - io.containerd.runc.v2
+          - io.containerd.runc.v2-rs
         runc: [runc]  # crun can be added here to debug crun issues
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
         cgroup_driver: [cgroupfs, systemd]
         exclude:
           - os: ${{ github.event.repository.private && 'ubuntu-24.04-arm' || '' }}
+          - runtime: io.containerd.runc.v2-rs
+            os: ubuntu-22.04
+          - runtime: io.containerd.runc.v2-rs
+            os: ubuntu-24.04-arm
+        include:
+          # Not supported by the Rust shim yet: checkpoints, trace propagation,
+          # State during an exec(TestIssue10589), and the idmapped mounts user namespaces need.
+          - runtime: io.containerd.runc.v2-rs
+            # CRI only types the options of the runc runtime, so it gets the
+            # Rust shim as that runtime's binary, the way a drop-in shim is configured.
+            cri_runtime: io.containerd.runc.v2
+            cri_runtime_path: /usr/local/bin/containerd-shim-runc-v2-rs
+            extra_testflags: "-no-criu -test.skip='(TestIssue10589|TestShimTraceContextPropagation)'"
+            cri_skip: "(TestPodUserNS|TestUsernsVolumeCopyUp|TestImageVolumeWithUserNamespace|TestIssue10598)"
 
     env:
       GOTEST: gotestsum --
       # Build the shim with tracing enabled, so that the integration suite
       # covers trace context propagation to runc and the OCI hooks.
       BUILDTAGS: shim_tracing
+      RUST_SHIM_VERSION: "0.2.0"
+      RUST_TOOLCHAIN: "1.91"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -483,6 +500,28 @@ jobs:
         run: |
           sudo modprobe dm_verity
 
+      - name: Cache the Rust runc shim
+        if: matrix.runtime == 'io.containerd.runc.v2-rs'
+        id: rust-shim
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/rust-shim/bin
+          key: rust-shim-${{ matrix.os }}-${{ env.RUST_SHIM_VERSION }}-rust-${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install the Rust toolchain
+        if: matrix.runtime == 'io.containerd.runc.v2-rs' && steps.rust-shim.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - name: Install the Rust runc shim
+        if: matrix.runtime == 'io.containerd.runc.v2-rs'
+        run: |
+          if [ "${{ steps.rust-shim.outputs.cache-hit }}" != "true" ]; then
+            cargo install containerd-runc-shim --version "$RUST_SHIM_VERSION" --locked --root "$RUNNER_TEMP/rust-shim"
+          fi
+          sudo install -D "$RUNNER_TEMP/rust-shim/bin/containerd-shim-runc-v2-rs" /usr/local/bin/
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1
@@ -510,6 +549,7 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          EXTRA_TESTFLAGS: ${{ matrix.extra_testflags }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: |
@@ -528,6 +568,7 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          EXTRA_TESTFLAGS: ${{ matrix.extra_testflags }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: |
@@ -543,9 +584,11 @@ jobs:
 
       - name: CRI Integration Test
         env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.cri_runtime || matrix.runtime }}
+          CONTAINERD_RUNTIME_PATH: ${{ matrix.cri_runtime_path }}
           CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
           RUNC_FLAVOR: ${{ matrix.runc }}
+          SKIP: ${{ matrix.cri_skip }}
         run: |
           cat /sys/fs/cgroup/cgroup.controllers
           systemctl status
@@ -557,13 +600,32 @@ jobs:
 
       - name: cri-tools critest
         env:
-          TEST_RUNTIME: ${{ matrix.runtime }}
+          TEST_RUNTIME: ${{ matrix.cri_runtime || matrix.runtime }}
+          TEST_RUNTIME_PATH: ${{ matrix.cri_runtime_path }}
           CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
-      - if: matrix.os != 'ubuntu-24.04-arm'
+      # Experimental: the same critest suite through the pause-less sandbox
+      # shim (containerd-shim-sandboxed-runc-v2 selected with runtime_path,
+      # with the shim sandboxer). The user namespace specs skip themselves:
+      # the handler does not advertise user namespaces until the shim
+      # supports them. The sandboxed shim is a Go shim: it runs on the
+      # runc.v2 legs only.
+      - if: matrix.runtime == 'io.containerd.runc.v2'
+        name: cri-tools critest (sandbox shim)
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          TEST_RUNTIME_PATH: /usr/local/bin/containerd-shim-sandboxed-runc-v2
+          SANDBOXER: shim
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          env
+          sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report-sandbox-shim"
+
+      # The Rust shim does not implement checkpoint yet.
+      - if: matrix.os != 'ubuntu-24.04-arm' && matrix.runtime != 'io.containerd.runc.v2-rs'
         name: Checkpoint/Restore Disable via CRI
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
@@ -587,7 +649,7 @@ jobs:
           sudo lsmod
           sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }} ${{ matrix.cgroup_driver }}
@@ -596,11 +658,13 @@ jobs:
             *-gotest.json
             ${{github.workspace}}/report/*.xml
             ${{github.workspace}}/report/*.log
+            ${{github.workspace}}/report-sandbox-shim/*.xml
+            ${{github.workspace}}/report-sandbox-shim/*.log
 
   integration-vm:
     name: VM integration
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -663,7 +727,14 @@ jobs:
           key: lima-${{ steps.lima-actions-setup.outputs.version }}-${{ matrix.template }}
       - name: Boot VM
         # --plain keeps the guest pristine (no guest agent, no mounts, no port forwards)
-        run: limactl start --plain --name=default --cpus=2 --memory=4 --disk=60 "template:$LIMA_TEMPLATE"
+        run: |
+          limactl start --plain --name=default --cpus=2 --memory=4 --disk=60 "template:$LIMA_TEMPLATE" || {
+            # limactl can fail to download the VM image due to flakiness on the
+            # upstream mirrors, wait a bit and retry
+            limactl delete -f default || true
+            sleep 60
+            limactl start --plain --name=default --cpus=2 --memory=4 --disk=60 "template:$LIMA_TEMPLATE"
+          }
       - name: Copy the source code to the VM
         env:
           # $LIMA_WORKDIR does not exist yet
@@ -686,10 +757,118 @@ jobs:
           LIMA_WORKDIR: /
         run: lima sudo dmesg -T -f kern
 
+
+  integration-runsc:
+    name: runsc (gVisor) integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cgroup_driver: [systemd, cgroupfs]
+
+    env:
+      CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+      TEST_RUNTIME: io.containerd.runsc.v1
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-go
+
+      - name: Install containerd dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf dmsetup strace xfsprogs
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
+
+      - name: Install runsc (gVisor)
+        run: script/runsc/install-runsc
+
+      - name: Build containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+
+      - name: CRI integration (runsc)
+        run: |
+          # Generate the runsc containerd config and pass it to cri-integration
+          # so utils.sh skips its own config generation.
+          cfg=$(mktemp /tmp/containerd-config-runsc-XXXXXX.toml)
+          trap 'rm -f "$cfg"' EXIT
+          script/runsc/write-runsc-shim-config.sh "$CGROUP_DRIVER" systrap
+          script/runsc/write-containerd-runsc-config.sh "$cfg" "$CGROUP_DRIVER"
+          # The external config and runsc shim config already contain the cgroup settings.
+          # Keep CGROUP_DRIVER set but empty so utils.sh does not append runc.options again.
+          CGROUP_DRIVER= CONTAINERD_CONFIG_FILE="$cfg" RUNTIME=runsc RUNTIME_TYPE=io.containerd.runsc.v1 make cri-integration
+
+      - name: Runsc memory baseline
+        run: |
+          set -eux
+          free -h
+          cat /proc/meminfo | grep -E 'MemAvailable|SwapFree|SwapTotal'
+          systemctl show containerd --property=MemoryMax --property=MemoryHigh || true
+          sudo systemd-cgtop -b -n 1 || true
+
+      - name: critest (runsc)
+        env:
+          GOMAXPROCS: "2"
+          GINKGO_NODES: "2"
+          GOMEMLIMIT: "4GiB"
+        run: |
+          mkdir -p "${{github.workspace}}/report"
+          cfg=$(mktemp /tmp/containerd-config-runsc-XXXXXX.toml)
+          trap 'rm -f "$cfg"' EXIT
+          script/runsc/write-containerd-runsc-config.sh "$cfg" "$CGROUP_DRIVER"
+          sudo \
+            CGROUP_DRIVER="$CGROUP_DRIVER" \
+            TEST_RUNTIME="$TEST_RUNTIME" \
+            CONTAINERD_CONFIG_FILE="$cfg" \
+            GOMAXPROCS="$GOMAXPROCS" \
+            GOMEMLIMIT="$GOMEMLIMIT" \
+            GINKGO_NODES="$GINKGO_NODES" \
+            PATH="$PATH" \
+            script/runsc/critest-runsc.sh "${{github.workspace}}/report"
+
+      - name: Host Status
+        if: always()
+        run: |
+          free -h
+          df -h
+          ps aux --sort=-%mem | head -n 30
+          sudo systemctl status containerd --no-pager || true
+          sudo journalctl -k --no-pager -n 200 || true
+          sudo dmesg -T | grep -iE 'oom|out of memory|killed process' || true
+
+      - name: Kernel Message
+        if: failure()
+        run: |
+          sudo dmesg -T | tail -n 200 || true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: TestResults-runsc-${{ matrix.cgroup_driver }}
+          path: |
+            *-junit.xml
+            *-gotest.json
+            ${{github.workspace}}/report/*.xml
+            ${{github.workspace}}/report/*.log
+
+
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
@@ -765,7 +944,7 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: TestResults MacOS
@@ -787,9 +966,9 @@ jobs:
   # See https://github.com/orgs/community/discussions/26822
   results:
     name: Report required job statuses
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
-    needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os, node-e2e]
+    needs: [linters, project, protos, binaries, integration-linux, integration-windows, integration-runsc, tests-cri-in-userns, tests-mac-os, node-e2e]
     if: ${{ always() }}
     steps:
       - run: exit 1
