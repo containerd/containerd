@@ -56,8 +56,11 @@ func (s *safePid) get() int {
 	return s.pid
 }
 
+// LastRuntimeError returns the message of the last error r logged, or an
+// empty string if it did not log one.
+//
 // TODO(mlaventure): move to runc package?
-func getLastRuntimeError(r *runc.Runc) (string, error) {
+func LastRuntimeError(r *runc.Runc) (string, error) {
 	if r.Log == "" {
 		return "", nil
 	}
