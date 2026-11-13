@@ -214,6 +214,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"fadvise64",
 				"fadvise64_64",
 				"fallocate",
+				"fanotify_init", // without CAP_SYS_ADMIN, kernel v5.13+ allows only unprivileged use
 				"fanotify_mark",
 				"fchdir",
 				"fchmod",
@@ -696,7 +697,6 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"bpf",
 					"clone",
 					"clone3",
-					"fanotify_init",
 					"fsconfig",
 					"fsmount",
 					"fsopen",
