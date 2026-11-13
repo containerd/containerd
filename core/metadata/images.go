@@ -318,7 +318,7 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 			}
 		}
 
-		if err = bkt.DeleteBucket([]byte(name)); err != nil {
+		if err := bkt.DeleteBucket([]byte(name)); err != nil {
 			if err == errbolt.ErrBucketNotFound {
 				err = fmt.Errorf("image %q: %w", name, errdefs.ErrNotFound)
 			}
@@ -381,11 +381,11 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 		return err
 	}
 
-	labels, err := boltutil.ReadLabels(bkt)
+	lbls, err := boltutil.ReadLabels(bkt)
 	if err != nil {
 		return err
 	}
-	image.Labels = labels
+	image.Labels = lbls
 
 	image.Target.Annotations, err = boltutil.ReadAnnotations(bkt)
 	if err != nil {
@@ -396,24 +396,18 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 	if tbkt == nil {
 		return errors.New("unable to read target bucket")
 	}
-	return tbkt.ForEach(func(k, v []byte) error {
-		if v == nil {
-			return nil // skip it? a bkt maybe?
-		}
 
-		// TODO(stevvooe): This is why we need to use byte values for
-		// keys, rather than full arrays.
-		switch string(k) {
-		case string(bucketKeyDigest):
-			image.Target.Digest = digest.Digest(v)
-		case string(bucketKeyMediaType):
-			image.Target.MediaType = string(v)
-		case string(bucketKeySize):
-			image.Target.Size, _ = binary.Varint(v)
-		}
+	if v := tbkt.Get(bucketKeyDigest); v != nil {
+		image.Target.Digest = digest.Digest(v)
+	}
+	if v := tbkt.Get(bucketKeyMediaType); v != nil {
+		image.Target.MediaType = string(v)
+	}
+	if v := tbkt.Get(bucketKeySize); v != nil {
+		image.Target.Size, _ = binary.Varint(v)
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func writeImage(bkt *bolt.Bucket, image *images.Image) error {
