@@ -30,7 +30,8 @@ verified:
    4. Ensure api replace statement is removed, run `make clean-vendor` and ensure
       no api changes in vendor afterwards.
 
-   5. (major/minor release only) Update RELEASES.md to refer to the new release and dates.
+   5. (major/minor release only) Add or update the release and its dates in `releases/support.toml`,
+      then run `make release-support`.
 
    6. Update the `.mailmap` files for commit authors which have multiple email addresses in the commit log.
       If it is not clear which email or name the contributor might want used in the release notes, reach
@@ -74,7 +75,9 @@ verified:
 
 4. (major/minor release only) Create `release/x.y` branch from tag and push to `git@github.com:containerd/containerd.git`.
 
-5. (patch release only) Update RELEASES.md in main branch to refer to the new patch release.
+5. The Release support workflow opens a pull request within a day so the release links in
+   `RELEASES.md` point to the new tag. To do it sooner, run `make release-support` on `main`
+   and open the pull request yourself.
 
 6. (major/minor release only) Create `cherry-pick/x.y.x` and `cherry-picked/x.y.x` labels
 

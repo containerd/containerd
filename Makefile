@@ -158,7 +158,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor release-support check-release-support
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -201,6 +201,14 @@ check-protos: ## check if protobufs needs to be generated again
 proto-fmt: ## format proto files
 	@echo "$(WHALE) $@"
 	@cd api && buf format --write --exclude-path vendor
+
+release-support: bin/gen-release-support ## regenerate the release support table in RELEASES.md from releases/support.toml
+	@echo "$(WHALE) $@"
+	@$<
+
+check-release-support: bin/gen-release-support ## check if the release support table in RELEASES.md is up to date
+	@echo "$(WHALE) $@"
+	@$< -check
 
 build: ## build the go packages
 	@echo "$(WHALE) $@"

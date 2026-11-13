@@ -125,27 +125,31 @@ to all committers.
 
 ### Current State of containerd Releases
 
-| Release                                                              | Status         | Start                          | End of Life                    | Owners                 |
-| -------------------------------------------------------------------- | -------------- | ------------------------------ | ------------------------------ | ---------------------- |
-| [0.0](https://github.com/containerd/containerd/releases/tag/0.0.5)   | End of Life    | Dec 4, 2015                    | -                              |                        |
-| [0.1](https://github.com/containerd/containerd/releases/tag/v0.1.0)  | End of Life    | Mar 21, 2016                   | -                              |                        |
-| [0.2](https://github.com/containerd/containerd/tree/v0.2.x)          | End of Life    | Apr 21, 2016                   | December 5, 2017               |                        |
-| [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.3)  | End of Life    | December 5, 2017               | December 5, 2018               |                        |
-| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life    | April 23, 2018                 | October 23, 2019               |                        |
-| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.13) | End of Life    | October 24, 2018               | October 15, 2020               |                        |
-| [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life    | September 26, 2019             | March 4, 2021                  |                        |
-| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life    | August 17, 2020                | March 3, 2022                  |                        |
-| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life    | May 3, 2021                    | February 28, 2023              |                        |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                |                        |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.36) | End of Life    | March 10, 2023                 | September 30, 2026             |                        |
-| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.13) | LTS            | November 5, 2024               | March 2027*                    | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
-| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
-| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.9)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
-| [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.6)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
-| [2.4](https://github.com/containerd/containerd/releases/tag/v2.4.1)  | Active         | September 16, 2026             | May 16, 2027                   | @containerd/committers |
-| _[2.5](https://github.com/containerd/containerd/milestone/52)_       | _Planned_      | _January 6, 2027_              | _September 6, 2027_            | @containerd/committers |
+<!-- release-support:begin (generated from releases/support.toml by "make release-support"; do not edit) -->
+
+| Release                                                              | Status      | Start              | End of Life         | Owners                                                                                       |
+| -------------------------------------------------------------------- | ----------- | ------------------ | ------------------- | -------------------------------------------------------------------------------------------- |
+| [0.0](https://github.com/containerd/containerd/releases/tag/0.0.5)   | End of Life | December 4, 2015   | -                   |                                                                                              |
+| [0.1](https://github.com/containerd/containerd/releases/tag/v0.1.0)  | End of Life | March 21, 2016     | -                   |                                                                                              |
+| [0.2](https://github.com/containerd/containerd/releases/tag/v0.2.9)  | End of Life | April 21, 2016     | December 5, 2017    |                                                                                              |
+| [1.0](https://github.com/containerd/containerd/releases/tag/v1.0.3)  | End of Life | December 5, 2017   | December 5, 2018    |                                                                                              |
+| [1.1](https://github.com/containerd/containerd/releases/tag/v1.1.8)  | End of Life | April 23, 2018     | October 23, 2019    |                                                                                              |
+| [1.2](https://github.com/containerd/containerd/releases/tag/v1.2.14) | End of Life | October 24, 2018   | October 15, 2020    |                                                                                              |
+| [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life | September 26, 2019 | March 4, 2021       |                                                                                              |
+| [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life | August 17, 2020    | March 3, 2022       |                                                                                              |
+| [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life | May 3, 2021        | February 28, 2023   |                                                                                              |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life | February 15, 2022  | August 23, 2025     |                                                                                              |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.36) | End of Life | March 10, 2023     | September 30, 2026  |                                                                                              |
+| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.14) | LTS         | November 5, 2024   | March 2027*         | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
+| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life | May 7, 2025        | July 3, 2026        |                                                                                              |
+| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.10) | End of Life | November 5, 2025   | November 6, 2026    |                                                                                              |
+| [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.7)  | LTS         | April 30, 2026     | April 30, 2028      | @containerd/committers                                                                       |
+| [2.4](https://github.com/containerd/containerd/releases/tag/v2.4.2)  | Active      | September 16, 2026 | May 16, 2027        | @containerd/committers                                                                       |
+| _[2.5](https://github.com/containerd/containerd/milestone/52)_       | _Planned_   | _January 6, 2027_  | _September 6, 2027_ | @containerd/committers                                                                       |
 
 \* Support for the 2.0 release branch was provided by @containerd/committers until November 7, 2025. Extended support through March 2027 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.33 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
+
+<!-- release-support:end -->
 
 ### Kubernetes Support
 
