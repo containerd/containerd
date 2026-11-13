@@ -17,7 +17,6 @@
 package mount
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -25,12 +24,10 @@ import (
 
 	bolt "go.etcd.io/bbolt"
 
-	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
 	"github.com/containerd/containerd/v2/core/metadata"
-	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/mount/manager"
 	"github.com/containerd/containerd/v2/plugins"
@@ -97,30 +94,6 @@ func init() {
 			if err != nil {
 				db.Close()
 				return nil, fmt.Errorf("failed to create mount manager: %w", err)
-			}
-
-			//TODO: IF has sync
-			if sync, ok := mm.(interface{ Sync(context.Context) error }); ok {
-
-				// Start transaction and then background sync with mount state,
-				// ensure startup waits until ready to continue
-				tx, err := db.Begin(true)
-				if err != nil {
-					db.Close()
-					return nil, fmt.Errorf("failed to open database for write: %w", err)
-				}
-				ctx := boltutil.WithTransaction(ic.Context, tx)
-
-				ready := ic.RegisterReadiness()
-				go func() {
-					defer ready()
-					if err := sync.Sync(ctx); err == nil {
-						tx.Commit()
-					} else {
-						log.G(ctx).WithError(err).Errorf("failed to sync mounts")
-						tx.Rollback()
-					}
-				}()
 			}
 
 			if collector, ok := mm.(metadata.Collector); ok {
