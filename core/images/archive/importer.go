@@ -322,6 +322,8 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 			} else {
 				layers[i].MediaType = images.MediaTypeDockerSchema2Layer
 			}
+		} else if s.GetCompression() == compression.Zstd {
+			layers[i].MediaType = images.MediaTypeDockerSchema2LayerZstd
 		} else {
 			layers[i].MediaType = images.MediaTypeDockerSchema2LayerGzip
 		}
@@ -414,6 +416,8 @@ func detectLayerMediaType(ctx context.Context, store content.Store, desc ocispec
 	switch c := compression.DetectCompression(bytes); c {
 	case compression.Uncompressed:
 		mediaType = images.MediaTypeDockerSchema2Layer
+	case compression.Zstd:
+		mediaType = images.MediaTypeDockerSchema2LayerZstd
 	default:
 		mediaType = images.MediaTypeDockerSchema2LayerGzip
 	}
