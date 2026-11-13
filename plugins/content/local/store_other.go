@@ -18,10 +18,32 @@
 
 package local
 
-import "os"
+import (
+	"errors"
+	"os"
+	"syscall"
+)
+
+// removeAttempts covers a writer closing concurrently with Abort.
+// Close writes a timestamp file into the ingest directory, and RemoveAll
+// can observe that new file only at the final rmdir and return ENOTEMPTY.
+const removeAttempts = 5
 
 func removePath(path string) error {
-	return os.RemoveAll(path)
+	var err error
+	for range removeAttempts {
+		err = os.RemoveAll(path)
+		if err == nil || !isDirNotEmpty(err) {
+			return err
+		}
+	}
+	return err
+}
+
+func isDirNotEmpty(err error) bool {
+	// POSIX rmdir reports a non-empty directory as ENOTEMPTY or, on some
+	// platforms, EEXIST.
+	return errors.Is(err, syscall.ENOTEMPTY) || errors.Is(err, syscall.EEXIST)
 }
 
 func readFileWithRetry(path string) ([]byte, error) {
