@@ -77,7 +77,7 @@ func unmount(target string, flags int) error {
 	if isFUSE(target) {
 		// TODO: Why error is ignored?
 		// Shouldn't this just be unconditional "return unmountFUSE(target)"?
-		if err := unmountFUSE(target); err == nil {
+		if err := unmountFUSE(target); err == nil { //nolint:staticcheck // #12279: non-linux stub always returns unsupported error
 			return nil
 		}
 	}
