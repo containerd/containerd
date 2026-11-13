@@ -53,12 +53,28 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		return &runtime.StopContainerResponse{}, nil
 	}
 
-	defer c.nri.BlockPluginSync().Unblock()
-
 	span.SetAttributes(tracing.Attribute("container.id", container.ID))
 	if err := c.stopContainerRetryOnConnectionClosed(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}
+
+	c.notifyStoppedContainer(ctx, container)
+
+	i, err := container.Container.Info(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get container info: %w", err)
+	}
+
+	containerStopTimer.WithValues(i.Runtime.Name).UpdateSince(start)
+
+	return &runtime.StopContainerResponse{}, nil
+}
+
+// notifyStoppedContainer reports a completed container stop to NRI.
+func (c *criService) notifyStoppedContainer(ctx context.Context, container containerstore.Container) {
+	// Do not hold plugin synchronization while waiting for the container to stop:
+	// that wait can last for the full CRI timeout and stall other lifecycle calls.
+	defer c.nri.BlockPluginSync().Unblock()
 
 	sandbox, err := c.sandboxStore.Get(container.SandboxID)
 	if err != nil {
@@ -69,15 +85,6 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 	if err != nil {
 		log.G(ctx).WithError(err).Error("NRI failed to stop container")
 	}
-
-	i, err := container.Container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get container info: %w", err)
-	}
-
-	containerStopTimer.WithValues(i.Runtime.Name).UpdateSince(start)
-
-	return &runtime.StopContainerResponse{}, nil
 }
 
 // stopContainerRetryOnConnectionClosed attempts to stop the container.
