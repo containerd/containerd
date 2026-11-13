@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 
 	"github.com/moby/sys/userns"
@@ -38,6 +39,17 @@ const (
 	// see https://man7.org/linux/man-pages/man2/statfs.2.html
 	tmpfsMagic = 0x01021994
 )
+
+// Testing dependencies
+var (
+	usernsRunningInUserNS  = userns.RunningInUserNS
+	isPathOnTmpfs          = IsPathOnTmpfs
+	kernelGreaterEqualThan = kernel.GreaterEqualThan
+	probeUserXattr         = probeUserXattrOnFile
+)
+
+// userXattrSupport caches the result of probeUserXattr by filesystem ID.
+var userXattrSupport sync.Map // map[unix.Fsid]bool
 
 // SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,
 // which is required for the overlay snapshotter. On 4.x kernels, multiple lowerdirs
@@ -111,6 +123,58 @@ func IsPathOnTmpfs(d string) bool {
 	return stat.Type == tmpfsMagic
 }
 
+// supportsUserXattr returns whether the filesystem of d allows setting extended
+// attributes in the "user." namespace.
+//
+// The result is cached by the filesystem ID rather than the device number, as the
+// anonymous device numbers of tmpfs are reused after unmounting, while tmpfs
+// generates a new filesystem ID for each mount. Kernels before 5.13 report a zero
+// filesystem ID for tmpfs, so all tmpfs mounts share the same cache entry there,
+// which is fine as the support does not differ between tmpfs mounts.
+// Errors are not cached.
+func supportsUserXattr(d string) (bool, error) {
+	var stat unix.Statfs_t
+	if err := unix.Statfs(d, &stat); err != nil {
+		return false, fmt.Errorf("failed to statfs %s: %w", d, err)
+	}
+	if supported, ok := userXattrSupport.Load(stat.Fsid); ok {
+		return supported.(bool), nil
+	}
+
+	supported, err := probeUserXattr(d)
+	if err != nil {
+		return false, err
+	}
+	userXattrSupport.Store(stat.Fsid, supported)
+	return supported, nil
+}
+
+// probeUserXattrOnFile returns whether the filesystem of d allows setting extended
+// attributes in the "user." namespace, by trying to set one on a temporary file in d.
+func probeUserXattrOnFile(d string) (bool, error) {
+	f, err := os.CreateTemp(d, "userxattr-check")
+	if err != nil {
+		return false, err
+	}
+	name := f.Name()
+	defer func() {
+		if err := os.Remove(name); err != nil {
+			log.L.WithError(err).Warnf("Failed to remove check file %v", name)
+		}
+	}()
+	if err := f.Close(); err != nil {
+		return false, err
+	}
+
+	if err := unix.Setxattr(name, "user.containerd.userxattr-check", []byte("1"), 0); err != nil {
+		if errors.Is(err, unix.ENOTSUP) || errors.Is(err, unix.EPERM) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to set user xattr on %s: %w", name, err)
+	}
+	return true, nil
+}
+
 // NeedsUserXAttr returns whether overlayfs should be mounted with the "userxattr" mount option.
 //
 // The "userxattr" option is needed for mounting overlayfs inside a user namespace with kernel >= 5.11.
@@ -131,15 +195,21 @@ func IsPathOnTmpfs(d string) bool {
 //
 // The "userxattr" support is not exposed in "/sys/module/overlay/parameters".
 func NeedsUserXAttr(d string) (bool, error) {
-	if !userns.RunningInUserNS() {
+	if !usernsRunningInUserNS() {
 		// we are the real root (i.e., the root in the initial user NS),
 		// so we do never need "userxattr" opt.
 		return false, nil
 	}
 
-	// userxattr not permitted on tmpfs https://man7.org/linux/man-pages/man5/tmpfs.5.html
-	if IsPathOnTmpfs(d) {
-		return false, nil
+	// tmpfs supports "user.*" xattrs only since Linux 6.6, and overlayfs mounted with
+	// "userxattr" fails on a backing filesystem that rejects them.
+	// Probe instead of comparing the kernel version, as the support may be backported
+	// or disabled (CONFIG_TMPFS_XATTR).
+	if isPathOnTmpfs(d) {
+		supported, err := supportsUserXattr(d)
+		if err != nil || !supported {
+			return false, err
+		}
 	}
 
 	// Fast path on kernels >= 5.11
@@ -147,7 +217,7 @@ func NeedsUserXAttr(d string) (bool, error) {
 	// Keep in mind that distro vendors might be going to backport the patch to older kernels
 	// so we can't completely remove the "slow path".
 	fiveDotEleven := kernel.KernelVersion{Kernel: 5, Major: 11}
-	if ok, err := kernel.GreaterEqualThan(fiveDotEleven); err == nil && ok {
+	if ok, err := kernelGreaterEqualThan(fiveDotEleven); err == nil && ok {
 		return true, nil
 	}
 
