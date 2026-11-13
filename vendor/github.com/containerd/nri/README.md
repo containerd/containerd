@@ -135,6 +135,58 @@ Once the handshake sequence is over and the plugin has registered with NRI,
 it will start receiving pod and container lifecycle events according to its
 subscription.
 
+### Request Errors, Timeouts and Failure Policy
+
+NRI calls plugins in index order for each lifecycle event. If a plugin
+returns an error for a request, NRI does not call the remaining plugins.
+It returns the error to the runtime, and the runtime fails the pod or
+container operation.
+
+Each request has a timeout. The timeout is configured in the runtime and
+applies to all plugins. A plugin fails to process a request when it exceeds
+this timeout, loses its connection, or causes a protocol error. The failure
+policy of the plugin tells NRI what to do in that case. The plugin declares
+the policy when it subscribes to events. The policy has two independent
+fields, one for the request and one for the plugin:
+
+  - `fail_request`: if set, the request fails with an error that names the
+    plugin and the request, like an error returned by the plugin. NRI does
+    not call the remaining plugins. By default, the request proceeds with
+    the remaining plugins and the runtime is not notified.
+  - `keep_connected`: if set, a plugin that exceeds the request timeout
+    stays registered and receives the next requests. The timeout only means
+    that the plugin did not handle this request in time. By default, NRI
+    unregisters the plugin. This field only applies to timeouts. NRI always
+    unregisters a plugin that loses its connection.
+
+The default of each field is the behavior of NRI before failure policies
+existed. A plugin that does not declare a policy is treated as before: NRI
+unregisters it and the request proceeds without it. A runtime with an NRI
+version without failure policy support ignores the policy and behaves the
+same way.
+
+Set both fields for a plugin that must process every request it subscribes
+to, for example a plugin that sets up networking or injects devices. With
+the stub library:
+
+```go
+stub.WithFailurePolicy(&api.FailurePolicy{FailRequest: true, KeepConnected: true})
+```
+
+Set `keep_connected` alone for a best-effort plugin that must not be lost
+when it is slow once, for example a logger or a metrics collector.
+
+Two notes. A plugin that is kept connected but stays unresponsive delays
+each request it receives by the full timeout. `fail_request` applies to all
+subscribed events, including `StopContainer` and `RemoveContainer`. A plugin
+must subscribe only to the events it must process.
+
+The failure policy only applies to connected plugins. A plugin that loses
+its connection, also between requests, does not receive the next requests
+and does not fail them. Use the required plugins check of the
+[default validator](#default-validation) to require that a plugin is
+present before containers are created.
+
 ### Pod Data and Available Lifecycle Events
 
 <details>
