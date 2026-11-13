@@ -23,14 +23,17 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
@@ -211,4 +214,32 @@ func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snaps
 	snap.cleanupFn = append([]closeFunc{removePool}, snap.cleanupFn...)
 
 	return snap, snap.Close, nil
+}
+
+func TestMountsCommittedSnapshotReturnsError(t *testing.T) {
+	ctx := context.Background()
+	store, err := storage.NewMetaStore(filepath.Join(t.TempDir(), "metadata.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	s := &Snapshotter{store: store, config: &Config{PoolName: "pool"}}
+
+	err = store.WithTransaction(ctx, true, func(ctx context.Context) error {
+		if _, err := storage.CreateSnapshot(ctx, snapshots.KindActive, "active", "",
+			snapshots.WithLabels(map[string]string{devmapperSnapshotFsType: string(fsTypeExt4)})); err != nil {
+			return err
+		}
+		_, err := storage.CommitActive(ctx, "active", "committed", snapshots.Usage{})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mounts, err := s.Mounts(ctx, "committed")
+	if !errdefs.IsFailedPrecondition(err) {
+		t.Fatalf("expected a failed precondition error for a committed snapshot, got err=%v mounts=%+v", err, mounts)
+	}
 }

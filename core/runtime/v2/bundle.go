@@ -19,10 +19,12 @@ package v2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -75,6 +77,9 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		return nil, err
 	}
 	if err := os.Mkdir(b.Path, 0700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, fmt.Errorf("bundle for %s: %w", id, errdefs.ErrAlreadyExists)
+		}
 		return nil, err
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {

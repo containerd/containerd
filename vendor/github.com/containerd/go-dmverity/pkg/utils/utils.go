@@ -23,35 +23,10 @@ import (
 	_ "crypto/sha512" // register SHA512 for crypto.Hash
 	"encoding/hex"
 	"fmt"
-	"os"
 	"strings"
-	"unsafe"
 
 	"github.com/google/uuid"
-	"golang.org/x/sys/unix"
 )
-
-func GetBlockOrFileSize(path string) (int64, error) {
-	st, err := os.Stat(path)
-	if err != nil {
-		return 0, err
-	}
-	mode := st.Mode()
-	if (mode&os.ModeDevice) != 0 && (mode&os.ModeCharDevice) == 0 {
-		f, err := os.Open(path)
-		if err != nil {
-			return 0, err
-		}
-		defer f.Close()
-		var size uint64
-		_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&size)))
-		if errno != 0 {
-			return 0, errno
-		}
-		return int64(size), nil
-	}
-	return st.Size(), nil
-}
 
 func SelectHashSize(name string) int {
 	switch strings.ToLower(strings.TrimSpace(name)) {
@@ -177,32 +152,6 @@ func ApplyUUID(uuidStr string, generateIfEmpty bool, noSuperblock bool, generate
 	}
 
 	return result, nil
-}
-
-func CalculateDataBlocks(dataPath string, userSpecified uint64, dataBlockSize uint32) (uint64, error) {
-	if userSpecified != 0 {
-		return userSpecified, nil
-	}
-
-	size, err := GetBlockOrFileSize(dataPath)
-	if err != nil {
-		return 0, fmt.Errorf("determine data device size: %w", err)
-	}
-
-	if size <= 0 {
-		return 0, fmt.Errorf("cannot determine data size; provide --data-blocks")
-	}
-
-	if dataBlockSize == 0 {
-		return 0, fmt.Errorf("data block size required")
-	}
-
-	if size%int64(dataBlockSize) != 0 {
-		return 0, fmt.Errorf("data size %d not multiple of data block size %d",
-			size, dataBlockSize)
-	}
-
-	return uint64(size / int64(dataBlockSize)), nil
 }
 
 func ValidateDataHashOverlap(dataBlocks uint64, dataBlockSize uint32, hashAreaOffset uint64, dataPath, hashPath string) error {

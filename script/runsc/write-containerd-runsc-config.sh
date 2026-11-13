@@ -59,6 +59,11 @@ version = 2
 
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runsc]
   runtime_type = "io.containerd.runsc.v1"
+  # Avoid passing host GPU devices to runsc when nvproxy is disabled.
+  # TODO: Revisit this workaround once runsc safely handles NVIDIA device
+  # specs with nvproxy disabled, and GPU-host tests pass with both cgroup drivers.
+  # Context: https://github.com/containerd/containerd/pull/14526#pullrequestreview-5802958842
+  privileged_without_host_devices = true
 
 # Point the runsc shim at its own config file so that all runsc-specific
 # settings (platform, systemd-cgroup, etc.) are read from one place.

@@ -76,9 +76,6 @@ func TestContainerStats(t *testing.T) {
 
 // Test to verify if the consumed stats are correct.
 func TestContainerConsumedStats(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not expose per-container memory working-set stats")
-	}
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
