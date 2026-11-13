@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 )
 
@@ -56,4 +57,24 @@ func TestMountsToLayerErofsMount(t *testing.T) {
 	}})
 	require.NoError(t, err)
 	assert.Equal(t, layer, got)
+}
+
+func TestIsErofsMediaType(t *testing.T) {
+	cases := []struct {
+		mt   string
+		want bool
+	}{
+		{images.MediaTypeErofsLayer, true},
+		{images.MediaTypeErofsLayer + "+zstd", true},
+		{images.MediaTypeErofs, true},
+		{images.MediaTypeErofs + "+zstd", true},
+		// A standalone chunk-index layer is not itself a mountable EROFS
+		// filesystem image and must not be treated as one.
+		{images.MediaTypeErofsChunkIndex, false},
+		{"application/vnd.oci.image.layer.v1.tar+gzip", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		assert.Equal(t, c.want, IsErofsMediaType(c.mt), c.mt)
+	}
 }
