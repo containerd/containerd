@@ -168,6 +168,48 @@ func TestReplaceOrAppendEnvValues(t *testing.T) {
 	}
 }
 
+func TestReplaceOrAppendEnvValuesDuplicateOverrides(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		defaults  []string
+		overrides []string
+		expected  []string
+	}{
+		{
+			// A key repeated within overrides must resolve to the last
+			// value, not be appended twice. This mirrors how CRI merges
+			// image config env followed by container config env into a
+			// single WithEnv call (container_create.go), where a key set
+			// by both must be overridden rather than duplicated.
+			name:      "override key repeated is deduplicated to last",
+			defaults:  nil,
+			overrides: []string{"FOO=image", "FOO=container"},
+			expected:  []string{"FOO=container"},
+		},
+		{
+			name:      "unset applies to a key introduced by overrides",
+			defaults:  nil,
+			overrides: []string{"FOO=1", "FOO"},
+			expected:  []string{},
+		},
+		{
+			name:      "later override wins over an appended default and override",
+			defaults:  []string{"A=1"},
+			overrides: []string{"B=x", "B=y"},
+			expected:  []string{"A=1", "B=y"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			results := replaceOrAppendEnvValues(tc.defaults, tc.overrides)
+			if err := assertEqualsStringArrays(results, tc.expected); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestWithDefaultSpecForPlatform(t *testing.T) {
 	t.Parallel()
 	var (
