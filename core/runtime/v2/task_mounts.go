@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/runtime"
 )
 
 // taskMountController activates and deactivates a task's rootfs mounts,
@@ -60,12 +61,12 @@ type mountActivation struct {
 // mount manager will not perform on the caller's behalf. bootstrap may be
 // nil, meaning the shim advertised nothing over bootstrap.
 //
-// If bootstrap carries no such extension, runtimeName is checked against the
-// deprecated runtime-allow-mounts annotation as a migration path; see
+// If bootstrap carries no such extension, the configured runtime is checked
+// for the deprecated runtime-allow-mounts annotation as a migration path; see
 // [deprecatedMountCapabilities].
-func (c *taskMountController) Activate(ctx context.Context, taskID string, runtimeName string, bootstrap *bootapi.BootstrapResult, rootfs []mount.Mount) (mountActivation, error) {
+func (c *taskMountController) Activate(ctx context.Context, taskID string, createOpts runtime.CreateOpts, bootstrap *bootapi.BootstrapResult) (mountActivation, error) {
 	if c.manager == nil {
-		return mountActivation{rootfs: rootfs}, nil
+		return mountActivation{rootfs: createOpts.Rootfs}, nil
 	}
 
 	activateOpts := []mount.ActivateOpt{
@@ -73,9 +74,9 @@ func (c *taskMountController) Activate(ctx context.Context, taskID string, runti
 			"containerd.io/gc.bref.container": taskID,
 		}),
 	}
-	activateOpts = append(activateOpts, c.mountClaimOpts(ctx, runtimeName, bootstrap)...)
+	activateOpts = append(activateOpts, c.mountClaimOpts(ctx, createOpts, bootstrap)...)
 
-	ai, err := c.manager.Activate(ctx, taskID, rootfs, activateOpts...)
+	ai, err := c.manager.Activate(ctx, taskID, createOpts.Rootfs, activateOpts...)
 	switch {
 	case err == nil:
 		return mountActivation{rootfs: ai.System, owned: true}, nil
@@ -90,7 +91,7 @@ func (c *taskMountController) Activate(ctx context.Context, taskID string, runti
 		return mountActivation{rootfs: ai.System}, nil
 	case errdefs.IsNotImplemented(err):
 		// Nothing needed the mount manager, the shim performs all the mounts.
-		return mountActivation{rootfs: rootfs}, nil
+		return mountActivation{rootfs: createOpts.Rootfs}, nil
 	default:
 		return mountActivation{}, err
 	}
@@ -104,11 +105,11 @@ func (c *taskMountController) Deactivate(ctx context.Context, taskID string) err
 	return c.manager.Deactivate(ctx, taskID)
 }
 
-// mountClaimOpts translates the mount capabilities of runtimeName's shim into
+// mountClaimOpts translates the configured shim's mount capabilities into
 // activation options describing the mount types and transforms it performs
 // itself. bootstrap's MountCapabilities extension is authoritative when
 // present; otherwise c.legacy is consulted as a migration path.
-func (c *taskMountController) mountClaimOpts(ctx context.Context, runtimeName string, bootstrap *bootapi.BootstrapResult) []mount.ActivateOpt {
+func (c *taskMountController) mountClaimOpts(ctx context.Context, createOpts runtime.CreateOpts, bootstrap *bootapi.BootstrapResult) []mount.ActivateOpt {
 	caps, err := mountCapabilitiesExtension(bootstrap)
 	if err != nil {
 		// The shim's mount capabilities are unreadable. Claiming nothing means
@@ -118,7 +119,11 @@ func (c *taskMountController) mountClaimOpts(ctx context.Context, runtimeName st
 		return nil
 	}
 	if caps == nil {
-		caps = c.legacy.lookup(ctx, runtimeName)
+		opts := createOpts.TaskOptions
+		if opts == nil || opts.GetValue() == nil {
+			opts = createOpts.RuntimeOptions
+		}
+		caps = c.legacy.lookup(ctx, createOpts.Runtime, opts)
 	}
 	if caps == nil {
 		return nil
