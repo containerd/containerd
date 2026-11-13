@@ -51,6 +51,18 @@ type Config struct {
 
 	// MountOptions are options used for the overlay mount (not used on bind mounts)
 	MountOptions []string `toml:"mount_options"`
+
+	// LayerContentCaches lists directories of pre-populated overlayfs snapshots.
+	// A layer found in one of them is mounted from that directory, in both
+	// sequential and parallel unpack modes. The directories are searched in the
+	// order given and the first one holding the layer wins; one that doesn't
+	// exist is treated as a miss. A layer found in none of them is extracted
+	// normally.
+	//
+	// The directories are read but never written and are expected to outlive
+	// the snapshots using them. Removing one while an image still refers to it
+	// leaves that image unusable.
+	LayerContentCaches []string `toml:"layer_content_caches"`
 }
 
 func init() {
@@ -81,6 +93,9 @@ func init() {
 
 			if len(config.MountOptions) > 0 {
 				oOpts = append(oOpts, overlay.WithMountOptions(config.MountOptions))
+			}
+			if len(config.LayerContentCaches) > 0 {
+				oOpts = append(oOpts, overlay.WithLayerContentCaches(config.LayerContentCaches...))
 			}
 			if ok, err := overlayutils.SupportsIDMappedMounts(); err == nil && ok {
 				oOpts = append(oOpts, overlay.WithRemapIDs)
