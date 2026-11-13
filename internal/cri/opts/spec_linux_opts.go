@@ -201,6 +201,11 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				options = append(options, "rw")
 			}
 
+			mountOpts := mount.GetMountOptions()
+			if len(mountOpts) > 0 {
+				options = resolveBindMountConflicts(options, mountOpts)
+			}
+
 			if mount.GetSelinuxRelabel() {
 				if err := label.Relabel(src, mountLabel, false); err != nil &&
 					!errors.Is(err, syscall.ENOTSUP) {
@@ -251,6 +256,45 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 // WithMountsCgroupWritable sorts and adds runtime and CRI mounts to the spec if cgroup_writable is enabled.
 func WithMountsCgroupWritable(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
 	return withMounts(osi, config, extra, mountLabel, handler, true)
+}
+
+// resolveBindMountConflicts removes conflicting options from the existing set
+// and appends the requested mount options.
+func resolveBindMountConflicts(options, mountOpts []string) []string {
+	conflicts := map[string]string{
+		"noexec": "exec",
+		"nosuid": "suid",
+		"nodev":  "dev",
+	}
+
+	toRemove := make(map[string]struct{})
+
+	var toAdd []string
+
+	for _, opt := range mountOpts {
+		if conflict, ok := conflicts[opt]; ok {
+			toRemove[conflict] = struct{}{}
+
+			if !slices.Contains(toAdd, opt) {
+				toAdd = append(toAdd, opt)
+			}
+		}
+	}
+
+	result := make([]string, 0, len(options)+len(toAdd))
+	for _, o := range options {
+		if _, remove := toRemove[o]; !remove {
+			result = append(result, o)
+		}
+	}
+
+	for _, opt := range toAdd {
+		if !slices.Contains(result, opt) {
+			result = append(result, opt)
+		}
+	}
+
+	return result
 }
 
 // Ensure mount point on which path is mounted, is shared.
