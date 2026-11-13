@@ -16,6 +16,8 @@ TESTFLAGS_PARALLEL ?= 8
 
 EXTRA_TESTFLAGS ?=
 
+GO_CMD     := go
+
 # quiet or not
 ifeq ($(V),1)
 	Q =
@@ -29,13 +31,17 @@ help: ## this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST) | sort
 
 test: ## run tests, except integration tests and tests that require root
-	$(Q)go test -v -race $(EXTRA_TESTFLAGS) -count=1 ./...
+	$(Q)$(GO_CMD) test -v -race $(EXTRA_TESTFLAGS) -count=1 ./...
 
 integration: bin/integration.test ## run integration test
 	$(Q)bin/integration.test -test.v -test.count=1 -test.root $(EXTRA_TESTFLAGS) -test.parallel $(TESTFLAGS_PARALLEL)
 
 bin/integration.test: ## build integration test binary into bin
-	$(Q)cd ./integration && go test -race -c . -o ../bin/integration.test
+	$(Q)cd ./integration && $(GO_CMD) test -race -c . -o ../bin/integration.test
+
+mod-tidy: ## vendor updates
+	$(Q)$(GO_CMD) mod tidy
+	$(Q)./script/go-mod-tidy
 
 clean: ## clean up binaries
 	$(Q)rm -rf bin/
