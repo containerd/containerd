@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"path/filepath"
 	"strings"
@@ -304,7 +305,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
-	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath), sb.WithRuntimePath(ociRuntime.Path)); err != nil {
+	createOpts := []sb.CreateOpt{
+		sb.WithOptions(config),
+		sb.WithNetNSPath(sandbox.NetNSPath),
+		sb.WithRuntimePath(ociRuntime.Path),
+		sb.WithAnnotations(sandboxAnnotations(id, config, ociRuntime.PodAnnotations)),
+	}
+	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, createOpts...); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
@@ -463,6 +470,19 @@ func (c *criService) ensurePauseImageExists(ctx context.Context, config *runtime
 	}
 
 	return nil
+}
+
+// sandboxAnnotations returns the annotations to pass to the sandbox
+// controller: the pod annotations that match the runtime's pod_annotations
+// list, then the CRI annotations of the sandbox. The CRI annotations are set
+// last, so that a pod annotation cannot replace them.
+func sandboxAnnotations(id string, config *runtime.PodSandboxConfig, runtimePodAnnotations []string) map[string]string {
+	result := util.GetPassthroughAnnotations(config.GetAnnotations(), runtimePodAnnotations)
+	maps.Copy(result, annotations.DefaultCRIAnnotations(id, "", "", config, true))
+	// Only the podsandbox controller has a sandbox image, and it sets the
+	// annotation on the pause container itself.
+	delete(result, annotations.SandboxImageName)
+	return result
 }
 
 // getNetworkPlugin returns the network plugin to be used by the runtime class

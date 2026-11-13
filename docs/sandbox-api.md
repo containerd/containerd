@@ -129,6 +129,18 @@ sequenceDiagram
     containerd-->>kubelet: OK
 ```
 
+### Sandbox annotations
+
+CRI sets the `annotations` field of the `CreateSandbox` request to:
+
+- The pod annotations that match the `pod_annotations` list of the runtime.
+- The CRI sandbox annotations: `io.kubernetes.cri.container-type` (`sandbox`), `io.kubernetes.cri.sandbox-id`,
+  `io.kubernetes.cri.sandbox-name`, `io.kubernetes.cri.sandbox-namespace`, `io.kubernetes.cri.sandbox-uid` and
+  `io.kubernetes.cri.sandbox-log-directory`. A CRI sandbox annotation replaces a pod annotation with the same key.
+
+The `options` field holds the pod sandbox configuration with every pod annotation. A sandbox implementation reads pod
+annotations from the `annotations` field to honor `pod_annotations`.
+
 ### Shutdown behavior for grouped shims
 
 containerd invokes `TaskService.Shutdown` after deleting every task. It may be

@@ -545,7 +545,8 @@ version = 2
       runtime_path = ""
 
       # pod_annotations is a list of pod annotations passed to both pod
-      # sandbox as well as container OCI annotations. Pod_annotations also
+      # sandbox as well as container OCI annotations, and to the sandbox
+      # controller when the sandbox is created. Pod_annotations also
       # supports golang path match pattern - https://golang.org/pkg/path/#Match.
       # e.g. ["runc.com.*"], ["*.runc.com"], ["runc.com/*"].
       #

@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"maps"
 	"net"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 )
 
@@ -230,6 +232,66 @@ func TestDisablePauseImagePullConfig(t *testing.T) {
 			}, "")
 			require.NoError(t, err)
 			assert.Equal(t, test.DisablePauseImagePull, ociRuntime.DisablePauseImagePull)
+		})
+	}
+}
+
+func TestSandboxAnnotations(t *testing.T) {
+	const id = "test-sandbox-id"
+	config := &runtime.PodSandboxConfig{
+		Metadata: &runtime.PodSandboxMetadata{
+			Name:      "test-name",
+			Uid:       "test-uid",
+			Namespace: "test-ns",
+		},
+		LogDirectory: "/var/log/pods/test",
+		Annotations: map[string]string{
+			"dev.example.allowed":        "a",
+			"io.other.not-allowed":       "b",
+			annotations.SandboxID:        "spoofed-id",
+			annotations.SandboxImageName: "spoofed-image",
+			annotations.ContainerType:    annotations.ContainerTypeContainer,
+		},
+	}
+	criAnnotations := map[string]string{
+		annotations.ContainerType:    annotations.ContainerTypeSandbox,
+		annotations.SandboxID:        id,
+		annotations.SandboxNamespace: "test-ns",
+		annotations.SandboxUID:       "test-uid",
+		annotations.SandboxName:      "test-name",
+		annotations.SandboxLogDir:    "/var/log/pods/test",
+	}
+	withCRIAnnotations := func(extra map[string]string) map[string]string {
+		expected := maps.Clone(criAnnotations)
+		maps.Copy(expected, extra)
+		return expected
+	}
+
+	for _, test := range []struct {
+		desc           string
+		podAnnotations []string
+		expected       map[string]string
+	}{
+		{
+			desc:     "only CRI annotations are passed without pod_annotations",
+			expected: withCRIAnnotations(nil),
+		},
+		{
+			desc:           "pod annotations matching pod_annotations are passed",
+			podAnnotations: []string{"dev.example.*"},
+			expected:       withCRIAnnotations(map[string]string{"dev.example.allowed": "a"}),
+		},
+		{
+			desc:           "pod annotations cannot replace CRI annotations",
+			podAnnotations: []string{"*"},
+			expected: withCRIAnnotations(map[string]string{
+				"dev.example.allowed":  "a",
+				"io.other.not-allowed": "b",
+			}),
+		},
+	} {
+		t.Run(test.desc, func(t *testing.T) {
+			assert.Equal(t, test.expected, sandboxAnnotations(id, config, test.podAnnotations))
 		})
 	}
 }
