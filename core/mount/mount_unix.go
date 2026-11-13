@@ -19,9 +19,12 @@
 package mount
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/moby/sys/mountinfo"
@@ -50,7 +53,8 @@ func UnmountRecursive(target string, flags int) error {
 
 	targetSet := make(map[string]struct{})
 	for _, m := range mounts {
-		targetSet[m.Mountpoint] = struct{}{}
+		cleaned := filepath.Clean(m.Mountpoint)
+		targetSet[cleaned] = struct{}{}
 	}
 
 	var targets []string
@@ -60,15 +64,21 @@ func UnmountRecursive(target string, flags int) error {
 
 	// Make the deepest mount be first
 	sort.SliceStable(targets, func(i, j int) bool {
+		depthI := strings.Count(targets[i], string(filepath.Separator))
+		depthJ := strings.Count(targets[j], string(filepath.Separator))
+		if depthI != depthJ {
+			return depthI > depthJ
+		}
 		return len(targets[i]) > len(targets[j])
 	})
-
-	for i, target := range targets {
-		if err := UnmountAll(target, flags); err != nil {
-			if i == len(targets)-1 { // last mount
-				return err
-			}
+	var errRet error
+	for _, t := range targets {
+		if errMount := UnmountAll(t, flags); errMount != nil {
+			errRet = errors.Join(errRet, fmt.Errorf("failed to unmount %s: %w", t, errMount))
 		}
+	}
+	if errRet != nil {
+		return errRet
 	}
 	return nil
 }
