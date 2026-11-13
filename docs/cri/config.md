@@ -210,7 +210,7 @@ There are some differences in how image pull configurations are specified betwee
 | ImageDecryption | ❌ Disabled | ❌ Disabled |
 | MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
 | IgnoreDescriptorURLs | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
-| ImagePullWithSyncFs | ✅ Supported | ❌ Not Supported |
+| ImagePullWithSyncFs | ✅ Supported | ⚠️ Must be configured in diff service plugin:<br>`[plugins."io.containerd.service.v1.diff-service"]`<br>`sync_fs = true` |
 | StatsCollectPeriod | ✅ Supported | ✅ Supported |
 
 To ensure compatibility, ***containerd 2.1 automatically detects configuration conflicts and falls back to local image pull mode when necessary***.

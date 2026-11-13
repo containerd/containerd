@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	contentlocal "github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -56,6 +57,7 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 		expectedErr           error
 		expectedUnpackConfigs int
 		expectedApplier       bool
+		expectedSyncFs        bool
 	}{
 		{
 			name: "optional explicit differ skip",
@@ -119,6 +121,41 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 			expectedUnpackConfigs: 1,
 			expectedApplier:       true,
 		},
+		{
+			name: "diff service sync_fs enabled",
+			candidates: []*plugin.Registration{
+				newTestDiffPlugin("usable", testApplier{}, nil, platforms.DefaultSpec()),
+				newTestDiffService(true),
+			},
+			config: transferConfig{
+				UnpackConfiguration: []unpackConfiguration{
+					{
+						Platform:    platforms.Format(platforms.DefaultSpec()),
+						Snapshotter: "native",
+					},
+				},
+			},
+			expectedUnpackConfigs: 1,
+			expectedApplier:       true,
+			expectedSyncFs:        true,
+		},
+		{
+			name: "diff service sync_fs disabled",
+			candidates: []*plugin.Registration{
+				newTestDiffPlugin("usable", testApplier{}, nil, platforms.DefaultSpec()),
+				newTestDiffService(false),
+			},
+			config: transferConfig{
+				UnpackConfiguration: []unpackConfiguration{
+					{
+						Platform:    platforms.Format(platforms.DefaultSpec()),
+						Snapshotter: "native",
+					},
+				},
+			},
+			expectedUnpackConfigs: 1,
+			expectedApplier:       true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -136,6 +173,17 @@ func TestConfigureUnpackPlatforms(t *testing.T) {
 			if tt.expectedApplier {
 				if _, ok := lc.UnpackPlatforms[0].Applier.(testApplier); !ok {
 					t.Fatalf("expected test applier, got %T", lc.UnpackPlatforms[0].Applier)
+				}
+			}
+			if tt.expectedUnpackConfigs > 0 {
+				var ac diff.ApplyConfig
+				for _, opt := range lc.UnpackPlatforms[0].ApplyOpts {
+					if err := opt(t.Context(), ocispec.Descriptor{}, &ac); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if ac.SyncFs != tt.expectedSyncFs {
+					t.Fatalf("expected sync fs %v, got %v", tt.expectedSyncFs, ac.SyncFs)
 				}
 			}
 		})
@@ -308,6 +356,17 @@ func newTestDiffPlugin(id string, applier diff.Applier, err error, supported ...
 		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = append(ic.Meta.Platforms, supported...)
 			return applier, err
+		},
+	}
+}
+
+func newTestDiffService(syncFs bool) *plugin.Registration {
+	return &plugin.Registration{
+		Type: plugins.ServicePlugin,
+		ID:   services.DiffService,
+		InitFn: func(ic *plugin.InitContext) (any, error) {
+			ic.Meta.Exports[plugins.DiffServiceSyncFs] = strconv.FormatBool(syncFs)
+			return nil, nil
 		},
 	}
 }
