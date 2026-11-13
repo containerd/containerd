@@ -333,6 +333,9 @@ func (p *Init) delete(ctx context.Context) error {
 		p.deleting = nil
 		close(done)
 	}()
+	if p.io != nil {
+		p.io.CloseReaders()
+	}
 	shutdownAndDrain(ctx, p.Platform, p.console, &p.wg, "init process "+p.id)
 	err := p.runtime.Delete(ctx, p.id, nil)
 	// ignore errors if a runtime has already deleted the process

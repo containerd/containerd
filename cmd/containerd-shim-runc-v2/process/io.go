@@ -53,9 +53,10 @@ var bufPool = sync.Pool{
 type processIO struct {
 	io runc.IO
 
-	uri   *url.URL
-	copy  bool
-	stdio stdio.Stdio
+	uri     *url.URL
+	copy    bool
+	stdio   stdio.Stdio
+	readers []io.Closer
 }
 
 func (p *processIO) Close() error {
@@ -63,6 +64,33 @@ func (p *processIO) Close() error {
 		return p.io.Close()
 	}
 	return nil
+}
+
+// CloseReaders releases the read ends that copyPipes opened for the
+// container's stdout, stderr and stdin.
+//
+// The shim keeps an extra read end of each fifo open so that a consumer which
+// detaches and reconnects to the same fifo (containerd restart, `ctr task
+// attach` exiting, ...) keeps receiving the output. That read end has to be
+// released when the process goes away: as long as it is open, a write to a
+// fifo whose real consumer is gone blocks forever instead of failing with
+// EPIPE, so the copy could only be cleaned up by giving up on it after the
+// Delete timeout.
+//
+// Only read ends are released here. Output that is still being drained is not
+// affected, because writes keep succeeding while the real consumer is
+// attached, and the write ends are closed by the copy goroutines themselves
+// once they are done.
+func (p *processIO) CloseReaders() {
+	for _, r := range p.readers {
+		r.Close()
+	}
+}
+
+// addReader registers a fifo read end so that it is released by Close and by
+// CloseReaders.
+func (p *processIO) addReader(f io.Closer) {
+	p.readers = append(p.readers, f)
 }
 
 func (p *processIO) IO() runc.IO {
@@ -74,7 +102,7 @@ func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 		return nil
 	}
 	var cwg sync.WaitGroup
-	if err := copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
+	if err := copyPipes(ctx, p, p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
 		return fmt.Errorf("unable to copy pipes: %w", err)
 	}
 	cwg.Wait()
@@ -131,7 +159,8 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	return pio, nil
 }
 
-func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+func copyPipes(ctx context.Context, pio *processIO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+	rio := pio.IO()
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
@@ -189,9 +218,17 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 			if fw, err = fifo.OpenFifo(ctx, i.name, syscall.O_WRONLY, 0); err != nil {
 				return fmt.Errorf("containerd-shim: opening w/o fifo %q failed: %w", i.name, err)
 			}
+			// Hold an extra read end open for as long as the process exists.
+			// It keeps the fifo pipe object alive when the consumer goes away
+			// (containerd restarting, `ctr task attach` detaching, ...), so a
+			// write blocks instead of failing with EPIPE and a consumer that
+			// reconnects to the same fifo still receives the output.
+			// processIO.CloseReaders releases it when the process is deleted,
+			// which unblocks the copy and lets it exit.
 			if fr, err = fifo.OpenFifo(ctx, i.name, syscall.O_RDONLY, 0); err != nil {
 				return fmt.Errorf("containerd-shim: opening r/o fifo %q failed: %w", i.name, err)
 			}
+			pio.addReader(fr)
 		} else {
 			if sameFile != nil {
 				sameFile.bumpCount(1)
