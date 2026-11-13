@@ -39,7 +39,8 @@ const (
 // Config represents configuration for the native plugin.
 type Config struct {
 	// Root directory for the plugin
-	RootPath string `toml:"root_path"`
+	RootPath      string `toml:"root_path"`
+	UpperdirLabel bool   `toml:"upperdir_label"`
 
 	// MountOptions are options used for the EROFS overlayfs mount
 	OvlOptions []string `toml:"ovl_mount_options"`
@@ -103,6 +104,10 @@ func init() {
 			root := ic.Properties[plugins.PropertyRootDir]
 			if len(config.RootPath) != 0 {
 				root = config.RootPath
+			}
+
+			if config.UpperdirLabel {
+				opts = append(opts, erofs.WithUpperdirLabel)
 			}
 
 			if len(config.OvlOptions) > 0 {
