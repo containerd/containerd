@@ -85,6 +85,17 @@ func TestMigration(t *testing.T) {
 			cmd.Stdout = buf
 			cmd.Stderr = os.Stderr
 			require.NoError(t, cmd.Run())
+
+			// The migrated config only has the values set in the original
+			// config, compare the config that results from loading it.
+			migrated := filepath.Join(t.TempDir(), "migrated.toml")
+			require.NoError(t, os.WriteFile(migrated, buf.Bytes(), 0644))
+
+			buf = bytes.NewBuffer(nil)
+			cmd = exec.Command("containerd", "-c", migrated, "config", "dump")
+			cmd.Stdout = buf
+			cmd.Stderr = os.Stderr
+			require.NoError(t, cmd.Run())
 			actual := buf.String()
 			assert.Equal(t, tc.Migrated, actual, "Actual (full)\n%s", tc.Migrated, actual)
 		})
