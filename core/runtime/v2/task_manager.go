@@ -203,7 +203,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	if sc, ok := shim.(shimCapabilities); ok {
 		bootstrap = sc.BootstrapResult()
 	}
-	activation, err = m.taskMounts.Activate(ctx, taskID, opts.Runtime, bootstrap, opts.Rootfs)
+	activation, err = m.taskMounts.Activate(ctx, taskID, opts, bootstrap)
 	if err != nil {
 		return nil, err
 	}
