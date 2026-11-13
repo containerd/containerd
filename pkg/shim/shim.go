@@ -148,7 +148,11 @@ func parseFlags() {
 }
 
 func setRuntime() {
-	debug.SetGCPercent(40)
+	if os.Getenv("GOGC") == "" {
+		// If GOGC hasn't been set, we default to a value of 40 to reduce
+		// the memory footprint of the shim.
+		debug.SetGCPercent(40)
+	}
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			debug.FreeOSMemory()
