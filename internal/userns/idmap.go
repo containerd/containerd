@@ -29,9 +29,13 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
-const invalidID = 1<<32 - 1
+// InvalidID is the reserved UID/GID value that cannot identify a user or group.
+const InvalidID = 1<<32 - 1
 
-var invalidUser = User{Uid: invalidID, Gid: invalidID}
+// ErrUnmappedID indicates that an ID is outside all ranges of a valid mapping.
+var ErrUnmappedID = errors.New("ID is not mapped")
+
+var invalidUser = User{Uid: InvalidID, Gid: InvalidID}
 
 // User is a Uid and Gid pair of a user
 //
@@ -125,27 +129,38 @@ func toHost(contID uint32, idMap []specs.LinuxIDMapping) (uint32, error) {
 	if idMap == nil {
 		return contID, nil
 	}
+	invalidMapping := false
 	for _, m := range idMap {
 		high, err := safeSum(m.ContainerID, m.Size)
 		if err != nil {
+			invalidMapping = true
 			break
 		}
 		if contID >= m.ContainerID && contID < high {
 			hostID, err := safeSum(m.HostID, contID-m.ContainerID)
-			if err != nil || hostID == invalidID {
+			if err != nil || hostID == InvalidID {
+				invalidMapping = true
 				break
 			}
 			return hostID, nil
 		}
+		if _, err := safeSum(m.HostID, m.Size); err != nil || m.Size == 0 {
+			invalidMapping = true
+		}
 	}
-	return invalidID, fmt.Errorf("container ID %d cannot be mapped to a host ID", contID)
+	err := fmt.Errorf("container ID %d cannot be mapped to a host ID", contID)
+	// Only classify an absent ID as unmapped when the ranges and ID are valid.
+	if !invalidMapping && len(idMap) > 0 && contID != InvalidID {
+		err = fmt.Errorf("%v: %w", err, ErrUnmappedID)
+	}
+	return InvalidID, err
 }
 
 // safeSum returns the sum of x and y. or an error if the result overflows
 func safeSum(x, y uint32) (uint32, error) {
 	z := x + y
 	if z < x || z < y {
-		return invalidID, errors.New("ID overflow")
+		return InvalidID, errors.New("ID overflow")
 	}
 	return z, nil
 }
@@ -164,7 +179,7 @@ func deserializeLinuxIDMapping(str string) (specs.LinuxIDMapping, error) {
 	if err != nil {
 		return specs.LinuxIDMapping{}, fmt.Errorf("input value %s unparsable: %w", str, err)
 	}
-	if ctrID < 0 || ctrID >= invalidID || hostID < 0 || hostID >= invalidID || length < 0 || length >= invalidID {
+	if ctrID < 0 || ctrID >= InvalidID || hostID < 0 || hostID >= InvalidID || length < 0 || length >= InvalidID {
 		return specs.LinuxIDMapping{}, fmt.Errorf("invalid mapping \"%s\"", str)
 	}
 	return specs.LinuxIDMapping{
