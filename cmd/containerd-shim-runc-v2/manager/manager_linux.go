@@ -342,6 +342,17 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	}); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to remove runc container")
 	}
+	// Make sure nothing is left running in the container cgroup, whatever runc
+	// reported. runc can fail to tear the container down, and it also reports
+	// success without doing anything when the container state was never
+	// written, as happens when "runc create" is killed part way through. In
+	// both cases leftover processes keep the cgroup populated and hold
+	// references to the rootfs below, which makes the bundle impossible to
+	// delete and leaves containerd retrying this same cleanup on every start.
+	// When runc did its job the cgroup is already gone and this is a no-op.
+	if err := reapContainerCgroup(ctx, path, opts != nil && opts.SystemdCgroup); err != nil {
+		log.G(ctx).WithError(err).Warn("failed to reap container cgroup")
+	}
 
 	// Use the time immediately after the forced runc deletion attempt as the
 	// fallback when no recorded exit time is available.
