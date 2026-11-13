@@ -50,8 +50,8 @@ github.com/containerd/fifo v1.1.0 h1:4I2mbh5stb1u6ycIABlBw9zgtlK8viPI9QkQNRQEEmY
 github.com/containerd/fifo v1.1.0/go.mod h1:bmC4NWMbXlt2EZ0Hc7Fx7QzTFxgPID13eH0Qu+MAb2o=
 github.com/containerd/go-cni v1.1.15 h1:ce9mQ012Es7DKGq4CP60k97AnTIzIwOKF9/j/7LEeLQ=
 github.com/containerd/go-cni v1.1.15/go.mod h1:5DAleVZ1qeXMhkTJnPSTFZVgP7QbEz2RDd67hMFZ4ew=
-github.com/containerd/go-dmverity v0.0.0-20260611211332-9879dd340c85 h1:gx3Y03j1gun0s5xpzojnAqeMMm/Rje1Ama8nUivl3GM=
-github.com/containerd/go-dmverity v0.0.0-20260611211332-9879dd340c85/go.mod h1:vYevYgfeVF244IpQCKshXLvyKoRHwoVrFG0HV6GrUrs=
+github.com/containerd/go-dmverity v0.1.0 h1:aqnpBRI6mmscya/XqvknZ4wQNJnXzx6lKxPa7Q71hDo=
+github.com/containerd/go-dmverity v0.1.0/go.mod h1:vYevYgfeVF244IpQCKshXLvyKoRHwoVrFG0HV6GrUrs=
 github.com/containerd/go-runc v1.2.1 h1:TAnah92bVA7dYDZ7Mm9FrOoFQvnLZdL3z3xT7BS19kA=
 github.com/containerd/go-runc v1.2.1/go.mod h1:Azy6SkBcIFMSMYiYUuSQhZ25zD3zJEYYbbIVplhYD7M=
 github.com/containerd/imgcrypt/v2 v2.0.3 h1:yM6//IOTtca9TpxPP8prJqLDuidbF/VhUQujLw7UQ3w=
