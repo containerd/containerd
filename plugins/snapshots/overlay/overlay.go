@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+	"golang.org/x/sys/unix"
 )
 
 // upperdirKey is a key of an optional label to each snapshot.
@@ -49,6 +50,7 @@ type SnapshotterConfig struct {
 	mountOptions  []string
 	remapIDs      bool
 	slowChown     bool
+	syncOnCommit  bool
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -106,6 +108,17 @@ func WithSlowChown(config *SnapshotterConfig) error {
 	return nil
 }
 
+// WithoutSyncOnCommit disables flushing the upperdir to stable storage
+// before a snapshot is committed. By default Commit calls syncfs on the
+// upperdir so that committed snapshot content is durable; turning this off
+// trades durability for a small performance gain and is not recommended —
+// a system crash or storage-level data loss inside the write-back window
+// can leave a committed snapshot with valid metadata but empty files.
+func WithoutSyncOnCommit(config *SnapshotterConfig) error {
+	config.syncOnCommit = false
+	return nil
+}
+
 type snapshotter struct {
 	root          string
 	ms            MetaStore
@@ -114,6 +127,7 @@ type snapshotter struct {
 	options       []string
 	remapIDs      bool
 	slowChown     bool
+	syncOnCommit  bool
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -121,6 +135,9 @@ type snapshotter struct {
 // the root.
 func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	var config SnapshotterConfig
+	// Syncing the upperdir before a snapshot is committed is enabled by
+	// default; see WithoutSyncOnCommit for the trade-off of turning it off.
+	config.syncOnCommit = true
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
 			return nil, err
@@ -173,6 +190,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		options:       config.mountOptions,
 		remapIDs:      config.remapIDs,
 		slowChown:     config.slowChown,
+		syncOnCommit:  config.syncOnCommit,
 	}, nil
 }
 
@@ -299,6 +317,33 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
+	if o.syncOnCommit {
+		// Flush the upperdir to stable storage before the snapshot is
+		// marked as committed. Without this, the metadata commit below is
+		// durable while the unpacked file contents may still live in the
+		// page cache — a storage-level data loss inside the write-back
+		// window then leaves a committed snapshot with valid metadata but
+		// empty file contents.
+		//
+		// The flush runs outside the metadata write transaction: syncfs is
+		// filesystem-wide and unbounded, so holding the daemon-wide bolt
+		// write lock during the flush would block unrelated metadata
+		// operations. Nothing writes to this upperdir between the flush and
+		// the commit below — the unpack finished before Commit was called.
+		var id string
+		if err := o.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+			var err error
+			id, _, _, err = storage.GetInfo(ctx, key)
+			return err
+		}); err != nil {
+			return fmt.Errorf("failed to get active snapshot %s: %w", key, err)
+		}
+		upperdir := o.upperPath(id)
+		if err := syncFsFn(upperdir); err != nil {
+			return fmt.Errorf("failed to sync filesystem containing upperdir %s: %w", upperdir, err)
+		}
+	}
+
 	return o.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
 		// grab the existing id
 		id, _, _, err := storage.GetInfo(ctx, key)
@@ -317,6 +362,25 @@ func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return nil
 	})
 }
+
+// syncFs flushes the filesystem containing path (data and metadata) to
+// stable storage.
+func syncFs(path string) error {
+	fd, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", path, err)
+	}
+	defer fd.Close()
+
+	if err := unix.Syncfs(int(fd.Fd())); err != nil {
+		return fmt.Errorf("failed to syncfs %s: %w", path, err)
+	}
+	return nil
+}
+
+// syncFsFn is the flush function used by Commit; a variable so tests can
+// inject failures or observe the flushed path.
+var syncFsFn = syncFs
 
 // Remove abandons the snapshot identified by key. The snapshot will
 // immediately become unavailable and unrecoverable. Disk space will
