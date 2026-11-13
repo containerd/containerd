@@ -889,15 +889,20 @@ func uniquePart() string {
 // caller should skip fetching and applying the layer, and just Commit the
 // snapshot as-is (applying the real parent at Commit time).
 //
-// Only the last mount in the slice is inspected: earlier entries are inputs
-// consumed by mount templating (e.g. "{{ mount 0 }}" in an overlay's
+// Only the last root mount in the slice is inspected: earlier entries are
+// inputs consumed by mount templating (e.g. "{{ mount 0 }}" in an overlay's
 // lowerdir) rather than the mount that is actually stacked on top, so they
-// carry no information about writability.
+// carry no information about writability. Mounts with a Target are child
+// mounts on a subdirectory of the root (e.g. read-only bind mounts appended
+// by nix-snapshotter) and are skipped, as they say nothing about whether the
+// root itself is writable.
 func isStaged(mounts []mount.Mount) bool {
-	if len(mounts) == 0 {
-		return false
+	for i := len(mounts) - 1; i >= 0; i-- {
+		if t := mounts[i].Target; t == "" || t == "/" {
+			return mounts[i].ReadOnly()
+		}
 	}
-	return mounts[len(mounts)-1].ReadOnly()
+	return false
 }
 
 // TODO: this is a temporary workaround until #13053 lands.
