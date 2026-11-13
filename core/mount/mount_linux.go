@@ -303,7 +303,7 @@ func doPrepareIDMappedOverlay(tmpDir string, lowerDirs []string, usernsFd int) (
 // getCommonDirectory finds the common directory among the lowerDirs passed in.
 // "/" and "." are considered invalid common directories and are treated as error
 func getCommonDirectory(lowerDirs []string) (string, error) {
-	commonPrefix := longestCommonPrefix(lowerDirs)
+	commonPrefix := longestCommonPrefix(lowerdirPaths(lowerDirs))
 	if commonPrefix == "" {
 		return "", errors.New("no common prefix found")
 	}
@@ -325,6 +325,11 @@ func buildIDMappedPaths(lowerDirs []string, commonDir, idMappedDir string) []str
 	tmpLowerDirs := make([]string, 0, len(lowerDirs))
 
 	for _, lowerDir := range lowerDirs {
+		if lowerDir == "" {
+			// the "::" data-only separator, not a path
+			tmpLowerDirs = append(tmpLowerDirs, "")
+			continue
+		}
 		relativePath := strings.TrimPrefix(lowerDir, commonDir)
 		tmpLowerDirs = append(tmpLowerDirs, filepath.Join(idMappedDir, relativePath))
 	}
@@ -413,7 +418,7 @@ func compactLowerdirOption(opts []string) (string, []string) {
 	}
 
 	// find out common dir
-	commondir := longestCommonPrefix(dirs)
+	commondir := longestCommonPrefix(lowerdirPaths(dirs))
 	if commondir == "" {
 		return "", opts
 	}
@@ -429,6 +434,11 @@ func compactLowerdirOption(opts []string) (string, []string) {
 
 	newdirs := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
+		if dir == "" {
+			// the "::" data-only separator, not a path
+			newdirs = append(newdirs, "")
+			continue
+		}
 		if len(dir) <= len(commondir) {
 			return "", opts
 		}
@@ -442,7 +452,8 @@ func compactLowerdirOption(opts []string) (string, []string) {
 }
 
 // findOverlayLowerdirs returns the index of lowerdir in mount's options and
-// all the lowerdir target.
+// all the lowerdir target. An empty element is the "::" data-only
+// separator, not a path.
 func findOverlayLowerdirs(opts []string) (int, []string) {
 	var (
 		idx    = -1
@@ -460,6 +471,18 @@ func findOverlayLowerdirs(opts []string) (int, []string) {
 		return -1, nil
 	}
 	return idx, strings.Split(opts[idx][len(prefix):], ":")
+}
+
+// lowerdirPaths returns the path elements of a split lowerdir option,
+// dropping the empty element that the "::" data-only separator produces.
+func lowerdirPaths(dirs []string) []string {
+	paths := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		if dir != "" {
+			paths = append(paths, dir)
+		}
+	}
+	return paths
 }
 
 // longestCommonPrefix finds the longest common prefix in the string slice.

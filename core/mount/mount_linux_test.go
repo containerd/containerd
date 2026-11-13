@@ -97,6 +97,13 @@ func TestCompactLowerdirOption(t *testing.T) {
 			"",
 			[]string{"lowerdir=a:aaa"},
 		},
+
+		// data-only lower layers, introduced by "::"
+		{
+			[]string{"lowerdir=/snapshots/1/fs:/snapshots/10/fs::/snapshots/objects"},
+			"/snapshots/",
+			[]string{"lowerdir=1/fs:10/fs::objects"},
+		},
 	}
 
 	for i, tc := range tcases {
@@ -559,6 +566,23 @@ func TestBuildIDMappedPaths(t *testing.T) {
 			},
 		},
 		{
+			name: "data-only lower layers",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.erofs/snapshots/2/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.erofs/snapshots/1/fs",
+				"",
+				"/mnt/containerd/io.containerd.snapshotter.v1.erofs/objects",
+			},
+			commonDir:   "/mnt/containerd/io.containerd.snapshotter.v1.erofs",
+			idMappedDir: "/tmp/idmapped456",
+			expected: []string{
+				"/tmp/idmapped456/snapshots/2/fs",
+				"/tmp/idmapped456/snapshots/1/fs",
+				"",
+				"/tmp/idmapped456/objects",
+			},
+		},
+		{
 			name: "single layer",
 			lowerDirs: []string{
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs",
@@ -658,6 +682,16 @@ func TestGetCommonDirectory(t *testing.T) {
 				"/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585/fs",
 			},
 			expected: "/mnt/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16585",
+		},
+		{
+			name: "data-only lower layers",
+			lowerDirs: []string{
+				"/mnt/containerd/io.containerd.snapshotter.v1.erofs/snapshots/2/fs",
+				"/mnt/containerd/io.containerd.snapshotter.v1.erofs/snapshots/1/fs",
+				"",
+				"/mnt/containerd/io.containerd.snapshotter.v1.erofs/objects",
+			},
+			expected: "/mnt/containerd/io.containerd.snapshotter.v1.erofs",
 		},
 		{
 			name: "snapshots with common prefix in snapshot id",
