@@ -35,6 +35,126 @@ message TransferOptions {
 
 ## Transfer Objects (Sources and Destinations)
 
+Transfer operations operate on source and destination pairs. The core transfer packages provide implementations for registries, local image stores, and archive streams:
+
+- **Registry (`core/transfer/registry`)**: `registry.NewOCIRegistry(ctx, ref, opts...)` creates an OCI/Docker registry transfer object. It acts as a source when pulling images or as a destination when pushing images. Configuration options include:
+  - `registry.WithCredentials(helper)`: sets a credential helper (`registry.CredentialHelper`) to supply authentication for registry hosts.
+  - `registry.WithHostDir(dir)`: specifies a directory containing host configurations and certificates (such as `/etc/containerd/certs.d`).
+  - `registry.WithHeaders(headers)`: attaches custom HTTP headers to registry requests.
+  - `registry.WithDefaultScheme(scheme)`: sets the default URL scheme (such as `"http"` for plain HTTP registries).
+- **Image Store (`core/transfer/image`)**: `image.NewStore(ref, opts...)` creates a local image store transfer object. It acts as a destination when pulling or importing images, or as a source when pushing or exporting images. Configuration options include:
+  - `image.WithPlatforms(platforms...)`: specifies which OCI platforms to include.
+  - `image.WithUnpack(platform, snapshotter)`: unpacks the image layers for the given platform into the specified snapshotter (such as `"overlayfs"`).
+  - `image.WithImageLabels(labels)`: attaches labels to the created image metadata.
+  - `image.WithAllMetadata`: retains metadata descriptors for all platforms.
+- **Archive Import Stream (`core/transfer/archive`)**: `archive.NewImageImportStream(reader, mediaType, opts...)` wraps an `io.Reader` as a source to import an image tarball into containerd.
+- **Archive Export Stream (`core/transfer/archive`)**: `archive.NewImageExportStream(writer, mediaType, opts...)` wraps an `io.WriteCloser` as a destination to export images from containerd into an OCI or Docker archive format. Options include `archive.WithPlatform` and `archive.WithAllPlatforms`.
+
+## Usage Examples
+
+The `client.Transfer` method executes a transfer operation within a lease managed by containerd.
+
+### Pulling and Unpacking an Image
+
+To pull an image from an OCI registry, unpack its layers into a snapshotter, and retrieve the image object:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
+	"github.com/containerd/platforms"
+)
+
+func pullExample(ctx context.Context, client *containerd.Client, ref string) (containerd.Image, error) {
+	// Configure the target platform and unpack settings.
+	platform := platforms.DefaultSpec()
+	snapshotter := "overlayfs"
+
+	storeOpts := []image.StoreOpt{
+		image.WithPlatforms(platform),
+		image.WithUnpack(platform, snapshotter),
+	}
+	is := image.NewStore(ref, storeOpts...)
+
+	// Configure registry source options.
+	registryOpts := []registry.Opt{
+		// registry.WithHostDir("/etc/containerd/certs.d"),
+	}
+	reg, err := registry.NewOCIRegistry(ctx, ref, registryOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("create registry source: %w", err)
+	}
+
+	// Define an optional progress callback.
+	progressOpt := transfer.WithProgress(func(p transfer.Progress) {
+		if p.Total > 0 {
+			log.Printf("%s: %d/%d (%s)", p.Event, p.Progress, p.Total, p.Name)
+		}
+	})
+
+	// Execute the transfer.
+	if err := client.Transfer(ctx, reg, is, progressOpt); err != nil {
+		return nil, fmt.Errorf("transfer failed: %w", err)
+	}
+
+	// Fetch the resulting image from containerd's image store.
+	img, err := client.GetImage(ctx, ref)
+	if err != nil {
+		return nil, fmt.Errorf("get image: %w", err)
+	}
+
+	return img, nil
+}
+```
+
+### Pushing an Image
+
+To push a locally stored image to an OCI registry:
+
+```go
+is := image.NewStore(ref)
+reg, err := registry.NewOCIRegistry(ctx, ref)
+if err != nil {
+	return err
+}
+
+err = client.Transfer(ctx, is, reg)
+```
+
+When pushing a multi-platform image index, all manifests and blobs referenced by the index must be present in the local content store (for example, by omitting `image.WithPlatforms` when pulling).
+
+### Importing an Image Archive
+
+To import an image from a tar archive stream (`io.Reader`):
+
+```go
+iis := archive.NewImageImportStream(archiveReader, "")
+is := image.NewStore(ref)
+
+err := client.Transfer(ctx, iis, is)
+```
+
+### Exporting an Image Archive
+
+To export an image to a tar archive stream (`io.WriteCloser`):
+
+```go
+is := image.NewStore("", image.WithExtraReference(ref))
+ies := archive.NewImageExportStream(archiveWriter, "")
+
+err := client.Transfer(ctx, is, ies)
+```
+
+`archive.NewImageExportStream` copies stream content asynchronously in a background goroutine and closes `archiveWriter` when streaming finishes. The writer and context should remain active until `archiveWriter.Close()` is called.
+
 ## Transfer Operations
 
 |   Source    | Destination | Description | Local Implementation Version |

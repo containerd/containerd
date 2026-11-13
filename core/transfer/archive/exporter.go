@@ -61,7 +61,7 @@ func WithSkipNonDistributableBlobs(s *ImageExportStream) {
 	s.skipNonDistributable = true
 }
 
-// NewImageExportStream returns an image exporter via tar stream
+// NewImageExportStream returns an image exporter via tar stream.
 func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ...ExportOpt) *ImageExportStream {
 	s := &ImageExportStream{
 		stream:    stream,
@@ -73,6 +73,7 @@ func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ...Expor
 	return s
 }
 
+// ImageExportStream wraps an io.WriteCloser stream to export an image archive from containerd.
 type ImageExportStream struct {
 	stream    io.WriteCloser
 	mediaType string
