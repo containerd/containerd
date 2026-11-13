@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sync"
@@ -228,40 +229,36 @@ func deepCopyOf(s Status) Status {
 				})
 			}
 		}
-		copy.Resources = &runtime.ContainerResources{
-			Linux: &runtime.LinuxContainerResources{
-				CpuPeriod:              s.Resources.Linux.CpuPeriod,
-				CpuQuota:               s.Resources.Linux.CpuQuota,
-				CpuShares:              s.Resources.Linux.CpuShares,
-				CpusetCpus:             s.Resources.Linux.CpusetCpus,
-				CpusetMems:             s.Resources.Linux.CpusetMems,
-				MemoryLimitInBytes:     s.Resources.Linux.MemoryLimitInBytes,
-				MemorySwapLimitInBytes: s.Resources.Linux.MemorySwapLimitInBytes,
-				OomScoreAdj:            s.Resources.Linux.OomScoreAdj,
-				Unified:                s.Resources.Linux.Unified,
-				HugepageLimits:         hugepageLimits,
-			},
+		copy.Resources.Linux = &runtime.LinuxContainerResources{
+			CpuPeriod:              s.Resources.Linux.CpuPeriod,
+			CpuQuota:               s.Resources.Linux.CpuQuota,
+			CpuShares:              s.Resources.Linux.CpuShares,
+			CpusetCpus:             s.Resources.Linux.CpusetCpus,
+			CpusetMems:             s.Resources.Linux.CpusetMems,
+			MemoryLimitInBytes:     s.Resources.Linux.MemoryLimitInBytes,
+			MemorySwapLimitInBytes: s.Resources.Linux.MemorySwapLimitInBytes,
+			OomScoreAdj:            s.Resources.Linux.OomScoreAdj,
+			Unified:                maps.Clone(s.Resources.Linux.Unified),
+			HugepageLimits:         hugepageLimits,
 		}
 	}
 
 	if s.Resources != nil && s.Resources.Windows != nil {
-		copy.Resources = &runtime.ContainerResources{
-			Windows: &runtime.WindowsContainerResources{
-				CpuShares:          s.Resources.Windows.CpuShares,
-				CpuCount:           s.Resources.Windows.CpuCount,
-				CpuMaximum:         s.Resources.Windows.CpuMaximum,
-				MemoryLimitInBytes: s.Resources.Windows.MemoryLimitInBytes,
-				RootfsSizeInBytes:  s.Resources.Windows.RootfsSizeInBytes,
-				AffinityCpus: func() []*runtime.WindowsCpuGroupAffinity {
-					cp := make([]*runtime.WindowsCpuGroupAffinity, 0, len(s.Resources.Windows.AffinityCpus))
-					for _, a := range s.Resources.Windows.AffinityCpus {
-						if a != nil {
-							cp = append(cp, &runtime.WindowsCpuGroupAffinity{CpuMask: a.CpuMask, CpuGroup: a.CpuGroup})
-						}
+		copy.Resources.Windows = &runtime.WindowsContainerResources{
+			CpuShares:          s.Resources.Windows.CpuShares,
+			CpuCount:           s.Resources.Windows.CpuCount,
+			CpuMaximum:         s.Resources.Windows.CpuMaximum,
+			MemoryLimitInBytes: s.Resources.Windows.MemoryLimitInBytes,
+			RootfsSizeInBytes:  s.Resources.Windows.RootfsSizeInBytes,
+			AffinityCpus: func() []*runtime.WindowsCpuGroupAffinity {
+				cp := make([]*runtime.WindowsCpuGroupAffinity, 0, len(s.Resources.Windows.AffinityCpus))
+				for _, a := range s.Resources.Windows.AffinityCpus {
+					if a != nil {
+						cp = append(cp, &runtime.WindowsCpuGroupAffinity{CpuMask: a.CpuMask, CpuGroup: a.CpuGroup})
 					}
-					return cp
-				}(),
-			},
+				}
+				return cp
+			}(),
 		}
 	}
 	return copy
