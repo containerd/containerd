@@ -58,10 +58,12 @@ func FuzzCRIServer(f *testing.F) {
 			t.Fatal(err)
 		}
 
+		listStreaming := criconfig.DefaultServerConfig().ListStreaming
 		c, rs, err := server.NewCRIService(&server.CRIServiceOptions{
-			RuntimeService: &fakeRuntimeService{},
-			ImageService:   imageService,
-			Client:         client,
+			RuntimeService:      &fakeRuntimeService{},
+			ImageService:        imageService,
+			Client:              client,
+			ListStreamingConfig: listStreaming,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -70,7 +72,7 @@ func FuzzCRIServer(f *testing.F) {
 		fuzzCRI(t, f, &service{
 			CRIService:           c,
 			RuntimeServiceServer: rs,
-			ImageServiceServer:   imageService.GRPCService(),
+			ImageServiceServer:   imageService.GRPCService(listStreaming),
 		})
 	})
 }

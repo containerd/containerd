@@ -38,7 +38,7 @@ func (c *criService) StreamContainerStats(r *runtime.StreamContainerStatsRequest
 
 	resp := c.toCRIContainerStats(css)
 
-	return criutil.SendInBatches(ctx, resp.Stats, criutil.DefaultStreamBatchSize, func(batch []*runtime.ContainerStats) error {
+	return criutil.SendInBatches(ctx, resp.Stats, c.listStreaming.BatchSize, func(batch []*runtime.ContainerStats) error {
 		return s.Send(&runtime.StreamContainerStatsResponse{ContainerStats: batch})
 	})
 }
