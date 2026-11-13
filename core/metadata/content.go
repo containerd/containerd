@@ -27,6 +27,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
@@ -436,12 +437,14 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 
 		brefb := bkt.Get(bucketKeyRef)
 		if brefb == nil {
-			sid, err := bkt.NextSequence()
+			// The identity must survive neither abort nor bucket recreation:
+			// a stale writer must not match a new ingest with the same ref.
+			id, err := uuid.NewRandom()
 			if err != nil {
 				return err
 			}
 
-			bref = createKey(sid, ns, wOpts.Ref)
+			bref = fmt.Sprintf("%s/%s/%s", ns, id, wOpts.Ref)
 			if err := bkt.Put(bucketKeyRef, []byte(bref)); err != nil {
 				return err
 			}
@@ -584,6 +587,7 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 
 	nw.l.RLock()
 	defer nw.l.RUnlock()
+	defer nw.Close()
 
 	var innerErr error
 	var actualDgst digest.Digest
@@ -597,12 +601,54 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	// REF:
 	// [1]: https://github.com/containerd/containerd/blob/c4c3c6ea568ce0cfbcf754863abadeea37d77c8f/plugins/content/local/writer.go#L95
 	if err := nw.Sync(); err != nil {
-		nw.Close()
 		return fmt.Errorf("failed to perform sync: %w", err)
 	}
 
+	// Validate before preparation can make the ingest immutable. Evaluate options
+	// only once; the resulting metadata is written in the transaction below.
+	var base content.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			return err
+		}
+	}
+	if err := validateInfo(&base); err != nil {
+		return err
+	}
+	if nw.w != nil {
+		status, err := nw.w.Status()
+		if err != nil {
+			return err
+		}
+		if size != 0 && size != status.Offset {
+			return fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
+		}
+		size = status.Offset
+
+		// An externally owned transaction is already open, so leave preparation
+		// to Commit in that case. In particular, do not seal an ingest when the
+		// supplied transaction is read-only.
+		if _, inTransaction := boltutil.Transaction(ctx); !inTransaction {
+			if preparer, ok := nw.w.(content.Precommitter); ok {
+				if err := preparer.Precommit(ctx, size, expected); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	if err := update(ctx, nw.db, func(tx *bolt.Tx) error {
-		dgst, size, err := nw.commit(ctx, tx, size, expected, opts...)
+		// Abort or ingest GC may have removed this upload during preparation.
+		// Do not publish it or remove metadata belonging to a replacement ref.
+		bkt := getIngestsBucket(tx, nw.namespace)
+		if bkt == nil {
+			return fmt.Errorf("ingest %q: %w", nw.ref, errdefs.ErrNotFound)
+		}
+		ingest := bkt.Bucket([]byte(nw.ref))
+		if ingest == nil || string(ingest.Get(bucketKeyRef)) != nw.bref {
+			return fmt.Errorf("ingest %q is no longer active: %w", nw.ref, errdefs.ErrNotFound)
+		}
+		dgst, size, err := nw.commit(ctx, tx, size, expected, base)
 		if err != nil {
 			if !errdefs.IsAlreadyExists(err) {
 				return err
@@ -611,11 +657,8 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 		}
 		actualDgst = dgst
 		actualSize = size
-		bkt := getIngestsBucket(tx, nw.namespace)
-		if bkt != nil {
-			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
-				return err
-			}
+		if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
+			return err
 		}
 		if err := removeIngestLease(ctx, tx, nw.ref); err != nil {
 			return err
@@ -648,23 +691,7 @@ func (nw *namespacedWriter) Sync() error {
 	return nil
 }
 
-func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) (digest.Digest, int64, error) {
-	var base content.Info
-	for _, opt := range opts {
-		if err := opt(&base); err != nil {
-			if nw.w != nil {
-				nw.w.Close()
-			}
-			return "", 0, err
-		}
-	}
-	if err := validateInfo(&base); err != nil {
-		if nw.w != nil {
-			nw.w.Close()
-		}
-		return "", 0, err
-	}
-
+func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, base content.Info) (digest.Digest, int64, error) {
 	var actual digest.Digest
 	if nw.w == nil {
 		if size != 0 && size != nw.desc.Size {
@@ -676,17 +703,6 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		size = nw.desc.Size
 		actual = nw.desc.Digest
 	} else {
-		status, err := nw.w.Status()
-		if err != nil {
-			nw.w.Close()
-			return "", 0, err
-		}
-		if size != 0 && size != status.Offset {
-			nw.w.Close()
-			return "", 0, fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
-		}
-		size = status.Offset
-
 		if err := nw.w.Commit(ctx, size, expected); err != nil && !errdefs.IsAlreadyExists(err) {
 			return "", 0, err
 		}
