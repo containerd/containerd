@@ -132,7 +132,8 @@ func buildCache(ctx context.Context, cs content.Store, image ocispec.Descriptor,
 	}
 
 	for _, layer := range manifest.Layers {
-		if !images.IsLayerType(layer.MediaType) || erofsutils.IsErofsMediaType(layer.MediaType) || images.IsNonDistributable(layer.MediaType) {
+		if !images.IsLayerType(layer.MediaType) || erofsutils.IsErofsMediaType(layer.MediaType) ||
+			images.IsSkippableLayerType(layer.MediaType) || images.IsNonDistributable(layer.MediaType) {
 			continue
 		}
 		if err := buildLayer(ctx, cs, layer, cacheDir, withDmverity, opts...); err != nil {

@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/google/uuid"
 	"github.com/opencontainers/go-digest"
@@ -125,5 +126,29 @@ func TestConvertLayerToErofsMkfsMissing(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "layer.erofs")
 	if _, err := ConvertLayerToErofs(context.Background(), cs, desc, out, WithMkfsOptions([]string{"-T0"})); err == nil {
 		t.Fatal("ConvertLayerToErofs with mkfs options succeeded without mkfs.erofs; want an error")
+	}
+}
+
+// TestLayerConvertFuncSkipsChunkIndex verifies that a standalone chunk-index
+// layer (see the EROFS image layer format specification,
+// https://github.com/erofs/erofs-image-spec, §2.2) is left untouched by the
+// converter, since it is not itself a filesystem image.
+func TestLayerConvertFuncSkipsChunkIndex(t *testing.T) {
+	convertFn := LayerConvertFunc()
+
+	desc := ocispec.Descriptor{
+		MediaType: images.MediaTypeErofsChunkIndex,
+		Digest:    "sha256:0000000000000000000000000000000000000000000000000000000000000",
+		Size:      1,
+	}
+
+	// cs is nil: the function must return before doing any content store
+	// I/O for a skippable layer type.
+	newDesc, err := convertFn(context.Background(), nil, desc)
+	if err != nil {
+		t.Fatalf("LayerConvertFunc(%s): %v", desc.MediaType, err)
+	}
+	if newDesc != nil {
+		t.Errorf("LayerConvertFunc(%s) = %v, want nil: a skippable layer must not be converted", desc.MediaType, newDesc)
 	}
 }
