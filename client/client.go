@@ -41,6 +41,7 @@ import (
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -551,18 +552,25 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		return err
 	}
 
-	var wrapper func(images.Handler) images.Handler
-
-	if len(pushCtx.BaseHandlers) > 0 {
-		wrapper = func(h images.Handler) images.Handler {
+	var (
+		mu     sync.Mutex
+		pushed []ocispec.Descriptor
+	)
+	collect := images.HandlerFunc(func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		mu.Lock()
+		pushed = append(pushed, desc)
+		mu.Unlock()
+		return nil, nil
+	})
+	wrapper := func(h images.Handler) images.Handler {
+		h = images.Handlers(h, collect)
+		if len(pushCtx.BaseHandlers) > 0 {
 			h = images.Handlers(append(pushCtx.BaseHandlers, h)...)
-			if pushCtx.HandlerWrapper != nil {
-				h = pushCtx.HandlerWrapper(h)
-			}
-			return h
 		}
-	} else if pushCtx.HandlerWrapper != nil {
-		wrapper = pushCtx.HandlerWrapper
+		if pushCtx.HandlerWrapper != nil {
+			h = pushCtx.HandlerWrapper(h)
+		}
+		return h
 	}
 
 	var limiter *semaphore.Weighted
@@ -570,7 +578,25 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 		limiter = semaphore.NewWeighted(int64(pushCtx.MaxConcurrentUploadedLayers))
 	}
 
-	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper)
+	if err := remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper); err != nil {
+		return err
+	}
+
+	// A registry may discard uploaded blobs if the manifest is rejected.
+	// Record the destination only after the entire push has succeeded.
+	appendDistSrcLabel, err := docker.AppendDistributionSourceLabel(c.ContentStore(), ref)
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to prepare distribution source labels")
+		return nil
+	}
+	for _, desc := range pushed {
+		// Blobs already present remotely may not exist in the local store.
+		if _, err := appendDistSrcLabel(ctx, desc); err != nil && !errdefs.IsNotFound(err) {
+			log.G(ctx).WithError(err).WithField("digest", desc.Digest).Warn("failed to append distribution source label to pushed content")
+			break
+		}
+	}
+	return nil
 }
 
 // GetImage returns an existing image
