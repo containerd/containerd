@@ -28,7 +28,7 @@ import (
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig, _ *imagespec.ImageConfig, _ string, _ string, _ []string) (_ *runtimespec.Spec, _ error) {
-	return c.runtimeSpec(id, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
+	return c.runtimeSpec(id, oci.WithAnnotations(annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)))
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for

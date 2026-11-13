@@ -963,7 +963,7 @@ func (c *criService) buildLinuxSpec(
 	)
 	specOpts = append(
 		specOpts,
-		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
+		oci.WithAnnotations(annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)),
 	)
 
 	return specOpts, nil
@@ -1059,7 +1059,7 @@ func (c *criService) buildWindowsSpec(
 
 	specOpts = append(specOpts, customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxHpc)))
 	specOpts = append(specOpts,
-		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
+		oci.WithAnnotations(annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)),
 	)
 
 	if config.Windows != nil {
@@ -1114,7 +1114,7 @@ func (c *criService) buildDarwinSpec(
 	}
 
 	specOpts = append(specOpts,
-		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
+		oci.WithAnnotations(annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)),
 	)
 
 	return specOpts, nil
