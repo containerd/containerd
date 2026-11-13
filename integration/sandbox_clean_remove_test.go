@@ -126,11 +126,9 @@ func TestSandboxRemoveWithoutIPLeakage(t *testing.T) {
 	assert.False(t, checkIP(ip))
 }
 
-// TestSandboxStopWithNilCNIResult verifies that StopPodSandbox succeeds when
-// CNIResult is nil (network setup never completed) even if the network teardown
-// itself fails. This exercises the condition in sandbox_stop.go where a nil
-// CNIResult causes the teardown error to be logged as a warning instead of
-// returned as a hard error.
+// TestSandboxStopWithNilCNIResult verifies that StopPodSandbox retries network
+// teardown when CNIResult is nil (network setup never completed) if the network
+// teardown fails, and succeeds once CNI Del succeeds.
 func TestSandboxStopWithNilCNIResult(t *testing.T) {
 	t.Log("Init PodSandboxConfig with specific label")
 	sbName := t.Name()
@@ -139,11 +137,11 @@ func TestSandboxStopWithNilCNIResult(t *testing.T) {
 	}
 	sbConfig := PodSandboxConfig(sbName, "failpoint", WithPodLabels(labels))
 
-	t.Log("Inject CNI failpoint: delay Add (so CNIResult is never set) and fail Del")
+	t.Log("Inject CNI failpoint: delay Add (so CNIResult is never set) and fail Del once")
 	conf := &failpointConf{
 		// Delay CNI Add for 1 day so network setup never completes and CNIResult stays nil
 		Add: "1*delay(86400000)",
-		// Make CNI Del fail so teardownPodNetwork returns an error during stop
+		// Make CNI Del fail once so teardownPodNetwork returns an error on the first stop
 		Del: "1*error(network-teardown-injected-error)",
 	}
 	injectCNIFailpoint(t, sbConfig, conf)
@@ -179,9 +177,13 @@ func TestSandboxStopWithNilCNIResult(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, info.CNIResult, "CNIResult should be nil because CNI setup never completed")
 
-	t.Log("StopPodSandbox should succeed even though CNI Del fails, because CNIResult is nil")
+	t.Log("First StopPodSandbox should fail when CNI Del fails so teardown can be retried")
 	err = runtimeService.StopPodSandbox(sb.Id)
-	assert.NoError(t, err, "StopPodSandbox should not return error when CNIResult is nil")
+	assert.Error(t, err, "StopPodSandbox should return error when CNI Del fails")
+
+	t.Log("Second StopPodSandbox should succeed when CNI Del succeeds on retry")
+	err = runtimeService.StopPodSandbox(sb.Id)
+	assert.NoError(t, err, "StopPodSandbox should succeed when CNI Del succeeds on retry")
 
 	t.Log("RemovePodSandbox should succeed")
 	err = runtimeService.RemovePodSandbox(sb.Id)

@@ -28,6 +28,10 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+var (
+	ErrCNIConfigNotInitialized = errors.New("cni config not initialized")
+)
+
 // cniNetConfSyncer is used to reload cni network conf triggered by fs change
 // events.
 type cniNetConfSyncer struct {

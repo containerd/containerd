@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -115,10 +116,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 			sandbox.NetNSPath = ""
 		}
 		if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
-			if sandbox.CNIResult != nil {
+			if sandbox.CNIResult != nil ||
+				(!errors.Is(err, ErrCNIConfigNotInitialized) && !errors.Is(err, cni.ErrCNINotInitialized)) {
 				return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 			}
-			log.G(ctx).WithError(err).Warnf("failed to destroy network for sandbox %q; and ignoring because the sandbox network setup result is nil indicating the network setup never completed", id)
+			log.G(ctx).WithError(err).Warnf("failed to destroy network for sandbox %q; and ignoring because CNI plugin is not initialized and the sandbox network setup never completed", id)
 		}
 		if err := sandbox.NetNS.Remove(); err != nil {
 			return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
@@ -154,7 +156,7 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
 	if netPlugin == nil {
-		return errors.New("cni config not initialized")
+		return ErrCNIConfigNotInitialized
 	}
 
 	var (
