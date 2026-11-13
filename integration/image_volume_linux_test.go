@@ -361,8 +361,8 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 }
 
 func TestImageVolumeWithUserNamespace(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not support host user namespaces")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not support host user namespaces")
 	}
 	// Check if user namespace and idmap are supported
 	if !supportsUserNS() {

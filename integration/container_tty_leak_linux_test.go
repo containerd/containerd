@@ -35,8 +35,8 @@ import (
 )
 
 func TestContainerTTYLeakAfterExit(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc uses grouped shims; direct shim socket connection is not supported")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not support direct shim socket connection")
 	}
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-tty-leak-after-exit")
