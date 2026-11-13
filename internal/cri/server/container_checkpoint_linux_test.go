@@ -30,6 +30,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 )
 
 func TestCopyNoFollowRegularFile(t *testing.T) {
@@ -220,5 +222,48 @@ func TestCheckpointContainerDisabled(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "criu support is disabled by configuration") {
 		t.Errorf("expected error containing 'criu support is disabled by configuration', got: %v", err)
+	}
+}
+
+func TestCheckNoActiveNsdelegateContainers(t *testing.T) {
+	var (
+		created = containerstore.Status{CreatedAt: 1}
+		running = containerstore.Status{CreatedAt: 1, StartedAt: 2}
+		exited  = containerstore.Status{CreatedAt: 1, StartedAt: 2, FinishedAt: 3}
+		unknown = containerstore.Status{CreatedAt: 1, Unknown: true}
+	)
+	for _, tc := range []struct {
+		desc        string
+		mountMode   runtime.CgroupMountMode
+		status      containerstore.Status
+		expectBlock bool
+	}{
+		{desc: "created read-write container blocks checkpoint", mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, status: created, expectBlock: true},
+		{desc: "running read-write container blocks checkpoint", mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, status: running, expectBlock: true},
+		{desc: "unknown read-write container blocks checkpoint", mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, status: unknown, expectBlock: true},
+		{desc: "exited read-write container does not block checkpoint", mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE, status: exited},
+		{desc: "running read-only container does not block checkpoint", mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY, status: running},
+		{desc: "running unspecified container does not block checkpoint", mountMode: runtime.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED, status: running},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := newTestCRIService()
+			cntr, err := containerstore.NewContainer(containerstore.Metadata{
+				ID: "writable",
+				Config: &runtime.ContainerConfig{
+					Linux: &runtime.LinuxContainerConfig{
+						SecurityContext: &runtime.LinuxContainerSecurityContext{CgroupMountMode: tc.mountMode},
+					},
+				},
+			}, containerstore.WithFakeStatus(tc.status))
+			require.NoError(t, err)
+			require.NoError(t, c.containerStore.Add(cntr))
+
+			err = c.checkNoActiveNsdelegateContainers()
+			if tc.expectBlock {
+				require.ErrorContains(t, err, `container "writable" with cgroup mount mode CGROUP_MOUNT_MODE_READ_WRITE is active`)
+				return
+			}
+			require.NoError(t, err)
+		})
 	}
 }

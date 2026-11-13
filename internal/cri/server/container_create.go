@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -450,9 +451,8 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	// Add container into container store.
-	if err := c.containerStore.Add(container); err != nil {
-		return "", fmt.Errorf("failed to add container %q into store: %w", r.containerID, err)
+	if err := c.addContainer(container); err != nil {
+		return "", err
 	}
 
 	c.generateAndSendContainerEvent(r.ctx, r.containerID, r.sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
@@ -788,8 +788,46 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
+	usernsOpts := securityContext.GetNamespaceOptions().GetUsernsOptions()
+	usernsEnabled := usernsOpts != nil && usernsOpts.GetMode() == runtime.NamespaceMode_POD
+	hostNetwork := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
+	bindMountHostSys := hostNetwork && usernsEnabled
+
+	mode := securityContext.GetCgroupMountMode()
+	if requiresNsdelegate(config) {
+		if err := c.checkWritableCgroupsSupported(); err != nil {
+			return nil, err
+		}
+	}
+	var cgroupWritable bool
+	switch mode {
+	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED:
+		cgroupWritable = ociRuntime.CgroupWritable
+	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_ONLY:
+		if securityContext.GetPrivileged() {
+			return nil, errors.New("read-only cgroups are not supported for privileged containers")
+		}
+		cgroupWritable = false
+	case runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE:
+		if bindMountHostSys {
+			return nil, errors.New("writable cgroups are not supported for host-network containers in a user namespace")
+		}
+		// nsdelegate confines a writable mount only at a cgroup namespace boundary.
+		if !securityContext.GetPrivileged() && securityContext.GetNamespaceOptions().GetCgroupnsOptions().GetMode() == runtime.NamespaceMode_NODE {
+			return nil, errors.New("writable cgroups are not supported for unprivileged containers in the host cgroup namespace")
+		}
+		cgroupWritable = true
+	default:
+		return nil, fmt.Errorf("unsupported cgroup mount mode %q", mode)
+	}
+	if mode != runtime.CgroupMountMode_CGROUP_MOUNT_MODE_UNSPECIFIED {
+		if dst, ok := coversCgroupMount(slices.Concat(config.GetMounts(), extraMounts)); ok {
+			return nil, fmt.Errorf("cgroup mount mode %s cannot be honored: the mount at %q covers /sys/fs/cgroup", mode, dst)
+		}
+	}
+
 	var ociSpecOpts oci.SpecOpts
-	if ociRuntime.CgroupWritable {
+	if cgroupWritable {
 		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, config, extraMounts, mountLabel, runtimeHandler)
 	} else {
 		ociSpecOpts = customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler)
@@ -916,16 +954,9 @@ func (c *criService) buildLinuxSpec(
 		return nil, fmt.Errorf("user namespace config for sandbox is different from container. Sandbox userns config: %v - Container userns config: %v", sandboxUsernsOpts, nsOpts.GetUsernsOptions())
 	}
 
-	// Determine if user namespace is enabled
-	var usernsEnabled bool
-	if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
-		usernsEnabled = true
-	}
-
 	// When using both host network and user namespace, we need to bind mount /sys
 	// instead of mounting sysfs, because mounting sysfs will fail with EPERM in this configuration.
-	sandboxNsOpts := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions()
-	if sandboxNsOpts.GetNetwork() == runtime.NamespaceMode_NODE && usernsEnabled {
+	if bindMountHostSys {
 		specOpts = append(specOpts, oci.WithoutMounts("/sys"))
 		// Add bind mount for /sys
 		specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
@@ -949,6 +980,59 @@ func (c *criService) buildLinuxSpec(
 	)
 
 	return specOpts, nil
+}
+
+func (c *criService) checkWritableCgroupsSupported() error {
+	if !isUnifiedCgroupsMode() {
+		return errors.New("writable cgroups are only supported on cgroup v2")
+	}
+	mountInfo, err := c.os.LookupMount("/sys/fs/cgroup")
+	if err != nil {
+		return fmt.Errorf("failed to look up the cgroup mount: %w", err)
+	}
+	// nsdelegate makes the kernel treat the container's cgroup namespace as a
+	// delegation boundary. Processes in the container cannot write to the
+	// resource-control files of the namespace root (like memory.max).
+	if !slices.Contains(strings.Split(mountInfo.VFSOptions, ","), "nsdelegate") {
+		return errors.New("writable cgroups require /sys/fs/cgroup to be mounted with nsdelegate")
+	}
+	return nil
+}
+
+// requiresNsdelegate reports whether the container needs /sys/fs/cgroup to
+// stay mounted with nsdelegate while it runs. Only CGROUP_MOUNT_MODE_READ_WRITE
+// does. A writable mount from the runtime handler's cgroup_writable option
+// does not need nsdelegate.
+func requiresNsdelegate(config *runtime.ContainerConfig) bool {
+	return config.GetLinux().GetSecurityContext().GetCgroupMountMode() == runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE
+}
+
+// addContainer adds the container to the store. For a container that requires
+// nsdelegate, it rechecks nsdelegate under nsdelegateContainersMu first,
+// because a checkpoint may have cleared it since the check in buildLinuxSpec.
+func (c *criService) addContainer(container containerstore.Container) error {
+	if requiresNsdelegate(container.Config) {
+		c.nsdelegateContainersMu.Lock()
+		defer c.nsdelegateContainersMu.Unlock()
+		if err := c.checkWritableCgroupsSupported(); err != nil {
+			return err
+		}
+	}
+	if err := c.containerStore.Add(container); err != nil {
+		return fmt.Errorf("failed to add container %q into store: %w", container.ID, err)
+	}
+	return nil
+}
+
+func coversCgroupMount(mounts []*runtime.Mount) (string, bool) {
+	coveringPaths := []string{"/", "/sys", "/sys/fs", "/sys/fs/cgroup"}
+	for _, m := range mounts {
+		dst := filepath.Clean(m.GetContainerPath())
+		if slices.Contains(coveringPaths, dst) {
+			return dst, true
+		}
+	}
+	return "", false
 }
 
 func (c *criService) buildWindowsSpec(
