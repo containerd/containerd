@@ -51,7 +51,7 @@ func FuzzDiffApply(f *testing.F) {
 			return
 		}
 		tmpDir := t.TempDir()
-		cs, err := local.NewStore(tmpDir)
+		cs, err := local.NewStore(tmpDir, nil)
 		if err != nil {
 			return
 		}
@@ -94,7 +94,7 @@ func FuzzDiffCompare(f *testing.F) {
 
 		ctx := context.Background()
 		tmpDir := t.TempDir()
-		cs, err := local.NewStore(tmpDir)
+		cs, err := local.NewStore(tmpDir, nil)
 		if err != nil {
 			return
 		}

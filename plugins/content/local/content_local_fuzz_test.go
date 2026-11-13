@@ -32,7 +32,7 @@ import (
 
 func FuzzContentStoreWriter(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		cs, err := NewStore(t.TempDir())
+		cs, err := NewStore(t.TempDir(), nil)
 		if err != nil {
 			t.Fatal(err)
 		}

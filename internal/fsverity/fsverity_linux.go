@@ -39,6 +39,12 @@ type fsverityEnableArg struct {
 	reserved2     [11]uint64
 }
 
+type fsverityDigest struct {
+	digestAlgorithm uint16
+	digestSize      uint16
+	digest          [64]uint8
+}
+
 const (
 	defaultBlockSize int    = 4096
 	maxDigestSize    uint16 = 64
@@ -127,4 +133,25 @@ func Enable(path string) error {
 	}
 
 	return nil
+}
+
+func Measure(path string) (string, error) {
+	var verityDigest string
+	f, err := os.Open(path)
+	if err != nil {
+		return verityDigest, fmt.Errorf("error opening file: %s", err.Error())
+	}
+
+	d := &fsverityDigest{digestSize: maxDigestSize}
+	_, _, errno := unix.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(unix.FS_IOC_MEASURE_VERITY), uintptr(unsafe.Pointer(d)))
+	if errno != 0 {
+		return verityDigest, fmt.Errorf("measure fsverity failed: %w", errno)
+	}
+
+	var i uint16
+	for i = 0; i < (*d).digestSize; i++ {
+		verityDigest = fmt.Sprintf("%s%x", verityDigest, (*d).digest[i])
+	}
+
+	return verityDigest, nil
 }
