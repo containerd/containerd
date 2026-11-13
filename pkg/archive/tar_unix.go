@@ -39,6 +39,23 @@ func chmodTarEntry(perm os.FileMode) os.FileMode {
 	return perm
 }
 
+// syscallMode returns the Unix permission bits (including the setuid, setgid
+// and sticky bits) for an os.FileMode, matching the translation os.Chmod does
+// internally before calling the kernel.
+func syscallMode(i os.FileMode) (o uint32) {
+	o |= uint32(i.Perm())
+	if i&os.ModeSetuid != 0 {
+		o |= unix.S_ISUID
+	}
+	if i&os.ModeSetgid != 0 {
+		o |= unix.S_ISGID
+	}
+	if i&os.ModeSticky != 0 {
+		o |= unix.S_ISVTX
+	}
+	return o
+}
+
 func setHeaderForSpecialDevice(hdr *tar.Header, name string, fi os.FileInfo) error {
 	// Devmajor and Devminor are only needed for special devices.
 
