@@ -19,12 +19,40 @@ package proxy
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/core/sandbox"
 )
+
+// statusClient answers Status with a fixed response.
+type statusClient struct {
+	api.ControllerClient
+	resp *api.ControllerStatusResponse
+}
+
+func (c *statusClient) Status(context.Context, *api.ControllerStatusRequest, ...grpc.CallOption) (*api.ControllerStatusResponse, error) {
+	return c.resp, nil
+}
+
+// A timestamp the controller did not set is the zero time, so that callers
+// can tell it from a real one.
+func TestStatusTimestamps(t *testing.T) {
+	createdAt := time.Date(2026, 5, 6, 7, 8, 9, 0, time.UTC)
+	c := NewSandboxController(&statusClient{resp: &api.ControllerStatusResponse{
+		CreatedAt: timestamppb.New(createdAt),
+	}}, "remote")
+
+	status, err := c.Status(context.Background(), "sb", false)
+	require.NoError(t, err)
+	require.Equal(t, createdAt, status.CreatedAt)
+	require.True(t, status.ExitedAt.IsZero(), "got %v", status.ExitedAt)
+}
 
 // A failing create option ends Create before the request is sent: the
 // controller has no client here, so getting past the options would panic.

@@ -332,17 +332,23 @@ func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose 
 	}
 	address, version := shim.Endpoint()
 
-	return sandbox.ControllerStatus{
+	status := sandbox.ControllerStatus{
 		SandboxID: resp.GetSandboxID(),
 		Pid:       resp.GetPid(),
 		State:     resp.GetState(),
 		Info:      resp.GetInfo(),
-		CreatedAt: resp.GetCreatedAt().AsTime(),
-		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 		Address:   address,
 		Version:   uint32(version),
-	}, nil
+	}
+	// A timestamp that was not set stays the zero time, not the Unix epoch.
+	if t := resp.GetCreatedAt(); t != nil {
+		status.CreatedAt = t.AsTime()
+	}
+	if t := resp.GetExitedAt(); t != nil {
+		status.ExitedAt = t.AsTime()
+	}
+	return status, nil
 }
 
 func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
