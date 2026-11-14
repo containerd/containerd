@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1461,6 +1462,116 @@ func TestResolve404ManifestFallback(t *testing.T) {
 	}
 	if desc.MediaType != "application/vnd.docker.distribution.manifest.v2+json" {
 		t.Errorf("unexpected media type: %s", desc.MediaType)
+	}
+}
+
+// TestResolveBlobsFallbackOnlyOnNotFound verifies that resolving a digest
+// falls back from /manifests/ to /blobs/ only when every host answered
+// /manifests/ with 404. Registries answer /blobs/ with
+// application/octet-stream, so falling back after a timeout or a reset
+// connection returns a descriptor with the wrong media type.
+func TestResolveBlobsFallbackOnlyOnNotFound(t *testing.T) {
+	const dgst = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // empty sha
+
+	// manifestsAnswer is how a host answers /manifests/.
+	type manifestsAnswer int
+	const (
+		notFound manifestsAnswer = iota
+		// reset closes the connection with a TCP RST.
+		reset
+		// hang never answers; the client's timeout ends the request.
+		hang
+	)
+
+	for _, tc := range []struct {
+		name string
+		// manifests is the answer of each host, in the order the hosts are
+		// tried.
+		manifests []manifestsAnswer
+		fallback  bool
+	}{
+		{name: "not found", manifests: []manifestsAnswer{notFound}, fallback: true},
+		{name: "not found on every host", manifests: []manifestsAnswer{notFound, notFound}, fallback: true},
+		{name: "connection reset", manifests: []manifestsAnswer{reset}},
+		{name: "timeout", manifests: []manifestsAnswer{hang}},
+		{name: "timeout on one host, not found on the other", manifests: []manifestsAnswer{hang, notFound}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				hosts       []RegistryHost
+				blobsCalled atomic.Bool
+			)
+			for _, answer := range tc.manifests {
+				ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+					switch {
+					case strings.HasSuffix(r.URL.Path, "/manifests/"+dgst):
+						switch answer {
+						case notFound:
+							rw.WriteHeader(http.StatusNotFound)
+						case reset:
+							conn, _, err := rw.(http.Hijacker).Hijack()
+							if err != nil {
+								rw.WriteHeader(http.StatusInternalServerError)
+								return
+							}
+							conn.(*net.TCPConn).SetLinger(0)
+							conn.Close()
+						case hang:
+							<-r.Context().Done()
+						}
+					case strings.HasSuffix(r.URL.Path, "/blobs/"+dgst):
+						blobsCalled.Store(true)
+						rw.Header().Set("Content-Type", "application/octet-stream")
+						rw.Header().Set("Docker-Content-Digest", dgst)
+						rw.WriteHeader(http.StatusOK)
+					default:
+						rw.WriteHeader(http.StatusNotFound)
+					}
+				}))
+				t.Cleanup(ts.Close)
+				// Only the host that hangs gets a short timeout, so that a slow
+				// test machine cannot turn a healthy answer into a timeout.
+				client := &http.Client{Timeout: 30 * time.Second}
+				if answer == hang {
+					client.Timeout = 100 * time.Millisecond
+				}
+				hosts = append(hosts, RegistryHost{
+					Client:       client,
+					Host:         ts.Listener.Addr().String(),
+					Scheme:       "http",
+					Path:         "/v2",
+					Capabilities: HostCapabilityPull | HostCapabilityResolve,
+				})
+			}
+
+			resolver := NewResolver(ResolverOptions{
+				Hosts: func(string) ([]RegistryHost, error) {
+					return hosts, nil
+				},
+			})
+
+			ref := fmt.Sprintf("%s/test-repo@%s", hosts[0].Host, dgst)
+			_, desc, err := resolver.Resolve(context.Background(), ref)
+
+			if !tc.fallback {
+				if err == nil {
+					t.Errorf("expected an error, resolved to %+v", desc)
+				}
+				if blobsCalled.Load() {
+					t.Error("blobs endpoint was called, but /manifests/ did not answer 404 on every host")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !blobsCalled.Load() {
+				t.Error("blobs endpoint was not called after 404 on every host")
+			}
+			if desc.Digest != dgst {
+				t.Errorf("unexpected digest: %s", desc.Digest)
+			}
+		})
 	}
 }
 
