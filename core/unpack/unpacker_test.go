@@ -372,8 +372,8 @@ type failPrepareSnapshotter struct {
 	stagedSnapshotter
 	failAt int
 	// prepareCalls counts every Prepare, including the failing one, which
-	// stagedSnapshotter only records on success. Prepare is called from the
-	// layer launch loop alone, so this needs no synchronization.
+	// stagedSnapshotter only records on success. Prepare runs for one layer at
+	// a time, in layer order. The counter does not need a lock.
 	prepareCalls int
 }
 
@@ -388,7 +388,7 @@ func (s *failPrepareSnapshotter) Prepare(ctx context.Context, key, parent string
 	return s.stagedSnapshotter.Prepare(ctx, key, parent, opts...)
 }
 
-// TestUnpackParallelPrepareError verifies that a topHalf failure in parallel
+// TestUnpackParallelPrepareError verifies that a Prepare failure in parallel
 // mode is reported back from unpack instead of being silently dropped, while
 // the layers queued before the failure are still committed.
 func TestUnpackParallelPrepareError(t *testing.T) {
@@ -431,7 +431,7 @@ func TestUnpackParallelPrepareError(t *testing.T) {
 	err = u.unpack(fetch, config, layers)
 	require.ErrorIs(t, err, errPrepareFailed)
 
-	// The launch loop stops at the failing layer: the third one is never
+	// Preparing stops at the failing layer: the third one is never
 	// prepared, and only the first was prepared successfully.
 	assert.Equal(t, 2, sn.prepareCalls)
 	require.Len(t, sn.prepares, 1)
