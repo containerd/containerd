@@ -14,8 +14,6 @@
    limitations under the License.
 */
 
-//go:build linux
-
 package utils
 
 import (

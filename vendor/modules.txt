@@ -216,7 +216,7 @@ github.com/containerd/fifo
 # github.com/containerd/go-cni v1.1.15
 ## explicit; go 1.21
 github.com/containerd/go-cni
-# github.com/containerd/go-dmverity v0.0.0-20260611211332-9879dd340c85
+# github.com/containerd/go-dmverity v0.1.0
 ## explicit; go 1.24.3
 github.com/containerd/go-dmverity/pkg/dm
 github.com/containerd/go-dmverity/pkg/keyring
