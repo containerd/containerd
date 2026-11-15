@@ -84,12 +84,13 @@ func init() {
 			}
 
 			c := Controller{
-				client:         client,
-				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
-				imageConfig:    criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
-				os:             osinterface.RealOS{},
-				warningService: warningPlugin.(warning.Service),
-				store:          NewStore(),
+				client:           client,
+				config:           criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
+				imageConfig:      criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
+				os:               osinterface.RealOS{},
+				warningService:   warningPlugin.(warning.Service),
+				store:            NewStore(),
+				imageSnapshotter: criImagePlugin.(imageSnapshotterSelector),
 			}
 
 			// There is no need to subscribe to the exit event for the pause container,
@@ -122,6 +123,15 @@ type Controller struct {
 	eventMonitor *events.EventMonitor
 
 	store *Store
+
+	// imageSnapshotter selects the snapshotter for an image.
+	imageSnapshotter imageSnapshotterSelector
+}
+
+// imageSnapshotterSelector is implemented by the CRI image service to select
+// the snapshotter for an image.
+type imageSnapshotterSelector interface {
+	SnapshotterForImage(ctx context.Context, ociRuntime criconfig.Runtime, imageLabels map[string]string) string
 }
 
 var _ sandbox.Controller = (*Controller)(nil)

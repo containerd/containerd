@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/v2/core/images"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 )
@@ -36,8 +37,6 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 		return fmt.Errorf("unable to list images: %w", err)
 	}
 
-	// TODO: Support all snapshotter
-	snapshotter := c.config.Snapshotter
 	var wg sync.WaitGroup
 	for _, i := range cImages {
 		wg.Go(func() {
@@ -68,6 +67,7 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 			}
 			// Checking existence of top-level snapshot for each image being recovered.
 			// TODO: This logic should be done elsewhere and owned by the image service
+			snapshotter := c.SnapshotterForImage(ctx, criconfig.Runtime{}, i.Labels())
 			unpacked, err := i.IsUnpacked(ctx, snapshotter)
 			if err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())

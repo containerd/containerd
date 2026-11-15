@@ -550,7 +550,7 @@ func TestRuntimeHandlerPullBackends(t *testing.T) {
 		}
 		c := &CRIImageService{client: client, transferrer: transferrer}
 
-		image, _, err := c.pullImageWithTransferService(context.Background(), "example.com/test:latest", nil, "native", &platform, nil, time.Minute)
+		image, _, err := c.pullImageWithTransferService(context.Background(), "example.com/test:latest", nil, "native", &platform, false, nil, time.Minute)
 		require.NoError(t, err)
 		require.True(t, image.Platform().Match(platform))
 	})

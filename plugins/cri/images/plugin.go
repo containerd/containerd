@@ -51,6 +51,7 @@ func init() {
 			plugins.LeasePlugin,
 			plugins.MetadataPlugin,
 			plugins.SandboxStorePlugin,
+			plugins.DiffPlugin,     // For detecting the erofs differ
 			plugins.ServicePlugin,  // For client
 			plugins.SnapshotPlugin, // For root directory properties
 			plugins.TransferPlugin, // For pulling image using transfer service
@@ -136,6 +137,17 @@ func init() {
 
 			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot(defaultSnapshotter)
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
+
+			_, erofsDifferErr := ic.GetByID(plugins.DiffPlugin, images.ErofsSnapshotter)
+			erofsSn, erofsLoaded := allSnapshotters[images.ErofsSnapshotter]
+			if enabled, reason := autoSnapshotterEnabled(defaultSnapshotter, erofsLoaded, erofsDifferErr); enabled {
+				options.AutoSnapshotter = true
+				options.Snapshotters[images.ErofsSnapshotter] = erofsSn
+				options.ImageFSPaths[images.ErofsSnapshotter] = snapshotRoot(images.ErofsSnapshotter)
+				log.L.Infof("Automatic snapshotter selection enabled: EROFS images use %q, other images use %q", images.ErofsSnapshotter, defaultSnapshotter)
+			} else {
+				log.L.Infof("Automatic snapshotter selection disabled: %s", reason)
+			}
 
 			for runtimeName, rp := range config.RuntimePlatforms {
 				if rp.Snapshotter != "" {

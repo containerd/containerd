@@ -173,6 +173,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 
 	snapshotter := runtime.Snapshotter
 	platform := runtime.Platform
+	// Select the snapshotter per image only when the runtime handler doesn't
+	// configure a snapshotter or a platform.
+	autoSnapshotter := c.autoSnapshotter && !runtime.SnapshotterSet && platform == nil
 
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
@@ -205,6 +208,12 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			useLocalPull = true
 		}
 	}
+	// The local pull unpacks into a single snapshotter, and the transfer
+	// service must be configured to unpack EROFS images.
+	if autoSnapshotter {
+		ts, ok := c.transferrer.(unpackSupportChecker)
+		autoSnapshotter = !useLocalPull && (!ok || ts.SupportsUnpack(ctx, erofsPlatform(unpackPlatform), ErofsSnapshotter))
+	}
 	var (
 		image       containerd.Image
 		bytesPulled uint64
@@ -212,11 +221,26 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if useLocalPull {
 		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	} else {
-		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, platform, autoSnapshotter, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
 		return "", err
+	}
+
+	if autoSnapshotter {
+		sn, err := c.unpackedSnapshotter(ctx, image)
+		if err != nil {
+			return "", err
+		}
+		labels[crilabels.ImageSnapshotterLabelKey] = sn
+		if sn == ErofsSnapshotter {
+			// Record the EROFS platform so that later reads of the image
+			// (image store, restart recovery) select the EROFS variant.
+			ep := erofsPlatform(unpackPlatform)
+			platform = &ep
+			labels[crilabels.ImagePlatformLabelKey] = platforms.FormatAll(ep)
+		}
 	}
 
 	span.AddEvent("Pull and unpack image complete")
@@ -344,10 +368,11 @@ func (c *CRIImageService) pullImageWithTransferService(
 	credentials func(string) (string, string, error),
 	snapshotter string,
 	platform *imagespec.Platform,
+	autoSnapshotter bool,
 	labels map[string]string,
 	imagePullProgressTimeout time.Duration,
 ) (containerd.Image, uint64, error) {
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service (auto: %t)", ref, snapshotter, autoSnapshotter)
 	rctx, rcancel := context.WithCancel(ctx)
 	defer rcancel()
 	transferProgressReporter := newTransferProgressReporter(ref, rcancel, imagePullProgressTimeout)
@@ -357,11 +382,16 @@ func (c *CRIImageService) pullImageWithTransferService(
 	if platform != nil {
 		unpackPlatform = *platform
 	}
-	sopts := []transferimage.StoreOpt{
-		transferimage.WithPlatforms(unpackPlatform),
-		transferimage.WithUnpack(unpackPlatform, snapshotter),
-		transferimage.WithImageLabels(labels),
+	var sopts []transferimage.StoreOpt
+	if autoSnapshotter {
+		sopts = autoSnapshotterStoreOpts(unpackPlatform, snapshotter)
+	} else {
+		sopts = []transferimage.StoreOpt{
+			transferimage.WithPlatforms(unpackPlatform),
+			transferimage.WithUnpack(unpackPlatform, snapshotter),
+		}
 	}
+	sopts = append(sopts, transferimage.WithImageLabels(labels))
 
 	is := transferimage.NewStore(ref, sopts...)
 
@@ -391,6 +421,8 @@ func (c *CRIImageService) pullImageWithTransferService(
 	var image containerd.Image
 	if platform != nil {
 		image, err = c.client.GetImageWithPlatform(ctx, ref, platforms.Only(*platform))
+	} else if autoSnapshotter {
+		image, err = c.client.GetImageWithPlatform(ctx, ref, autoSnapshotterMatcher(unpackPlatform))
 	} else {
 		image, err = c.client.GetImage(ctx, ref)
 	}
@@ -477,6 +509,9 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 	if oldImg.Labels[crilabels.ImagePlatformLabelKey] != labels[crilabels.ImagePlatformLabelKey] {
 		fieldpaths = append(fieldpaths, "labels."+crilabels.ImagePlatformLabelKey)
 	}
+	if oldImg.Labels[crilabels.ImageSnapshotterLabelKey] != labels[crilabels.ImageSnapshotterLabelKey] {
+		fieldpaths = append(fieldpaths, "labels."+crilabels.ImageSnapshotterLabelKey)
+	}
 	if oldImg.Target.Digest == img.Target.Digest && len(fieldpaths) < 2 {
 		return nil
 	}
@@ -538,8 +573,10 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 
 	labels := img.Labels()
 	criLabels := c.getLabels(ctx, r)
-	if value := labels[crilabels.ImagePlatformLabelKey]; value != "" {
-		criLabels[crilabels.ImagePlatformLabelKey] = value
+	for _, key := range []string{crilabels.ImagePlatformLabelKey, crilabels.ImageSnapshotterLabelKey} {
+		if value := labels[key]; value != "" {
+			criLabels[key] = value
+		}
 	}
 	for key, value := range criLabels {
 		if labels[key] != value {

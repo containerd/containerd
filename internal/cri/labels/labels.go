@@ -67,6 +67,8 @@ const (
 	KubernetesPodUIDLabel = "io.kubernetes.pod.uid"
 	// KubernetesContainerNameLabel is the container name label used by Kubernetes.
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	// ImageSnapshotterLabelKey is the image label naming the snapshotter CRI should use for the image.
+	ImageSnapshotterLabelKey = "io.cri-containerd.image.snapshotter"
 	// PodInfraContainerName is the Kubernetes container name used for infra containers.
 	PodInfraContainerName = "POD"
 )

@@ -19,6 +19,8 @@ package images
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -29,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
@@ -85,6 +88,10 @@ type CRIImageService struct {
 	// defaultRuntimeName is the runtime used when a CRI request has an empty
 	// runtime handler.
 	defaultRuntimeName string
+	// snapshotters are the snapshotters available to the image service.
+	snapshotters map[string]snapshots.Snapshotter
+	// autoSnapshotter enables selecting the snapshotter from the image label.
+	autoSnapshotter bool
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -103,6 +110,9 @@ type CRIImageService struct {
 type resolvedRuntimeHandler struct {
 	Platform    *imagespec.Platform
 	Snapshotter string
+	// SnapshotterSet is true if the runtime handler configures its own
+	// snapshotter.
+	SnapshotterSet bool
 }
 
 type GRPCCRIImageService struct {
@@ -123,6 +133,9 @@ type CRIImageServiceOptions struct {
 	Client *containerd.Client
 
 	Transferrer transfer.Transferrer
+
+	// AutoSnapshotter enables per-image snapshotter selection.
+	AutoSnapshotter bool
 }
 
 // NewService creates a new CRI Image Service
@@ -147,6 +160,8 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
+		snapshotters:                options.Snapshotters,
+		autoSnapshotter:             options.AutoSnapshotter,
 		snapshotStore:               snapshotstore.NewStore(),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
@@ -207,6 +222,7 @@ func (c *CRIImageService) resolveRuntimeHandler(handler string) (resolvedRuntime
 		h.Platform = p.Platform
 		if p.Snapshotter != "" {
 			h.Snapshotter = p.Snapshotter
+			h.SnapshotterSet = true
 		}
 	}
 	return h, nil
@@ -252,6 +268,40 @@ func (c *CRIImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cri
 
 	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)
 	return ociRuntime.Snapshotter
+}
+
+// SnapshotterForImage returns the snapshotter for an image. Precedence: the
+// runtime handler's snapshotter, then the image label (only in auto mode and
+// if it names a known snapshotter), then the configured default.
+func (c *CRIImageService) SnapshotterForImage(ctx context.Context, ociRuntime criconfig.Runtime, imageLabels map[string]string) string {
+	if ociRuntime.Snapshotter != "" {
+		return c.RuntimeSnapshotter(ctx, ociRuntime)
+	}
+	if c.autoSnapshotter {
+		if name := imageLabels[crilabels.ImageSnapshotterLabelKey]; name != "" {
+			if _, ok := c.snapshotters[name]; ok {
+				return name
+			}
+			log.G(ctx).Debugf("Ignoring unknown snapshotter %q in image label", name)
+		}
+	}
+	return c.config.Snapshotter
+}
+
+// ImageSnapshotters returns every snapshotter SnapshotterForImage can
+// select for the runtime, with the runtime's default snapshotter first.
+func (c *CRIImageService) ImageSnapshotters(ctx context.Context, ociRuntime criconfig.Runtime) []string {
+	sn := c.RuntimeSnapshotter(ctx, ociRuntime)
+	result := []string{sn}
+	if ociRuntime.Snapshotter != "" || !c.autoSnapshotter {
+		return result
+	}
+	for _, name := range slices.Sorted(maps.Keys(c.snapshotters)) {
+		if name != sn {
+			result = append(result, name)
+		}
+	}
+	return result
 }
 
 // GetImage gets image metadata by image id.

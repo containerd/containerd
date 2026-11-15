@@ -86,15 +86,21 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to get sandbox image %q: %w", normalized.String(), err)
 	}
 
+	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
+	if err != nil {
+		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+
+	sandboxSnapshotter := c.imageSnapshotter.SnapshotterForImage(ctx, ociRuntime, pauseImage.Labels())
+	pauseImage, err = ctrdutil.ImageForSnapshotter(c.client, pauseImage, sandboxSnapshotter)
+	if err != nil {
+		return cin, err
+	}
+
 	// Get the image spec from containerd image
 	imageSpec, err := pauseImage.Spec(ctx)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get image spec: %w", err)
-	}
-
-	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
-	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
 
@@ -187,11 +193,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, err
 	}
 	snapshotterOpt = append(snapshotterOpt, extraSOpts...)
-
-	sandboxSnapshotter := c.imageConfig.Snapshotter
-	if ociRuntime.Snapshotter != "" {
-		sandboxSnapshotter = ociRuntime.Snapshotter
-	}
 
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(sandboxSnapshotter),

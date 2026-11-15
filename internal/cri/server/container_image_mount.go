@@ -25,6 +25,9 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -37,7 +40,7 @@ import (
 func (c *criService) mutateMounts(
 	ctx context.Context,
 	extraMounts []*runtime.Mount,
-	snapshotter string,
+	ociRuntime criconfig.Runtime,
 	sandboxID string,
 	platform imagespec.Platform,
 ) error {
@@ -47,7 +50,7 @@ func (c *criService) mutateMounts(
 
 	ctx = leases.WithLease(ctx, sandboxID)
 	for _, m := range extraMounts {
-		err := c.mutateImageMount(ctx, m, snapshotter, sandboxID, platform)
+		err := c.mutateImageMount(ctx, m, ociRuntime, sandboxID, platform)
 		if err != nil {
 			return fmt.Errorf("%w: %w", crierrors.ErrImageVolumeMountFailed, err)
 		}
@@ -69,7 +72,7 @@ func (c *criService) ensureLeaseExist(ctx context.Context, sandboxID string) err
 func (c *criService) mutateImageMount(
 	ctx context.Context,
 	extraMount *runtime.Mount,
-	snapshotter string,
+	ociRuntime criconfig.Runtime,
 	sandboxID string,
 	platform imagespec.Platform,
 ) error {
@@ -97,6 +100,9 @@ func (c *criService) mutateImageMount(
 		return fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
+	// Each image volume uses the snapshotter chosen for its own image.
+	snapshotter := c.SnapshotterForImage(ctx, ociRuntime, containerdImage.Labels())
+
 	// This is a digest of the manifest
 	imageID := containerdImage.Target().Digest.Encoded()
 
@@ -116,7 +122,10 @@ func (c *criService) mutateImageMount(
 			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
 		}
 
-		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
+		i, err := util.ImageForSnapshotter(c.client, containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform)), snapshotter)
+		if err != nil {
+			return err
+		}
 		if err := i.Unpack(ctx, snapshotter); err != nil {
 			return fmt.Errorf("failed to unpack image volume: %w", err)
 		}
@@ -217,9 +226,15 @@ func (c *criService) cleanupImageMounts(
 		log.G(ctx).WithError(err).Errorf("failed to get sandbox runtime handler %q", sandboxID)
 		return nil
 	}
-	snapshotter := c.RuntimeSnapshotter(ctx, ociRuntime)
-	s := c.client.SnapshotService(snapshotter)
-	if s == nil {
+	// Image volumes may live in any snapshotter the image service selects
+	// for this runtime, so try each of them when removing a snapshot.
+	var services []snapshots.Snapshotter
+	for _, sn := range c.ImageSnapshotters(ctx, ociRuntime) {
+		if s := c.client.SnapshotService(sn); s != nil {
+			services = append(services, s)
+		}
+	}
+	if len(services) == 0 {
 		return nil
 	}
 	targetBase := c.getImageVolumeBaseDir(sandboxID)
@@ -238,9 +253,11 @@ func (c *criService) cleanupImageMounts(
 		if err != nil {
 			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
 		}
-		err = s.Remove(ctx, target)
-		if err != nil && !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to removing snapshot: %w", err)
+		for _, s := range services {
+			err = s.Remove(ctx, target)
+			if err != nil && !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to remove snapshot: %w", err)
+			}
 		}
 		err = os.Remove(target)
 		if err != nil && !errdefs.IsNotFound(err) {

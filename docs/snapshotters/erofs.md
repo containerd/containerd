@@ -197,6 +197,26 @@ $ # run the container with the provides snapshotter
 $ ctr run -rm -t --snapshotter erofs docker.io/library/busybox:latest hello sh
 ```
 
+### Automatic snapshotter selection in CRI
+
+CRI selects the snapshotter per image when all of these are true:
+
+ - the CRI default snapshotter is `overlayfs` (the default on Linux);
+ - the EROFS snapshotter and the EROFS differ are both loaded;
+ - the transfer service can unpack EROFS images into the EROFS snapshotter
+   (true with the default `unpack_config`).
+
+In that case, images with an EROFS variant (a platform with the `erofs` OS
+feature, see the [EROFS image layer format specification](https://github.com/erofs/erofs-image-spec))
+are pulled as that variant and unpacked into the EROFS snapshotter. All other
+images are unpacked into `overlayfs` as before. No configuration is needed,
+and hosts without EROFS support keep using `overlayfs` only.
+
+The selected snapshotter is recorded in the `io.cri-containerd.image.snapshotter`
+image label and used for containers, sandboxes and image volumes created from
+the image. A runtime handler that sets `snapshotter` or `platform` keeps using
+it, and pulls with `use_local_image_pull` are not affected.
+
 ## Quota Support
 
 EROFS supports block mode to generate fixed‑size virtual blocks as the upper

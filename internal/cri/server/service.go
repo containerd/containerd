@@ -100,6 +100,8 @@ type RuntimeService interface {
 // ImageService specifies dependencies to image service.
 type ImageService interface {
 	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
+	SnapshotterForImage(ctx context.Context, ociRuntime criconfig.Runtime, imageLabels map[string]string) string
+	ImageSnapshotters(ctx context.Context, ociRuntime criconfig.Runtime) []string
 
 	PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (string, error)
 	UpdateImage(ctx context.Context, r string) error

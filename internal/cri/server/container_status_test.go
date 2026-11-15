@@ -371,6 +371,14 @@ func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cr
 	return ""
 }
 
+func (s *fakeImageService) SnapshotterForImage(ctx context.Context, ociRuntime criconfig.Runtime, imageLabels map[string]string) string {
+	return ""
+}
+
+func (s *fakeImageService) ImageSnapshotters(ctx context.Context, ociRuntime criconfig.Runtime) []string {
+	return nil
+}
+
 func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { return nil }
 
 func (s *fakeImageService) CheckImages(ctx context.Context) error { return nil }

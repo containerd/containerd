@@ -251,7 +251,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 	}
 
 	// mutate the extra CRI volume mounts from the runtime spec to properly specify the OCI image volume mount requests as bind mounts for this container
-	err = c.mutateMounts(r.ctx, r.containerConfig.GetMounts(), c.RuntimeSnapshotter(r.ctx, ociRuntime), r.sandboxID, platform)
+	err = c.mutateMounts(r.ctx, r.containerConfig.GetMounts(), ociRuntime, r.sandboxID, platform)
 	if err != nil {
 		return "", fmt.Errorf("failed to mount image volume: %w", err)
 	}
@@ -324,15 +324,21 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		return "", err
 	}
 
+	snapshotter := c.SnapshotterForImage(r.ctx, ociRuntime, (*r.containerdImage).Labels())
+	snapshotImage, err := util.ImageForSnapshotter(c.client, *r.containerdImage, snapshotter)
+	if err != nil {
+		return "", err
+	}
+
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.RuntimeSnapshotter(r.ctx, ociRuntime)),
+		containerd.WithSnapshotter(snapshotter),
 		// Prepare container rootfs. This is always writeable even if
 		// the container wants a readonly rootfs since we want to give
 		// the runtime (runc) a chance to modify (e.g. to create mount
 		// points corresponding to spec.Mounts) before making the
 		// rootfs readonly (requested by spec.Root.Readonly).
-		customopts.WithNewSnapshot(r.containerID, *r.containerdImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...),
+		customopts.WithNewSnapshot(r.containerID, snapshotImage, !c.ImageService.Config().DisableSnapshotAnnotations, sOpts...),
 	}
 	if len(volumeMounts) > 0 {
 		mountMap := make(map[string]string)
