@@ -109,6 +109,71 @@ func WithTimeout(timeout time.Duration) StopOpt {
 	}
 }
 
+// CheckpointContainer selects a container to include in a checkpoint.
+type CheckpointContainer struct {
+	// ID is the ID of the container in the sandbox. IDs are not kept across
+	// checkpoint and restore.
+	ID string
+	// Name is the stable name of the container. The checkpoint records it,
+	// and RestoreContainer.Name must match it on restore.
+	Name string
+}
+
+// CheckpointOptions are the parameters of Controller.Checkpoint.
+type CheckpointOptions struct {
+	// Path is an existing, empty local directory. The controller writes the
+	// checkpoint to this directory.
+	Path string
+	// Containers are the containers to include in the checkpoint.
+	Containers []CheckpointContainer
+	// Annotations are additional key-value options for the checkpoint.
+	Annotations map[string]string
+	// Extensions are optional features, keyed by a unique name.
+	Extensions map[string]typeurl.Any
+}
+
+// CheckpointResult is the result of Controller.Checkpoint.
+type CheckpointResult struct {
+	// Annotations are additional key-value data about the checkpoint.
+	Annotations map[string]string
+	// Extensions are optional feature data, keyed by a unique name.
+	Extensions map[string]typeurl.Any
+}
+
+// RestoreContainer maps a container in a checkpoint to a container in the
+// restored sandbox.
+type RestoreContainer struct {
+	// ID is the ID of the container in the restored sandbox. It can be
+	// different from the ID at checkpoint time.
+	ID string
+	// Name is the stable name of the container. It must match the name of a
+	// container in the checkpoint.
+	Name string
+	// Spec is the OCI runtime spec of the container in the restored sandbox.
+	Spec typeurl.Any
+}
+
+// RestoreOptions are the parameters of Controller.Restore.
+type RestoreOptions struct {
+	// Path is a directory that Controller.Checkpoint wrote. The checkpoint
+	// can come from a different sandbox.
+	Path string
+	// Containers are the containers to restore into the sandbox. Their names
+	// must be the same set as the container names in the checkpoint.
+	Containers []RestoreContainer
+	// Annotations are additional key-value options for the restore.
+	Annotations map[string]string
+	// Extensions are optional features, keyed by a unique name.
+	Extensions map[string]typeurl.Any
+}
+
+// RestoreResult is the result of Controller.Restore.
+type RestoreResult struct {
+	ControllerInstance
+	// Extensions are optional feature data, keyed by a unique name.
+	Extensions map[string]typeurl.Any
+}
+
 // Controller is an interface to manage sandboxes at runtime.
 // When running in sandbox mode, shim expected to implement `SandboxService`.
 // Shim lifetimes are now managed manually via sandbox API by the containerd's client.
