@@ -155,6 +155,14 @@ func (c *Controller) Update(
 	return nil
 }
 
+func (c *Controller) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) (sandbox.CheckpointResult, error) {
+	return sandbox.CheckpointResult{}, fmt.Errorf("checkpoint is not supported by the podsandbox controller: %w", errdefs.ErrNotImplemented)
+}
+
+func (c *Controller) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+	return sandbox.RestoreResult{}, fmt.Errorf("restore is not supported by the podsandbox controller: %w", errdefs.ErrNotImplemented)
+}
+
 func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) error {
 	select {
 	case e := <-exitCh:

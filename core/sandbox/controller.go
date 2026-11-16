@@ -199,6 +199,14 @@ type Controller interface {
 	// Update changes a part of sandbox, such as extensions/annotations/labels/spec of
 	// Sandbox object, controllers may have to update the running sandbox according to the changes.
 	Update(ctx context.Context, sandboxID string, sandbox Sandbox, fields ...string) error
+	// Checkpoint saves the state of a started sandbox and the selected
+	// containers to a directory. Controllers that do not support checkpoints
+	// return errdefs.ErrNotImplemented.
+	Checkpoint(ctx context.Context, sandboxID string, opts CheckpointOptions) (CheckpointResult, error)
+	// Restore starts a created sandbox from a checkpoint. It is called in place
+	// of Start. The checkpoint can come from a different sandbox. Controllers
+	// that do not support checkpoints return errdefs.ErrNotImplemented.
+	Restore(ctx context.Context, sandboxID string, opts RestoreOptions) (RestoreResult, error)
 }
 
 type ControllerInstance struct {

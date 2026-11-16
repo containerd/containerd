@@ -19,9 +19,18 @@ package proxy
 import (
 	"context"
 	"testing"
+	"time"
 
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/containerd/containerd/v2/core/sandbox"
 )
@@ -32,4 +41,106 @@ func TestCreateOptionError(t *testing.T) {
 	c := NewSandboxController(nil, "remote")
 	err := c.Create(context.Background(), sandbox.Sandbox{ID: "sb"}, sandbox.WithRuntimePath("containerd-shim-example-v1"))
 	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+}
+
+var restoredSpec = &anypb.Any{TypeUrl: "spec"}
+
+// fakeControllerClient records the checkpoint and restore requests. Calling
+// any other method panics on the nil embedded client.
+type fakeControllerClient struct {
+	api.ControllerClient
+	checkpoint *api.ControllerCheckpointRequest
+	restore    *api.ControllerRestoreRequest
+	err        error
+}
+
+func (f *fakeControllerClient) Checkpoint(_ context.Context, req *api.ControllerCheckpointRequest, _ ...grpc.CallOption) (*api.ControllerCheckpointResponse, error) {
+	f.checkpoint = req
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &api.ControllerCheckpointResponse{
+		Annotations: map[string]string{"runtime": "test"},
+		Extensions:  map[string]*anypb.Any{"io.example.result": {TypeUrl: "result"}},
+	}, nil
+}
+
+func (f *fakeControllerClient) Restore(_ context.Context, req *api.ControllerRestoreRequest, _ ...grpc.CallOption) (*api.ControllerRestoreResponse, error) {
+	f.restore = req
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &api.ControllerRestoreResponse{
+		SandboxID:  req.GetSandboxID(),
+		Pid:        42,
+		CreatedAt:  timestamppb.New(time.Unix(1, 0)),
+		Labels:     map[string]string{"env": "test"},
+		Address:    "ttrpc+unix:///run/sb.sock",
+		Version:    3,
+		Spec:       restoredSpec,
+		Extensions: map[string]*anypb.Any{"io.example.result": {TypeUrl: "result"}},
+	}, nil
+}
+
+func TestCheckpoint(t *testing.T) {
+	client := &fakeControllerClient{}
+	c := NewSandboxController(client, "remote")
+
+	res, err := c.Checkpoint(context.Background(), "sb", sandbox.CheckpointOptions{
+		Path:        "/checkpoints/sb",
+		Containers:  []sandbox.CheckpointContainer{{ID: "c1", Name: "app"}},
+		Annotations: map[string]string{"key": "value"},
+		Extensions:  map[string]typeurl.Any{"io.example.feature": &anypb.Any{TypeUrl: "feature"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "sb", client.checkpoint.GetSandboxID())
+	assert.Equal(t, "remote", client.checkpoint.GetSandboxer())
+	assert.Equal(t, "/checkpoints/sb", client.checkpoint.GetPath())
+	require.Len(t, client.checkpoint.GetContainers(), 1)
+	assert.Equal(t, "c1", client.checkpoint.GetContainers()[0].GetID())
+	assert.Equal(t, "app", client.checkpoint.GetContainers()[0].GetName())
+	assert.Equal(t, map[string]string{"key": "value"}, client.checkpoint.GetAnnotations())
+	assert.Equal(t, "feature", client.checkpoint.GetExtensions()["io.example.feature"].GetTypeUrl())
+	assert.Equal(t, map[string]string{"runtime": "test"}, res.Annotations)
+	assert.Equal(t, "result", res.Extensions["io.example.result"].GetTypeUrl())
+
+	client.err = status.Error(codes.Unimplemented, "not implemented")
+	_, err = c.Checkpoint(context.Background(), "sb", sandbox.CheckpointOptions{})
+	require.ErrorIs(t, err, errdefs.ErrNotImplemented)
+}
+
+func TestRestore(t *testing.T) {
+	client := &fakeControllerClient{}
+	c := NewSandboxController(client, "remote")
+
+	res, err := c.Restore(context.Background(), "sb", sandbox.RestoreOptions{
+		Path:        "/checkpoints/sb",
+		Containers:  []sandbox.RestoreContainer{{ID: "c2", Name: "app", Spec: &anypb.Any{TypeUrl: "container-spec"}}},
+		Annotations: map[string]string{"key": "value"},
+		Extensions:  map[string]typeurl.Any{"io.example.feature": &anypb.Any{TypeUrl: "feature"}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "sb", client.restore.GetSandboxID())
+	assert.Equal(t, "remote", client.restore.GetSandboxer())
+	assert.Equal(t, "/checkpoints/sb", client.restore.GetPath())
+	require.Len(t, client.restore.GetContainers(), 1)
+	assert.Equal(t, "c2", client.restore.GetContainers()[0].GetID())
+	assert.Equal(t, "app", client.restore.GetContainers()[0].GetName())
+	assert.Equal(t, "container-spec", client.restore.GetContainers()[0].GetSpec().GetTypeUrl())
+	assert.Equal(t, map[string]string{"key": "value"}, client.restore.GetAnnotations())
+	assert.Equal(t, "feature", client.restore.GetExtensions()["io.example.feature"].GetTypeUrl())
+	assert.Equal(t, sandbox.ControllerInstance{
+		SandboxID: "sb",
+		Pid:       42,
+		CreatedAt: time.Unix(1, 0).UTC(),
+		Labels:    map[string]string{"env": "test"},
+		Address:   "ttrpc+unix:///run/sb.sock",
+		Version:   3,
+		Spec:      restoredSpec,
+	}, res.ControllerInstance)
+	assert.Equal(t, "result", res.Extensions["io.example.result"].GetTypeUrl())
+
+	client.err = status.Error(codes.Unimplemented, "not implemented")
+	_, err = c.Restore(context.Background(), "sb", sandbox.RestoreOptions{})
+	require.ErrorIs(t, err, errdefs.ErrNotImplemented)
 }
