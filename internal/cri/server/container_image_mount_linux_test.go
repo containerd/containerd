@@ -20,12 +20,19 @@ package server
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/defaults"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -145,4 +152,48 @@ func optsToInfo(t *testing.T, opts ...snapshots.Opt) *snapshots.Info {
 		require.NoError(t, opt(&info))
 	}
 	return &info
+}
+
+func TestCleanupImageMountsNested(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	ctx := context.Background()
+	c := newTestCRIService()
+	c.config.StateDir = t.TempDir()
+	const sandboxID = "sandbox"
+	require.NoError(t, c.sandboxStore.Add(sandboxstore.NewSandbox(sandboxstore.Metadata{
+		ID:     sandboxID,
+		Config: &runtime.PodSandboxConfig{},
+	}, sandboxstore.Status{})))
+
+	client, err := containerd.New("", containerd.WithServices(containerd.WithSnapshotters(map[string]snapshots.Snapshotter{
+		defaults.DefaultSnapshotter: &stubSnapshotter{},
+	})))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, client.Close()) })
+	c.client = client
+
+	targetBase := c.getImageVolumeBaseDir(sandboxID)
+	target := filepath.Join(targetBase, "image")
+	rootSource := t.TempDir()
+	childSource := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(rootSource, "nested"), 0o755))
+	require.NoError(t, os.MkdirAll(target, 0o755))
+	t.Cleanup(func() { assert.NoError(t, mount.UnmountRecursive(target, unix.MNT_DETACH)) })
+	require.NoError(t, mount.All([]mount.Mount{
+		{Type: "bind", Source: rootSource, Options: []string{"bind", "ro"}},
+		{Type: "bind", Source: childSource, Target: "nested", Options: []string{"bind", "ro"}},
+	}, target))
+	require.ErrorIs(t, unix.Unmount(target, 0), unix.EBUSY)
+
+	require.NoError(t, c.cleanupImageMounts(ctx, sandboxID))
+	assert.NoDirExists(t, targetBase)
+}
+
+type stubSnapshotter struct {
+	snapshots.Snapshotter
+}
+
+func (*stubSnapshotter) Remove(context.Context, string) error {
+	return nil
 }

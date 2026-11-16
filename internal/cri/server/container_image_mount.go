@@ -179,7 +179,7 @@ func (c *criService) mutateImageMount(
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
 
 		if err := mount.All(mounts, target); err != nil {
-			if unmountErr := mount.UnmountAll(target, 0); unmountErr != nil {
+			if unmountErr := mount.UnmountRecursive(target, 0); unmountErr != nil {
 				log.G(ctx).WithError(unmountErr).Errorf("failed to unmount image volume component %q", target)
 			}
 			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
@@ -234,7 +234,7 @@ func (c *criService) cleanupImageMounts(
 	for _, entry := range entries {
 		target := filepath.Join(targetBase, entry.Name())
 
-		err = mount.UnmountAll(target, 0)
+		err = mount.UnmountRecursive(target, 0)
 		if err != nil {
 			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
 		}
