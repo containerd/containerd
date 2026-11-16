@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/mount"
@@ -281,4 +282,56 @@ func (s *controllerService) Update(
 		return &api.ControllerUpdateResponse{}, errgrpc.ToGRPC(err)
 	}
 	return &api.ControllerUpdateResponse{}, nil
+}
+
+func (s *controllerService) Checkpoint(ctx context.Context, req *api.ControllerCheckpointRequest) (*api.ControllerCheckpointResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("checkpoint sandbox")
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	opts := sandbox.CheckpointOptions{Path: req.GetPath()}
+	// Assigning a nil *anypb.Any would make opts.Options a non-nil interface.
+	if req.GetOptions() != nil {
+		opts.Options = req.GetOptions()
+	}
+	if err := ctrl.Checkpoint(ctx, req.GetSandboxID(), opts); err != nil {
+		return &api.ControllerCheckpointResponse{}, errgrpc.ToGRPC(err)
+	}
+	return &api.ControllerCheckpointResponse{}, nil
+}
+
+func (s *controllerService) Restore(ctx context.Context, req *api.ControllerRestoreRequest) (*api.ControllerRestoreResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("restore sandbox")
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
+	opts := sandbox.RestoreOptions{Path: req.GetPath()}
+	// Assigning a nil *anypb.Any would make opts.Options a non-nil interface.
+	if req.GetOptions() != nil {
+		opts.Options = req.GetOptions()
+	}
+	inst, err := ctrl.Restore(ctx, req.GetSandboxID(), opts)
+	if err != nil {
+		return &api.ControllerRestoreResponse{}, errgrpc.ToGRPC(err)
+	}
+
+	// The sandbox is running at this point. The client needs the response to
+	// manage it, so a failed publish is logged.
+	if err := s.publisher.Publish(ctx, "/sandboxes/start", &eventtypes.SandboxStart{
+		SandboxID: req.GetSandboxID(),
+	}); err != nil {
+		log.G(ctx).WithError(err).WithField("sandbox_id", req.GetSandboxID()).Error("failed to publish sandbox start event")
+	}
+
+	return &api.ControllerRestoreResponse{
+		SandboxID: inst.SandboxID,
+		Pid:       inst.Pid,
+		CreatedAt: protobuf.ToTimestamp(inst.CreatedAt),
+		Labels:    inst.Labels,
+		Address:   inst.Address,
+		Version:   inst.Version,
+		Spec:      typeurl.MarshalProto(inst.Spec),
+	}, nil
 }
