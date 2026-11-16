@@ -154,6 +154,40 @@ error, which maps to gRPC `codes.Unimplemented`; a shim that does not register
 the method at all is answered with the same code by ttrpc. Callers are expected
 to tolerate it.
 
+### Optional checkpoint and restore
+
+`SandboxController.Checkpoint` saves the state of a started sandbox and the
+selected containers to a directory. The `shim` controller forwards it to the
+shim via `SandboxService.CheckpointSandbox`.
+
+`SandboxController.Restore` starts a created sandbox from a checkpoint. A client
+calls it in place of `SandboxController.Start`. The `shim` controller forwards it
+to the shim via `SandboxService.RestoreSandbox`.
+
+The checkpoint can come from a different sandbox, for example on a different
+host, so container IDs can change between checkpoint and restore. Each
+container has a stable name, and restore matches the containers to the
+checkpoint by name. The restore request also carries the OCI runtime spec of
+each container, so that the runtime can check it against the checkpoint before
+the sandbox starts.
+
+The requests carry only fields that apply to all runtimes: the checkpoint
+directory, the containers, and annotations. A feature that is specific to a
+runtime or to a client goes in `extensions`, keyed by a unique name. The
+responses can return annotations and extensions in the same way.
+
+Implementing `CheckpointSandbox` and `RestoreSandbox` is optional. ttrpc answers
+a call to a method the shim does not register with gRPC `codes.Unimplemented`,
+which containerd returns to the client as
+`github.com/containerd/errdefs.ErrNotImplemented`. A shim that registers the
+methods and does not support checkpoints MUST return the same status, for
+example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`. The `podsandbox` controller
+returns `ErrNotImplemented` as well.
+
+When `RestoreSandbox` fails, the `shim` controller shuts the shim down, as it
+does when `StartSandbox` fails. A shim that returns `ErrNotImplemented` keeps
+running, and the client can call `SandboxController.Start`.
+
 ## Controller Implementations
 
 There are two `Controller` implementations today:
