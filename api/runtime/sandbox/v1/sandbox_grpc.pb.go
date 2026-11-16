@@ -50,6 +50,19 @@ type SandboxClient interface {
 	// return a `github.com/containerd/errdefs.ErrNotImplemented` error (gRPC
 	// `codes.Unimplemented`), which callers are expected to tolerate.
 	UpdateSandbox(ctx context.Context, in *UpdateSandboxRequest, opts ...grpc.CallOption) (*UpdateSandboxResponse, error)
+	// CheckpointSandbox saves the state of a started sandbox.
+	// Implementing this RPC is optional. ttrpc and gRPC answer a call to a method
+	// the shim does not register with `codes.Unimplemented`. A shim that
+	// registers the method and does not support checkpoints MUST return the same
+	// status, for example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`.
+	CheckpointSandbox(ctx context.Context, in *CheckpointSandboxRequest, opts ...grpc.CallOption) (*CheckpointSandboxResponse, error)
+	// RestoreSandbox starts a created sandbox from a checkpoint. containerd calls
+	// it in place of StartSandbox.
+	// Implementing this RPC is optional. ttrpc and gRPC answer a call to a method
+	// the shim does not register with `codes.Unimplemented`. A shim that
+	// registers the method and does not support checkpoints MUST return the same
+	// status, for example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`.
+	RestoreSandbox(ctx context.Context, in *RestoreSandboxRequest, opts ...grpc.CallOption) (*RestoreSandboxResponse, error)
 }
 
 type sandboxClient struct {
@@ -150,6 +163,24 @@ func (c *sandboxClient) UpdateSandbox(ctx context.Context, in *UpdateSandboxRequ
 	return out, nil
 }
 
+func (c *sandboxClient) CheckpointSandbox(ctx context.Context, in *CheckpointSandboxRequest, opts ...grpc.CallOption) (*CheckpointSandboxResponse, error) {
+	out := new(CheckpointSandboxResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/CheckpointSandbox", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sandboxClient) RestoreSandbox(ctx context.Context, in *RestoreSandboxRequest, opts ...grpc.CallOption) (*RestoreSandboxResponse, error) {
+	out := new(RestoreSandboxResponse)
+	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/RestoreSandbox", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SandboxServer is the server API for Sandbox service.
 // All implementations must embed UnimplementedSandboxServer
 // for forward compatibility
@@ -180,6 +211,19 @@ type SandboxServer interface {
 	// return a `github.com/containerd/errdefs.ErrNotImplemented` error (gRPC
 	// `codes.Unimplemented`), which callers are expected to tolerate.
 	UpdateSandbox(context.Context, *UpdateSandboxRequest) (*UpdateSandboxResponse, error)
+	// CheckpointSandbox saves the state of a started sandbox.
+	// Implementing this RPC is optional. ttrpc and gRPC answer a call to a method
+	// the shim does not register with `codes.Unimplemented`. A shim that
+	// registers the method and does not support checkpoints MUST return the same
+	// status, for example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`.
+	CheckpointSandbox(context.Context, *CheckpointSandboxRequest) (*CheckpointSandboxResponse, error)
+	// RestoreSandbox starts a created sandbox from a checkpoint. containerd calls
+	// it in place of StartSandbox.
+	// Implementing this RPC is optional. ttrpc and gRPC answer a call to a method
+	// the shim does not register with `codes.Unimplemented`. A shim that
+	// registers the method and does not support checkpoints MUST return the same
+	// status, for example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`.
+	RestoreSandbox(context.Context, *RestoreSandboxRequest) (*RestoreSandboxResponse, error)
 	mustEmbedUnimplementedSandboxServer()
 }
 
@@ -216,6 +260,12 @@ func (UnimplementedSandboxServer) SandboxMetrics(context.Context, *SandboxMetric
 }
 func (UnimplementedSandboxServer) UpdateSandbox(context.Context, *UpdateSandboxRequest) (*UpdateSandboxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSandbox not implemented")
+}
+func (UnimplementedSandboxServer) CheckpointSandbox(context.Context, *CheckpointSandboxRequest) (*CheckpointSandboxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckpointSandbox not implemented")
+}
+func (UnimplementedSandboxServer) RestoreSandbox(context.Context, *RestoreSandboxRequest) (*RestoreSandboxResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RestoreSandbox not implemented")
 }
 func (UnimplementedSandboxServer) mustEmbedUnimplementedSandboxServer() {}
 
@@ -410,6 +460,42 @@ func _Sandbox_UpdateSandbox_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Sandbox_CheckpointSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckpointSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxServer).CheckpointSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Sandbox/CheckpointSandbox",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxServer).CheckpointSandbox(ctx, req.(*CheckpointSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Sandbox_RestoreSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RestoreSandboxRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxServer).RestoreSandbox(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.runtime.sandbox.v1.Sandbox/RestoreSandbox",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxServer).RestoreSandbox(ctx, req.(*RestoreSandboxRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Sandbox_ServiceDesc is the grpc.ServiceDesc for Sandbox service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -456,6 +542,14 @@ var Sandbox_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSandbox",
 			Handler:    _Sandbox_UpdateSandbox_Handler,
+		},
+		{
+			MethodName: "CheckpointSandbox",
+			Handler:    _Sandbox_CheckpointSandbox_Handler,
+		},
+		{
+			MethodName: "RestoreSandbox",
+			Handler:    _Sandbox_RestoreSandbox_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

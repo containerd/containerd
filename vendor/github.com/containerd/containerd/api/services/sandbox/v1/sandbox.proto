@@ -95,6 +95,13 @@ service Controller {
   rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
   rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
   rpc Update(ControllerUpdateRequest) returns (ControllerUpdateResponse);
+  // Checkpoint saves the state of a started sandbox.
+  // Controllers that do not support checkpoints return `codes.Unimplemented`.
+  rpc Checkpoint(ControllerCheckpointRequest) returns (ControllerCheckpointResponse);
+  // Restore starts a created sandbox from a checkpoint. Clients call it in
+  // place of Start.
+  // Controllers that do not support checkpoints return `codes.Unimplemented`.
+  rpc Restore(ControllerRestoreRequest) returns (ControllerRestoreResponse);
 }
 
 message ControllerCreateRequest {
@@ -201,3 +208,37 @@ message ControllerUpdateRequest {
 }
 
 message ControllerUpdateResponse {}
+
+message ControllerCheckpointRequest {
+  string sandbox_id = 1;
+  // Path is the directory the sandbox controller writes the checkpoint to.
+  string path = 2;
+  // Options are runtime specific checkpoint options, such as what to capture
+  // and whether the sandbox keeps running afterwards.
+  google.protobuf.Any options = 3;
+  string sandboxer = 10;
+}
+
+message ControllerCheckpointResponse {}
+
+message ControllerRestoreRequest {
+  string sandbox_id = 1;
+  // Path is the directory of a checkpoint written by Checkpoint.
+  string path = 2;
+  // Options are runtime specific restore options.
+  google.protobuf.Any options = 3;
+  string sandboxer = 10;
+}
+
+message ControllerRestoreResponse {
+  string sandbox_id = 1;
+  uint32 pid = 2;
+  google.protobuf.Timestamp created_at = 3;
+  map<string, string> labels = 4;
+  // Address of the sandbox for containerd to connect,
+  // for calling Task or other APIs serving in the sandbox.
+  // it is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
+  string address = 5;
+  uint32 version = 6;
+  google.protobuf.Any spec = 7;
+}
