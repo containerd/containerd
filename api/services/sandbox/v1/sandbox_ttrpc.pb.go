@@ -117,6 +117,8 @@ type TTRPCControllerService interface {
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error)
 	Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error)
+	Checkpoint(context.Context, *ControllerCheckpointRequest) (*ControllerCheckpointResponse, error)
+	Restore(context.Context, *ControllerRestoreRequest) (*ControllerRestoreResponse, error)
 }
 
 func RegisterTTRPCControllerService(srv *ttrpc.Server, svc TTRPCControllerService) {
@@ -184,6 +186,20 @@ func RegisterTTRPCControllerService(srv *ttrpc.Server, svc TTRPCControllerServic
 					return nil, err
 				}
 				return svc.Update(ctx, &req)
+			},
+			"Checkpoint": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ControllerCheckpointRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Checkpoint(ctx, &req)
+			},
+			"Restore": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ControllerRestoreRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Restore(ctx, &req)
 			},
 		},
 	})
@@ -266,6 +282,22 @@ func (c *ttrpccontrollerClient) Metrics(ctx context.Context, req *ControllerMetr
 func (c *ttrpccontrollerClient) Update(ctx context.Context, req *ControllerUpdateRequest) (*ControllerUpdateResponse, error) {
 	var resp ControllerUpdateResponse
 	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "Update", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpccontrollerClient) Checkpoint(ctx context.Context, req *ControllerCheckpointRequest) (*ControllerCheckpointResponse, error) {
+	var resp ControllerCheckpointResponse
+	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "Checkpoint", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpccontrollerClient) Restore(ctx context.Context, req *ControllerRestoreRequest) (*ControllerRestoreResponse, error) {
+	var resp ControllerRestoreResponse
+	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "Restore", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
