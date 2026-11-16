@@ -386,6 +386,59 @@ func (c *controllerLocal) Update(
 	return nil
 }
 
+func (c *controllerLocal) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	svc, err := c.getSandbox(ctx, sandboxID)
+	if err != nil {
+		return err
+	}
+
+	if _, err := svc.CheckpointSandbox(ctx, &runtimeAPI.CheckpointSandboxRequest{
+		SandboxID: sandboxID,
+		Path:      opts.Path,
+		Options:   typeurl.MarshalProto(opts.Options),
+	}); err != nil {
+		return fmt.Errorf("failed to checkpoint sandbox %s: %w", sandboxID, errgrpc.ToNative(err))
+	}
+
+	return nil
+}
+
+func (c *controllerLocal) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error) {
+	shim, err := c.shims.Get(ctx, sandboxID)
+	if err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+
+	svc, err := sandbox.NewClient(shim.Client())
+	if err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+
+	resp, err := svc.RestoreSandbox(ctx, &runtimeAPI.RestoreSandboxRequest{
+		SandboxID: sandboxID,
+		Path:      opts.Path,
+		Options:   typeurl.MarshalProto(opts.Options),
+	})
+	if err != nil {
+		err = errgrpc.ToNative(err)
+		// A shim that does not implement RestoreSandbox has not touched the
+		// sandbox, so the caller can still Start it.
+		if !errdefs.IsNotImplemented(err) {
+			c.cleanupShim(ctx, sandboxID, svc)
+		}
+		return sandbox.ControllerInstance{}, fmt.Errorf("failed to restore sandbox %s: %w", sandboxID, err)
+	}
+	address, version := shim.Endpoint()
+	return sandbox.ControllerInstance{
+		SandboxID: sandboxID,
+		Pid:       resp.GetPid(),
+		Address:   address,
+		Version:   uint32(version),
+		CreatedAt: resp.GetCreatedAt().AsTime(),
+		Spec:      resp.GetSpec(),
+	}, nil
+}
+
 func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.TTRPCSandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {

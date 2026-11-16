@@ -83,3 +83,11 @@ func (g *grpcBridge) SandboxMetrics(ctx context.Context, request *api.SandboxMet
 func (g *grpcBridge) UpdateSandbox(ctx context.Context, request *api.UpdateSandboxRequest) (*api.UpdateSandboxResponse, error) {
 	return g.client.UpdateSandbox(ctx, request)
 }
+
+func (g *grpcBridge) CheckpointSandbox(ctx context.Context, request *api.CheckpointSandboxRequest) (*api.CheckpointSandboxResponse, error) {
+	return g.client.CheckpointSandbox(ctx, request)
+}
+
+func (g *grpcBridge) RestoreSandbox(ctx context.Context, request *api.RestoreSandboxRequest) (*api.RestoreSandboxResponse, error) {
+	return g.client.RestoreSandbox(ctx, request)
+}

@@ -109,6 +109,23 @@ func WithTimeout(timeout time.Duration) StopOpt {
 	}
 }
 
+// CheckpointOptions are the parameters of Controller.Checkpoint.
+type CheckpointOptions struct {
+	// Path is the directory the controller writes the checkpoint to.
+	Path string
+	// Options are runtime specific checkpoint options, such as what to capture
+	// and whether the sandbox keeps running afterwards.
+	Options typeurl.Any
+}
+
+// RestoreOptions are the parameters of Controller.Restore.
+type RestoreOptions struct {
+	// Path is the directory of a checkpoint written by Controller.Checkpoint.
+	Path string
+	// Options are runtime specific restore options.
+	Options typeurl.Any
+}
+
 // Controller is an interface to manage sandboxes at runtime.
 // When running in sandbox mode, shim expected to implement `SandboxService`.
 // Shim lifetimes are now managed manually via sandbox API by the containerd's client.
