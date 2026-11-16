@@ -66,6 +66,18 @@ service Sandbox {
   // return a `github.com/containerd/errdefs.ErrNotImplemented` error (gRPC
   // `codes.Unimplemented`), which callers are expected to tolerate.
   rpc UpdateSandbox(UpdateSandboxRequest) returns (UpdateSandboxResponse);
+
+  // CheckpointSandbox saves the state of a started sandbox and the selected
+  // containers to a directory.
+  // Implementing this RPC is optional. A shim that does not support
+  // checkpoints returns `codes.Unimplemented`.
+  rpc CheckpointSandbox(CheckpointSandboxRequest) returns (CheckpointSandboxResponse);
+
+  // RestoreSandbox starts a created sandbox from a checkpoint, in place of
+  // StartSandbox. The checkpoint can come from a different sandbox.
+  // Implementing this RPC is optional. A shim that does not support
+  // checkpoints returns `codes.Unimplemented`.
+  rpc RestoreSandbox(RestoreSandboxRequest) returns (RestoreSandboxResponse);
 }
 
 message CreateSandboxRequest {
@@ -162,4 +174,48 @@ message SandboxMetricsRequest {
 
 message SandboxMetricsResponse {
   containerd.types.Metric metrics = 1;
+}
+
+message CheckpointSandboxRequest {
+  string sandbox_id = 1;
+  // Path is an existing, empty local directory. The shim writes the
+  // checkpoint to this directory and does not write outside it.
+  string path = 2;
+  // Containers are the containers to include in the checkpoint.
+  repeated containerd.types.CheckpointSandboxContainer containers = 3;
+  // Annotations are additional key-value options for the checkpoint.
+  map<string, string> annotations = 4;
+  // Extensions are optional features, keyed by a unique name.
+  map<string, google.protobuf.Any> extensions = 5;
+}
+
+message CheckpointSandboxResponse {
+  // Annotations are additional key-value data about the checkpoint.
+  map<string, string> annotations = 1;
+  // Extensions are optional feature data, keyed by a unique name.
+  map<string, google.protobuf.Any> extensions = 2;
+}
+
+message RestoreSandboxRequest {
+  string sandbox_id = 1;
+  // Path is a directory that CheckpointSandbox wrote. The shim does not
+  // change the files in this directory.
+  string path = 2;
+  // Containers are the containers to restore into the sandbox. Their names
+  // must be the same set as the container names in the checkpoint. The
+  // shim returns an error if a container does not agree with the
+  // checkpoint.
+  repeated containerd.types.RestoreSandboxContainer containers = 3;
+  // Annotations are additional key-value options for the restore.
+  map<string, string> annotations = 4;
+  // Extensions are optional features, keyed by a unique name.
+  map<string, google.protobuf.Any> extensions = 5;
+}
+
+message RestoreSandboxResponse {
+  uint32 pid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Any spec = 3;
+  // Extensions are optional feature data, keyed by a unique name.
+  map<string, google.protobuf.Any> extensions = 4;
 }
