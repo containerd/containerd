@@ -171,6 +171,154 @@ func TestStartupDelay(t *testing.T) {
 
 }
 
+// TestCloseWaitsForRunLoop verifies that Close() cancels the run loop and
+// blocks until an in-progress GC completes and the loop exits.
+func TestCloseWaitsForRunLoop(t *testing.T) {
+	bc := &blockingCollector{
+		testCollector: &testCollector{},
+		started:       make(chan struct{}),
+		release:       make(chan struct{}),
+		completed:     make(chan struct{}),
+	}
+
+	scheduler := newScheduler(bc, &config{})
+
+	// Wire the cancel func into the scheduler so that Close() is responsible
+	// for stopping the run loop, mirroring how the plugin InitFn starts it.
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	scheduler.cancel = cancel
+	go scheduler.run(ctx)
+
+	// Send a trigger event to schedule an immediate GC.
+	go func() {
+		scheduler.eventC <- mutationEvent{ts: time.Now()}
+	}()
+
+	// Wait for GC to start.
+	select {
+	case <-bc.started:
+	case <-t.Context().Done():
+		t.Fatal("timed out waiting for GC to start")
+	}
+
+	// Call Close() while GC is in-flight. Close() is responsible for
+	// cancelling the run loop; the test does not cancel it directly.
+	closeDone := make(chan struct{})
+	go func() {
+		scheduler.Close()
+		close(closeDone)
+	}()
+
+	// Unblock GC; run() will exit on the next select iteration once Close()
+	// has cancelled the context.
+	close(bc.release)
+
+	select {
+	case <-closeDone:
+	case <-t.Context().Done():
+		t.Fatal("Close() did not return after GC finished")
+	}
+
+	// Verify GC completed before Close() returned.
+	select {
+	case <-bc.completed:
+	default:
+		t.Fatal("Close() returned before GC finished")
+	}
+}
+
+// TestSendersDoNotLeakAfterClose verifies that the event senders
+// (mutationCallback and the wait trigger) do not block forever on the
+// unbuffered eventC once the run loop has exited. Before the doneC select was
+// added, each post-shutdown mutation leaked a goroutine blocked on the send.
+func TestSendersDoNotLeakAfterClose(t *testing.T) {
+	scheduler := newScheduler(&testCollector{}, &config{})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	scheduler.cancel = cancel
+	go scheduler.run(ctx)
+
+	assert.NoError(t, scheduler.Close())
+
+	// ScheduleAndWait after close must return promptly rather than register a
+	// waiter that nothing will ever complete.
+	_, err := scheduler.ScheduleAndWait(context.Background())
+	assert.ErrorIs(t, err, errSchedulerClosed)
+
+	// Both mutationCallback and the wait trigger deliver events via
+	// go s.sendEvent(e). Drive sendEvent directly under a WaitGroup so the
+	// assertion tracks the exact senders we spawn. Every send targets the
+	// now-unread eventC; with the doneC select each sender returns, without
+	// it each would block forever on the channel send.
+	const senders = 100
+	var wg sync.WaitGroup
+	for range senders {
+		wg.Go(func() {
+			scheduler.sendEvent(mutationEvent{ts: time.Now(), mutation: true, dirty: true})
+		})
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-t.Context().Done():
+		t.Fatal("sender goroutines leaked after Close: blocked on eventC send")
+	}
+}
+
+// TestWaitUnblockedByClose verifies that a pending wait() caller is released
+// when the run loop exits, rather than blocking until its own context is done.
+func TestWaitUnblockedByClose(t *testing.T) {
+	scheduler := newScheduler(&testCollector{}, &config{})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	scheduler.cancel = cancel
+	go scheduler.run(ctx)
+
+	// Register a waiter that no collection will ever satisfy, using a context
+	// independent of the run loop's so that only Close() can release it.
+	errC := make(chan error, 1)
+	go func() {
+		_, err := scheduler.wait(t.Context(), false)
+		errC <- err
+	}()
+
+	assert.NoError(t, scheduler.Close())
+
+	select {
+	case err := <-errC:
+		assert.ErrorIs(t, err, errSchedulerClosed)
+	case <-t.Context().Done():
+		t.Fatal("wait did not unblock after Close")
+	}
+}
+
+// blockingCollector is a test collector that blocks until release is closed, allowing
+// tests to verify that Close() waits for an in-progress GC to complete before returning.
+type blockingCollector struct {
+	*testCollector
+	started   chan struct{}
+	release   chan struct{}
+	completed chan struct{}
+}
+
+func (bc *blockingCollector) GarbageCollect(ctx context.Context) (gc.Stats, error) {
+	close(bc.started)
+	defer close(bc.completed)
+
+	// Block until test releases.
+	<-bc.release
+	return gcStats{}, nil
+}
+
 type testCollector struct {
 	d  time.Duration
 	gc int
