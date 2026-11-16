@@ -45,7 +45,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.1
 	github.com/intel/goresctrl v0.13.0
 	github.com/klauspost/compress v1.20.3
-	github.com/mdlayher/vsock v1.3.0
+	github.com/mdlayher/vsock v1.4.0
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/moby/sys/signal v0.7.1
@@ -119,7 +119,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/knqyf263/go-plugin v0.9.0 // indirect
-	github.com/mdlayher/socket v0.6.1 // indirect
+	github.com/mdlayher/socket v0.8.0 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
