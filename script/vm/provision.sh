@@ -55,8 +55,11 @@ dnf -y install \
 	make \
 	strace \
 	which \
-	"kernel-modules-extra-$(uname -r)" \
 	${INSTALL_PACKAGES}
+
+# EL repositories only carry kernels of the latest point release, so pin them
+# to the image's release to match the running kernel.
+dnf -y install --releasever="$(. /etc/os-release && echo "${VERSION_ID}")" "kernel-modules-extra-$(uname -r)"
 modprobe xt_comment
 
 # Install Go
