@@ -102,9 +102,9 @@ func resolveMount(m mount.Mount, preceding []mount.Mount) (View, error) {
 		return openOverlay(m)
 	case strings.HasPrefix(m.Type, "format/"):
 		return openFormatMount(m, preceding)
+	default:
+		return nil, fmt.Errorf("mount type %s cannot be directly viewed: %w", m.Type, errdefs.ErrNotImplemented)
 	}
-
-	return nil, fmt.Errorf("mount type %s cannot be directly viewed: %w", m.Type, errdefs.ErrNotImplemented)
 }
 
 func openBind(m mount.Mount) (View, error) {
