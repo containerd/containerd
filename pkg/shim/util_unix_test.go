@@ -27,6 +27,51 @@ import (
 	"time"
 )
 
+func TestMkdirSocketDirKeepsDefaultStateTraversable(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "containerd")
+	socketDir := filepath.Join(root, "s")
+	if err := mkdirSocketDir(socketDir, root); err != nil {
+		t.Fatal(err)
+	}
+	assertPerm(t, root, 0o711)
+	assertPerm(t, socketDir, 0o700)
+
+	if err := os.Chmod(root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := mkdirSocketDir(socketDir, root); err != nil {
+		t.Fatal(err)
+	}
+	assertPerm(t, root, 0o711)
+
+	if err := os.Chmod(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := mkdirSocketDir(socketDir, root); err != nil {
+		t.Fatal(err)
+	}
+	assertPerm(t, root, 0o755)
+
+	other := filepath.Join(base, "custom", "s")
+	if err := mkdirSocketDir(other, root); err != nil {
+		t.Fatal(err)
+	}
+	assertPerm(t, filepath.Dir(other), 0o700)
+	assertPerm(t, other, 0o700)
+}
+
+func assertPerm(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	st, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := st.Mode().Perm(); got != want {
+		t.Fatalf("%s mode = %o, want %o", path, got, want)
+	}
+}
+
 func TestNewSocket(t *testing.T) {
 	t.Run("socket in nested directory", func(t *testing.T) {
 		dir, err := os.MkdirTemp("/tmp", "shim-test-")

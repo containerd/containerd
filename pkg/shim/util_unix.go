@@ -119,12 +119,10 @@ func NewSocket(address string) (*net.UnixListener, error) {
 		isAbstract = sock.isAbstract()
 		// Socket file permissions: read/write for owner only
 		sockPerm = os.FileMode(0600)
-		// Directory permissions: need execute bit for traversal
-		dirPerm = os.FileMode(0700)
 	)
 
 	if !isAbstract {
-		if err := os.MkdirAll(filepath.Dir(path), dirPerm); err != nil {
+		if err := mkdirSocketDir(filepath.Dir(path), defaults.DefaultStateDir); err != nil {
 			return nil, fmt.Errorf("mkdir failed for %s: %w", path, err)
 		}
 	}
@@ -142,6 +140,32 @@ func NewSocket(address string) (*net.UnixListener, error) {
 	}
 
 	return l.(*net.UnixListener), nil
+}
+
+// mkdirSocketDir creates the directory that holds a shim socket, mode 0700.
+// When that directory is directly under the default state directory, that
+// directory is created as 0711. os.MkdirAll would otherwise create it as 0700,
+// and a user namespace then cannot traverse it to reach the task rootfs.
+// An existing default state directory is corrected only when it is 0700, the
+// mode that call used to leave behind. Any other mode is left unchanged, as
+// is a custom state directory.
+func mkdirSocketDir(socketDir, stateDir string) error {
+	stateDir = filepath.Clean(stateDir)
+	if filepath.Clean(filepath.Dir(socketDir)) == stateDir {
+		if err := os.MkdirAll(stateDir, 0o711); err != nil {
+			return err
+		}
+		st, err := os.Stat(stateDir)
+		if err != nil {
+			return err
+		}
+		if st.Mode().Perm() == 0o700 {
+			if err := os.Chmod(stateDir, 0o711); err != nil && !os.IsPermission(err) {
+				return err
+			}
+		}
+	}
+	return os.MkdirAll(socketDir, 0o700)
 }
 
 const abstractSocketPrefix = "\x00"
