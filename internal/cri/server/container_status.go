@@ -22,9 +22,11 @@ import (
 	"fmt"
 
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"google.golang.org/protobuf/proto"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -52,17 +54,26 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	imageRef := container.ImageRef
 	imageID := container.ImageRef
 
-	image, err := c.GetImage(imageRef)
+	image, err := c.GetImage(imageRef, spec.GetRuntimeHandler())
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to get image %q: %w", imageRef, err)
 		}
 	} else {
-		repoTags, repoDigests := util.ParseImageReferences(image.References)
+		refs := make([]string, 0, len(image.References))
+		for _, name := range image.References {
+			ref, _, err := imagestore.ParseName(name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse image reference %q: %w", name, err)
+			}
+			refs = append(refs, ref)
+		}
+		repoTags, repoDigests := util.ParseImageReferences(refs)
 		if len(repoTags) > 0 {
 			// Based on current behavior of dockershim, this field should be
 			// image tag.
-			spec = &runtime.ImageSpec{Image: repoTags[0]}
+			spec = proto.Clone(spec).(*runtime.ImageSpec)
+			spec.Image = repoTags[0]
 		}
 		if len(repoDigests) > 0 {
 			// repoDigests[0] is the manifest list digest for multi-arch images.

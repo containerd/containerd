@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/imgcrypt/v2"
 	"github.com/containerd/imgcrypt/v2/images/encryption"
@@ -42,7 +43,9 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/events"
 	containerdimages "github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/core/transfer"
@@ -51,9 +54,11 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
+	bolt "go.etcd.io/bbolt"
 )
 
 // For image management:
@@ -178,6 +183,17 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
 	)
+	ctx, release, err := c.client.WithLease(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		if err := release(cleanupCtx); err != nil {
+			log.G(ctx).WithError(err).Warn("Failed to release image pull lease")
+		}
+	}()
 	labels := c.getLabels(ctx, ref)
 
 	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
@@ -210,9 +226,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		bytesPulled uint64
 	)
 	if useLocalPull {
-		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithLocalPull(ctx, ref, imagestore.Name(ref, runtime.Name), credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	} else {
-		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, credentials, snapshotter, platform, labels, imagePullProgressTimeout)
+		image, bytesPulled, err = c.pullImageWithTransferService(ctx, ref, imagestore.Name(ref, runtime.Name), credentials, snapshotter, platform, labels, imagePullProgressTimeout)
 	}
 
 	if err != nil {
@@ -228,12 +244,17 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	imageID := configDesc.Digest.String()
 	span.SetAttributes(tracing.Attribute("image.id", imageID))
 
+	if err := c.imageMutationLocker.Lock(ctx, runtime.Name); err != nil {
+		return "", err
+	}
+	defer c.imageMutationLocker.Unlock(runtime.Name)
 	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
 		}
-		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
+		r = imagestore.Name(r, runtime.Name)
+		if _, err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
 			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
@@ -276,7 +297,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 // HTTP request.
 func (c *CRIImageService) pullImageWithLocalPull(
 	ctx context.Context,
-	ref string,
+	ref, imageName string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
 	platform *imagespec.Platform,
@@ -297,6 +318,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
+		containerd.WithPullImageName(imageName),
 		containerd.WithDownloadLimiter(c.downloadLimiter),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
@@ -333,6 +355,21 @@ func (c *CRIImageService) pullImageWithLocalPull(
 	return image, bytesPulled, nil
 }
 
+type transferImageStore = transferimage.Store
+
+type pullImageStore struct {
+	*transferImageStore
+	images []containerdimages.Image
+}
+
+func (s *pullImageStore) Store(ctx context.Context, desc imagespec.Descriptor, store containerdimages.Store) ([]containerdimages.Image, error) {
+	stored, err := s.transferImageStore.Store(ctx, desc, store)
+	if err == nil {
+		s.images = stored
+	}
+	return stored, err
+}
+
 // pullImageWithTransferService handles image pulling using the transfer service.
 //
 // The returned bytesPulled is the number of bytes actually fetched from the
@@ -340,7 +377,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 // "already exists" event that does not increment the counter.
 func (c *CRIImageService) pullImageWithTransferService(
 	ctx context.Context,
-	ref string,
+	ref, imageName string,
 	credentials func(string) (string, string, error),
 	snapshotter string,
 	platform *imagespec.Platform,
@@ -363,7 +400,7 @@ func (c *CRIImageService) pullImageWithTransferService(
 		transferimage.WithImageLabels(labels),
 	}
 
-	is := transferimage.NewStore(ref, sopts...)
+	is := &pullImageStore{transferImageStore: transferimage.NewStore(imageName, sopts...)}
 
 	log.G(ctx).Debugf("Getting new CRI credentials")
 
@@ -387,18 +424,17 @@ func (c *CRIImageService) pullImageWithTransferService(
 		return nil, 0, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 
-	// Image should be pulled, unpacked and present in containerd image store at this moment
-	var image containerd.Image
+	var matcher platforms.MatchComparer
 	if platform != nil {
-		image, err = c.client.GetImageWithPlatform(ctx, ref, platforms.Only(*platform))
-	} else {
-		image, err = c.client.GetImage(ctx, ref)
+		matcher = platforms.Only(*platform)
 	}
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+	for _, stored := range is.images {
+		if stored.Name == imageName {
+			_, bytesPulled, _ := transferProgressReporter.reqReporter.status()
+			return c.client.ImageFromRecord(stored, matcher), bytesPulled, nil
+		}
 	}
-	_, bytesPulled, _ := transferProgressReporter.reqReporter.status()
-	return image, bytesPulled, nil
+	return nil, 0, fmt.Errorf("transfer did not return image %q", imageName)
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -441,10 +477,11 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 }
 
 // createOrUpdateImageReference creates or updates image reference inside containerd image store.
+// It returns the event topic for a mutation, or an empty topic for an unchanged reference.
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string) error {
+func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string) (string, error) {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
@@ -456,15 +493,15 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 	// TODO: Call CRIImageService directly
 	_, err := c.images.Create(ctx, img)
 	if err == nil {
-		return nil
+		return "/images/create", nil
 	} else if !errdefs.IsAlreadyExists(err) {
-		return err
+		return "", err
 	}
 	// Retrieve oldImg from image store here because Create routine returns an
 	// empty image on ErrAlreadyExists
 	oldImg, err := c.images.Get(ctx, name)
 	if err != nil {
-		return err
+		return "", err
 	}
 	fieldpaths := []string{"target"}
 	if oldImg.Labels[crilabels.ImageLabelKey] != labels[crilabels.ImageLabelKey] {
@@ -478,10 +515,10 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		fieldpaths = append(fieldpaths, "labels."+crilabels.ImagePlatformLabelKey)
 	}
 	if oldImg.Target.Digest == img.Target.Digest && len(fieldpaths) < 2 {
-		return nil
+		return "", nil
 	}
 	_, err = c.images.Update(ctx, img, fieldpaths...)
-	return err
+	return "/images/update", err
 }
 
 // getLabels get image labels to be added on CRI image
@@ -511,59 +548,90 @@ func imagePlatformFromLabels(labels map[string]string) (platforms.MatchComparer,
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
-	// TODO: Use image service
-	img, err := c.client.GetImage(ctx, r)
+	ref, handler, err := imagestore.ParseName(r)
 	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("get image by reference: %w", err)
-		}
-		// If the image is not found, we should continue updating the cache,
-		// so that the image can be removed from the cache.
-		if err := c.imageStore.UpdateWithPlatform(ctx, r, nil); err != nil {
-			return fmt.Errorf("update image store for %q: %w", r, err)
-		}
-		return nil
+		return err
 	}
-
-	platform, err := imagePlatformFromLabels(img.Labels())
+	lockHandler := handler
+	if lockHandler == "" {
+		lockHandler = c.defaultRuntimeName
+	}
+	if err := c.imageMutationLocker.Lock(ctx, lockHandler); err != nil {
+		return err
+	}
+	defer c.imageMutationLocker.Unlock(lockHandler)
+	img, err := c.images.Get(ctx, r)
+	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return c.imageStore.UpdateWithPlatform(ctx, r, nil)
+		}
+		return fmt.Errorf("get image by reference: %w", err)
+	}
+	criLabels := c.getLabels(ctx, ref)
+	var fields []string
+	for _, key := range []string{crilabels.ImageLabelKey, crilabels.PinnedImageLabelKey} {
+		if value, ok := criLabels[key]; ok && img.Labels[key] != value {
+			fields = append(fields, "labels."+key)
+		}
+	}
+	if len(fields) > 0 {
+		img, err = c.images.Update(ctx, containerdimages.Image{Name: r, Labels: criLabels}, fields...)
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return c.imageStore.UpdateWithPlatform(ctx, r, nil)
+			}
+			return fmt.Errorf("update managed labels: %w", err)
+		}
+	}
+	platform, err := imagePlatformFromLabels(img.Labels)
 	if err != nil {
 		return fmt.Errorf("get platform for image %q: %w", r, err)
 	}
-	if platform != nil {
-		img, err = c.client.GetImageWithPlatform(ctx, r, platform)
-		if err != nil {
-			return fmt.Errorf("get image by reference and platform: %w", err)
-		}
+	if platform == nil {
+		platform = platforms.Default()
 	}
-
-	labels := img.Labels()
-	criLabels := c.getLabels(ctx, r)
-	if value := labels[crilabels.ImagePlatformLabelKey]; value != "" {
-		criLabels[crilabels.ImagePlatformLabelKey] = value
+	configDesc, err := img.Config(ctx, c.content, platform)
+	if err != nil {
+		return fmt.Errorf("get image id: %w", err)
 	}
-	for key, value := range criLabels {
-		if labels[key] != value {
-			// Make sure the image has the image id as its unique
-			// identifier that references the image in its lifetime.
-			configDesc, err := img.Config(ctx)
+	id := imagestore.Name(configDesc.Digest.String(), handler)
+	if id != r {
+		var topic string
+		err := c.metadata.Update(func(tx *bolt.Tx) error {
+			txctx := boltutil.WithTransaction(ctx, tx)
+			current, err := c.images.Get(txctx, r)
 			if err != nil {
-				return fmt.Errorf("get image id: %w", err)
+				return err
 			}
-			id := configDesc.Digest.String()
-			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
-				return fmt.Errorf("create image id reference %q: %w", id, err)
+			// The source check and ID publication must exclude external deletion and retagging.
+			if current.Target.Digest != img.Target.Digest || current.Target.MediaType != img.Target.MediaType ||
+				current.Labels[crilabels.ImagePlatformLabelKey] != img.Labels[crilabels.ImagePlatformLabelKey] {
+				return errdefs.ErrNotFound
 			}
-			if err := c.imageStore.UpdateWithPlatform(ctx, id, platform); err != nil {
-				return fmt.Errorf("update image store for %q: %w", id, err)
+			img = current
+			topic, err = c.createOrUpdateImageReference(txctx, id, img.Target, img.Labels)
+			return err
+		})
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("create image id reference %q: %w", id, err)
+		}
+		if err == nil && topic != "" {
+			// Metadata suppresses events inside a supplied transaction.
+			if publisher := c.metadata.Publisher(ctx); publisher != nil {
+				var event events.Event = &eventstypes.ImageUpdate{Name: id, Labels: img.Labels}
+				if topic == "/images/create" {
+					event = &eventstypes.ImageCreate{Name: id, Labels: img.Labels}
+				}
+				if err := publisher.Publish(ctx, topic, event); err != nil {
+					return err
+				}
 			}
-			// The image id is ready, add the label to mark the image as managed.
-			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
-				return fmt.Errorf("create managed label: %w", err)
-			}
-			break
+		}
+		if err := c.imageStore.UpdateWithPlatform(ctx, id, nil); err != nil {
+			return fmt.Errorf("update image store for %q: %w", id, err)
 		}
 	}
-	if err := c.imageStore.UpdateWithPlatform(ctx, r, platform); err != nil {
+	if err := c.imageStore.UpdateWithPlatform(ctx, r, nil); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil

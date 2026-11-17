@@ -18,11 +18,15 @@ package images
 
 import (
 	"context"
+	"sync"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/snapshots"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
@@ -39,11 +43,12 @@ const (
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
-		config:           testImageConfig,
-		runtimePlatforms: map[string]*ImagePlatform{},
-		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
-		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
-		snapshotStore:    snapshotstore.NewStore(),
+		config:              testImageConfig,
+		runtimePlatforms:    map[string]*ImagePlatform{},
+		imageFSPaths:        map[string]string{"overlayfs": testImageFSPath},
+		imageStore:          imagestore.NewStore(nil, nil, platforms.Default()),
+		snapshotStore:       snapshotstore.NewStore(),
+		imageMutationLocker: kmutex.New(),
 	}
 
 	return service, &GRPCCRIImageService{service}
@@ -57,13 +62,51 @@ var testImageConfig = criconfig.ImageConfig{
 
 func TestUpdateRuntimeMergesSnapshotter(t *testing.T) {
 	c, _ := newTestCRIService()
+	sn, err := native.NewSnapshotter(t.TempDir())
+	if !assert.NoError(t, err) {
+		return
+	}
+	t.Cleanup(func() { assert.NoError(t, sn.Close()) })
+	_, err = sn.Prepare(context.Background(), "stats", "")
+	if !assert.NoError(t, err) {
+		return
+	}
+	c.snapshotsSyncer = newSnapshotsSyncer(c.snapshotStore, map[string]snapshots.Snapshotter{
+		"native": sn, "overlayfs": sn, "unused": nil,
+	}, 0)
 	c.runtimePlatforms["runtime"] = &ImagePlatform{}
 	c.UpdateRuntime("runtime", &ImagePlatform{Snapshotter: "native"})
 	assert.Equal(t, "native", c.runtimePlatforms["runtime"].Snapshotter)
+	assert.Len(t, c.snapshotsSyncer.enabled, 1)
+	assert.Contains(t, c.snapshotsSyncer.enabled, "native")
 
+	c.snapshotsSyncer.enabled = make(map[string]snapshots.Snapshotter)
 	c.runtimePlatforms["runtime"] = &ImagePlatform{Snapshotter: "overlayfs"}
 	c.UpdateRuntime("runtime", &ImagePlatform{Snapshotter: "native"})
 	assert.Equal(t, "overlayfs", c.runtimePlatforms["runtime"].Snapshotter)
+	assert.Len(t, c.snapshotsSyncer.enabled, 2)
+	assert.Contains(t, c.snapshotsSyncer.enabled, "native")
+	c.UpdateRuntime("new", &ImagePlatform{Snapshotter: "native"})
+	c.UpdateRuntime("default", nil)
+	assert.Len(t, c.snapshotsSyncer.enabled, 2)
+	assert.Contains(t, c.snapshotsSyncer.enabled, "overlayfs")
+	assert.NotContains(t, c.snapshotsSyncer.enabled, "unused")
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for range 100 {
+			assert.NoError(t, c.snapshotsSyncer.sync())
+		}
+	})
+	for range 100 {
+		c.UpdateRuntime("runtime", &ImagePlatform{Snapshotter: "native"})
+	}
+	wg.Wait()
+	for _, snapshotter := range []string{"native", "overlayfs"} {
+		snapshot, err := c.GetSnapshot("stats", snapshotter)
+		assert.NoError(t, err)
+		assert.Equal(t, snapshots.KindActive, snapshot.Kind)
+	}
 }
 
 func TestLocalResolve(t *testing.T) {
@@ -96,11 +139,11 @@ func TestLocalResolve(t *testing.T) {
 		"docker.io/library/busybox:latest",
 		"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 	} {
-		img, err := c.LocalResolve(ref)
+		img, err := c.LocalResolve(ref, "")
 		assert.NoError(t, err)
 		assert.Equal(t, image, img)
 	}
-	img, err := c.LocalResolve("randomid")
+	img, err := c.LocalResolve("randomid", "")
 	assert.Equal(t, errdefs.IsNotFound(err), true)
 	assert.Equal(t, imagestore.Image{}, img)
 }

@@ -34,7 +34,9 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/errdefs"
@@ -166,13 +168,41 @@ func criContainerStateToString(state runtime.ContainerState) string {
 	return runtime.ContainerState_name[int32(state)]
 }
 
-// toContainerdImage converts an image object in image store to containerd image handler.
-func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
-	// image should always have at least one reference.
-	if len(image.References) == 0 {
-		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
+func (c *criService) resolveContainerImage(spec *runtime.ImageSpec, runtimeHandler string) (imagestore.Image, error) {
+	if runtimeHandler == "" {
+		runtimeHandler = c.config.DefaultRuntimeName
 	}
-	return c.client.GetImage(ctx, image.References[0])
+	if handler := spec.GetRuntimeHandler(); handler != "" && handler != runtimeHandler {
+		return imagestore.Image{}, fmt.Errorf("image runtime handler %q does not match sandbox runtime handler %q: %w", handler, runtimeHandler, errdefs.ErrInvalidArgument)
+	}
+	image, err := c.LocalResolve(spec.GetImage(), runtimeHandler)
+	if errdefs.IsNotFound(err) && spec.GetRuntimeHandler() == "" {
+		return c.LocalResolve(spec.GetImage(), "")
+	}
+	return image, err
+}
+
+// toContainerdImage converts an image object in image store to containerd image handler.
+func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, string, error) {
+	if len(image.References) == 0 {
+		return nil, "", fmt.Errorf("invalid image with no reference %q", image.ID)
+	}
+	var lastErr error
+	for _, name := range image.References {
+		i, err := c.client.ImageService().Get(ctx, name)
+		if err == nil {
+			var converted containerd.Image
+			converted, err = customopts.ImageForConfig(ctx, c.client, i, image.ID)
+			if err == nil {
+				return converted, i.Target.Digest.String(), nil
+			}
+		}
+		if !errdefs.IsNotFound(err) {
+			return nil, "", err
+		}
+		lastErr = err
+	}
+	return nil, "", lastErr
 }
 
 // getUserFromImage gets uid or user name of the image user.
@@ -376,6 +406,19 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 	}
 
 	c.containerEventsQ.Send(&event)
+}
+
+func (c *criService) effectiveSandboxRuntimeHandler(config *runtime.PodSandboxConfig, runtimeHandler string) (string, error) {
+	if _, err := c.config.GetSandboxRuntime(config, runtimeHandler); err != nil {
+		return "", err
+	}
+	if config.GetAnnotations()[annotations.UntrustedWorkload] == "true" {
+		return criconfig.RuntimeUntrusted, nil
+	}
+	if runtimeHandler == "" {
+		return c.config.DefaultRuntimeName, nil
+	}
+	return runtimeHandler, nil
 }
 
 func (c *criService) getPodSandboxRuntime(sandboxID string) (runtime criconfig.Runtime, err error) {

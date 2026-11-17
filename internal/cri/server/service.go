@@ -106,10 +106,10 @@ type ImageService interface {
 
 	CheckImages(ctx context.Context) error
 
-	GetImage(id string) (imagestore.Image, error)
+	GetImage(id, runtimeHandler string) (imagestore.Image, error)
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
-	LocalResolve(refOrID string) (imagestore.Image, error)
+	LocalResolve(refOrID, runtimeHandler string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
 

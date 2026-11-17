@@ -32,6 +32,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
@@ -41,7 +42,6 @@ import (
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
-	dockerref "github.com/distribution/reference"
 )
 
 func init() {
@@ -76,25 +76,47 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		labels = map[string]string{}
 	)
 
-	sandboxImage := c.getSandboxImageName()
-	normalized, err := dockerref.ParseDockerRef(sandboxImage)
+	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
 	if err != nil {
-		return cin, fmt.Errorf("failed to parse image reference %q: %w", sandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
-	pauseImage, err := c.client.GetImage(ctx, normalized.String())
+	runtimeHandler := metadata.RuntimeHandler
+	if config.GetAnnotations()[annotations.UntrustedWorkload] == "true" {
+		runtimeHandler = criconfig.RuntimeUntrusted
+	} else if runtimeHandler == "" {
+		runtimeHandler = c.config.DefaultRuntimeName
+	}
+
+	sandboxImage := c.getSandboxImageName()
+	image, err := c.imageService.LocalResolve(sandboxImage, runtimeHandler)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", normalized.String(), err)
+		return cin, fmt.Errorf("failed to resolve sandbox image %q: %w", sandboxImage, err)
+	}
+	if len(image.References) == 0 {
+		return cin, fmt.Errorf("invalid sandbox image with no reference %q", image.ID)
+	}
+	var pauseImage containerd.Image
+	for _, candidate := range image.References {
+		img, getErr := c.client.ImageService().Get(ctx, candidate)
+		err = getErr
+		if err == nil {
+			pauseImage, err = customopts.ImageForConfig(ctx, c.client, img, image.ID)
+			if err == nil {
+				break
+			}
+		}
+		if !errdefs.IsNotFound(err) {
+			return cin, fmt.Errorf("failed to select sandbox image %q: %w", sandboxImage, err)
+		}
+	}
+	if err != nil {
+		return cin, fmt.Errorf("failed to select sandbox image %q: %w", sandboxImage, err)
 	}
 
 	// Get the image spec from containerd image
 	imageSpec, err := pauseImage.Spec(ctx)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get image spec: %w", err)
-	}
-
-	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
-	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
 

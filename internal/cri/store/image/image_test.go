@@ -160,7 +160,7 @@ func TestInternalStorePinnedImage(t *testing.T) {
 	i, err := s.get(image.ID)
 	assert.NoError(err)
 	assert.False(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref1))
+	assert.False(s.pinnedRefs[image.ID].Has(ref1))
 
 	t.Logf("add pinned image ref, image should be pinned")
 	ref2 := "containerd.io/ref-2"
@@ -170,40 +170,42 @@ func TestInternalStorePinnedImage(t *testing.T) {
 	i, err = s.get(image.ID)
 	assert.NoError(err)
 	assert.True(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref1))
-	assert.True(s.isPinned(image.ID, ref2))
+	assert.False(s.pinnedRefs[image.ID].Has(ref1))
+	assert.True(s.pinnedRefs[image.ID].Has(ref2))
 
 	t.Logf("pin unpinned image ref, image should be pinned, all refs should be pinned")
-	assert.NoError(s.pin(image.ID, ref1))
+	image.References = []string{ref1}
+	assert.NoError(s.add(image))
 	i, err = s.get(image.ID)
 	assert.NoError(err)
 	assert.True(i.Pinned)
-	assert.True(s.isPinned(image.ID, ref1))
-	assert.True(s.isPinned(image.ID, ref2))
+	assert.True(s.pinnedRefs[image.ID].Has(ref1))
+	assert.True(s.pinnedRefs[image.ID].Has(ref2))
 
 	t.Logf("unpin one of image refs, image should be pinned")
 	assert.NoError(s.unpin(image.ID, ref2))
 	i, err = s.get(image.ID)
 	assert.NoError(err)
 	assert.True(i.Pinned)
-	assert.True(s.isPinned(image.ID, ref1))
-	assert.False(s.isPinned(image.ID, ref2))
+	assert.True(s.pinnedRefs[image.ID].Has(ref1))
+	assert.False(s.pinnedRefs[image.ID].Has(ref2))
 
 	t.Logf("unpin the remaining one image ref, image should be unpinned")
 	assert.NoError(s.unpin(image.ID, ref1))
 	i, err = s.get(image.ID)
 	assert.NoError(err)
 	assert.False(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref1))
-	assert.False(s.isPinned(image.ID, ref2))
+	assert.False(s.pinnedRefs[image.ID].Has(ref1))
+	assert.False(s.pinnedRefs[image.ID].Has(ref2))
 
 	t.Logf("pin one of image refs, then delete this, image should be unpinned")
-	assert.NoError(s.pin(image.ID, ref1))
+	image.References = []string{ref1}
+	assert.NoError(s.add(image))
 	s.delete(image.ID, ref1)
 	i, err = s.get(image.ID)
 	assert.NoError(err)
 	assert.False(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref2))
+	assert.False(s.pinnedRefs[image.ID].Has(ref2))
 }
 
 func TestImageStore(t *testing.T) {
@@ -314,5 +316,103 @@ func TestImageStore(t *testing.T) {
 				assert.Empty(id)
 			}
 		})
+	}
+}
+
+func TestImageStoreRuntimeHandlers(t *testing.T) {
+	assert := assertlib.New(t)
+	id := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ref := "x.io/a:xG"
+	for _, handler := range []string{"", "runc", "kata/test", "n"} {
+		for _, ref := range []string{ref, id, "nn.nn/nn:nn"} {
+			name := Name(ref, handler)
+			decoded, owner, err := ParseName(name)
+			assert.NoError(err)
+			assert.Equal(ref, decoded)
+			assert.Equal(handler, owner)
+		}
+	}
+	for _, name := range []string{
+		namePrefix + "test",
+		namePrefix + "nested/test",
+		namePrefix + "test:latest",
+		namePrefix + "nested/test:latest",
+		namePrefix + "test@sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+	} {
+		ref, handler, err := ParseName(name)
+		assert.NoError(err)
+		assert.Equal(name, ref)
+		assert.Empty(handler)
+	}
+	for _, name := range []string{
+		strings.TrimSuffix(namePrefix, "/"), namePrefix, namePrefix + "/cmVm",
+		namePrefix + "cnVuYw/", namePrefix + "!/cmVm", namePrefix + "cnVuYw/!",
+		namePrefix + "cnVuYw/cmVm/extra", namePrefix + "cnVuYw==/cmVm",
+		namePrefix + "YR/cmVm", namePrefix + "cnVuYw/YR", namePrefix + "cnVuYw\n/cmVm",
+	} {
+		_, _, err := ParseName(name)
+		assert.ErrorIs(err, errdefs.ErrInvalidArgument)
+	}
+
+	s, err := NewFakeStore([]Image{
+		{ID: id, References: []string{id}},
+		{ID: id, RuntimeHandler: "runc", References: []string{id}},
+		{ID: id, RuntimeHandler: "kata", References: []string{id}},
+	})
+	if !assert.NoError(err) {
+		return
+	}
+	assert.Len(s.List(), 3)
+	for _, handler := range []string{"", "runc", "kata"} {
+		image := Image{ID: id, RuntimeHandler: handler, References: []string{Name(ref, handler)}, Pinned: handler == "runc"}
+		assert.NoError(s.update(Name(ref, handler), &image))
+		got, err := s.GetForRuntime("1123456789", handler)
+		assert.NoError(err)
+		assert.Equal(handler, got.RuntimeHandler)
+		assert.Equal([]string{Name(ref, handler), Name(id, handler)}, got.References)
+		assert.Equal(handler == "runc", got.Pinned)
+		resolved, err := s.ResolveForRuntime(ref, handler)
+		assert.NoError(err)
+		assert.Equal(id, resolved)
+	}
+	_, err = s.GetForRuntime(id, "missing")
+	assert.ErrorIs(err, errdefs.ErrNotFound)
+	_, err = s.ResolveForRuntime(ref, "missing")
+	assert.ErrorIs(err, errdefs.ErrNotFound)
+	_, err = s.ResolveForRuntime(Name(ref, "runc"), "kata")
+	assert.ErrorIs(err, errdefs.ErrNotFound)
+
+	alias := Name("x.io/a:xa", "runc")
+	runc := Image{ID: id, RuntimeHandler: "runc", References: []string{alias}, Size: 20}
+	assert.NoError(s.update(alias, &runc))
+	before, err := s.GetForRuntime(id, "runc")
+	assert.NoError(err)
+	assert.NoError(s.update(Name(ref, "runc"), nil))
+	assert.Equal([]string{Name(ref, "runc"), alias, Name(id, "runc")}, before.References)
+	got, err := s.GetForRuntime(id, "runc")
+	assert.NoError(err)
+	assert.False(got.Pinned)
+	assert.Equal([]string{alias, Name(id, "runc")}, got.References)
+	assert.Equal(int64(20), got.Size)
+
+	runc.Pinned = true
+	runc.Size = 30
+	assert.NoError(s.update(alias, &runc))
+	got, err = s.GetForRuntime(id, "runc")
+	assert.NoError(err)
+	assert.True(got.Pinned)
+	assert.Equal(int64(30), got.Size)
+	assert.NoError(s.update(alias, nil))
+	assert.NoError(s.update(Name(id, "runc"), nil))
+	_, err = s.GetForRuntime(id, "runc")
+	assert.ErrorIs(err, errdefs.ErrNotFound)
+	_, err = s.ResolveForRuntime(ref, "runc")
+	assert.ErrorIs(err, errdefs.ErrNotFound)
+	assert.Len(s.List(), 2)
+	for _, handler := range []string{"", "kata"} {
+		got, err = s.GetForRuntime(id, handler)
+		assert.NoError(err)
+		assert.False(got.Pinned)
+		assert.Equal([]string{Name(ref, handler), Name(id, handler)}, got.References)
 	}
 }
