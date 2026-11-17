@@ -48,7 +48,11 @@ func WithProfile(profile string) oci.SpecOpts {
 // Note: must follow the setting of process capabilities
 func WithDefaultProfile() oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		s.Linux.Seccomp = DefaultProfile(s)
+		profile, err := defaultProfile(s)
+		if err != nil {
+			return fmt.Errorf("failed to generate default seccomp profile: %w", err)
+		}
+		s.Linux.Seccomp = profile
 		return nil
 	}
 }
