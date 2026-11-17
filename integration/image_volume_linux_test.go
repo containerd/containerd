@@ -253,6 +253,50 @@ func setupRunningContainerWithImageVolume(t *testing.T, selinuxLevel string, con
 	return podCtx, cnID, nil
 }
 
+// TestImageVolumeReportsResolvedDigest verifies that image-volume mount
+// status reports the resolved config digest while preserving the requested image.
+func TestImageVolumeReportsResolvedDigest(t *testing.T) {
+	containerImage := images.Get(images.Alpine)
+	imageVolumeImage := images.Get(images.Pause)
+	containerPath := "/image-mount"
+
+	podCtx, cnID, err := setupRunningContainerWithImageVolume(t, "", containerImage, imageVolumeImage, "", containerPath)
+	require.NoError(t, err)
+	defer podCtx.stop(true)
+
+	imgStatus, err := imageService.ImageStatus(&criruntime.ImageSpec{Image: imageVolumeImage})
+	require.NoError(t, err)
+	require.NotNil(t, imgStatus)
+	require.NotEmpty(t, imgStatus.GetId())
+	var repoDigest string
+	for _, ref := range imgStatus.GetRepoDigests() {
+		if i := strings.LastIndexByte(ref, '@'); i >= 0 {
+			repoDigest = ref[i+1:]
+			break
+		}
+	}
+	require.NotEmpty(t, repoDigest, "expected the multi-platform pause image to have a repository digest")
+	require.NotEqual(t, imgStatus.GetId(), repoDigest,
+		"the repo digest should differ from the platform-specific config digest")
+
+	status, err := runtimeService.ContainerStatus(cnID)
+	require.NoError(t, err)
+
+	var found bool
+	for _, m := range status.GetMounts() {
+		if m.GetContainerPath() != containerPath {
+			continue
+		}
+		found = true
+		require.Equal(t, imageVolumeImage, m.GetImage().GetImage())
+
+		require.Equal(t, imgStatus.GetId(), m.GetImage().GetImageRef(),
+			"image volume mount should report the resolved config digest as ImageRef")
+		break
+	}
+	require.True(t, found, "expected to find the image-volume mount in container status")
+}
+
 func TestImageVolumeCheckVolatileOption(t *testing.T) {
 	ok, _ := kernel.GreaterEqualThan(
 		kernel.KernelVersion{
