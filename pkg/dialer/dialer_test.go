@@ -76,6 +76,20 @@ func TestDialerUnixSocket(t *testing.T) {
 	}
 }
 
+// TestContextDialerNoDeadline verifies that a context without a deadline
+// means no timeout, matching net.DialTimeout's zero-timeout semantics,
+// rather than an immediate timeout.
+func TestContextDialerNoDeadline(t *testing.T) {
+	l, sockPath := listenUnix(t, "test.sock")
+	go acceptAndClose(l)
+
+	conn, err := ContextDialer(context.Background(), sockPath)
+	if err != nil {
+		t.Fatalf("ContextDialer(%q) with no deadline failed: %v", sockPath, err)
+	}
+	conn.Close()
+}
+
 // TestDialAddressGRPC verifies that gRPC accepts the target from DialAddress
 // and connects through ContextDialer, as the containerd client does.
 func TestDialAddressGRPC(t *testing.T) {
