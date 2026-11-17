@@ -101,6 +101,16 @@ func newStatusTestCRIService() *criService {
 	}
 }
 
+// TestStatusVerboseReportsSnapshotter checks that verbose Status() reports
+// the resolved default snapshotter.
+func TestStatusVerboseReportsSnapshotter(t *testing.T) {
+	c := newStatusTestCRIService()
+	c.ImageService = &fakeImageService{snapshotter: "erofs"}
+	resp, err := c.Status(context.Background(), &runtime.StatusRequest{Verbose: true})
+	assert.NoError(t, err)
+	assert.Equal(t, `"erofs"`, resp.Info["snapshotter"])
+}
+
 // TestStatusRuntimeHandlersOrdering checks that the runtime handlers
 // returned by Status() are in the same order every time
 func TestStatusRuntimeHandlersOrdering(t *testing.T) {

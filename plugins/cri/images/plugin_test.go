@@ -18,12 +18,16 @@ package images
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
@@ -108,4 +112,41 @@ func TestRuntimePlatformsConfigMigration(t *testing.T) {
 
 	_, ok = runtimePlatforms["runc"]
 	assert.False(t, ok, "runc has no snapshotter and must not appear in runtime_platforms")
+}
+
+func TestDefaultSnapshotter(t *testing.T) {
+	add := func(set *plugin.Set, typ plugin.Type, id string, err error) {
+		reg := plugin.Registration{
+			Type: typ,
+			ID:   id,
+			InitFn: func(*plugin.InitContext) (any, error) {
+				return struct{}{}, err
+			},
+		}
+		require.NoError(t, set.Add(reg.Init(plugin.NewContext(context.Background(), plugin.NewPluginSet(), nil))))
+	}
+	skip := fmt.Errorf("unsupported: %w", plugin.ErrSkipPlugin)
+
+	for _, tc := range []struct {
+		name         string
+		snErr, dfErr error
+		expect       string
+	}{
+		{"both loaded", nil, nil, "erofs"},
+		{"snapshotter skipped", skip, nil, defaults.DefaultSnapshotter},
+		{"differ skipped", nil, skip, defaults.DefaultSnapshotter},
+		{"both skipped", skip, skip, defaults.DefaultSnapshotter},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := plugin.NewPluginSet()
+			add(set, plugins.SnapshotPlugin, "erofs", tc.snErr)
+			add(set, plugins.DiffPlugin, "erofs", tc.dfErr)
+			ic := plugin.NewContext(context.Background(), set, nil)
+			expect := tc.expect
+			if runtime.GOOS != "linux" {
+				expect = defaults.DefaultSnapshotter
+			}
+			assert.Equal(t, expect, defaultSnapshotter(ic))
+		})
+	}
 }
