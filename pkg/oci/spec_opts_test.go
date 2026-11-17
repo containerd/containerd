@@ -979,3 +979,42 @@ func TestAmbientCapabilityOptionsInitializeSpec(t *testing.T) {
 		})
 	}
 }
+
+func TestAmbientCapabilityOptionsIndependentStorage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		opts []SpecOpts
+	}{
+		{
+			name: "inheritable then ambient",
+			opts: []SpecOpts{
+				WithAddedInheritableCapabilities([]string{"CAP_NET_RAW"}),
+				WithAddedAmbientCapabilities([]string{"CAP_NET_BIND_SERVICE"}),
+			},
+		},
+		{
+			name: "ambient then inheritable",
+			opts: []SpecOpts{
+				WithAddedAmbientCapabilities([]string{"CAP_NET_BIND_SERVICE"}),
+				WithAddedInheritableCapabilities([]string{"CAP_NET_RAW"}),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caps := make([]string, 1, 4)
+			caps[0] = "CAP_CHOWN"
+			s := &Spec{}
+			ctx := context.Background()
+
+			require.NoError(t, WithAmbientCapabilities(caps)(ctx, nil, nil, s))
+			for _, opt := range tc.opts {
+				require.NoError(t, opt(ctx, nil, nil, s))
+			}
+
+			assert.Equal(t, []string{"CAP_CHOWN", "CAP_NET_RAW"},
+				s.Process.Capabilities.Inheritable)
+			assert.Equal(t, []string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE"},
+				s.Process.Capabilities.Ambient)
+		})
+	}
+}

@@ -1144,8 +1144,8 @@ func WithDroppedCapabilities(caps []string) SpecOpts {
 func WithAmbientCapabilities(caps []string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setCapabilities(s)
-		s.Process.Capabilities.Inheritable = caps
-		s.Process.Capabilities.Ambient = caps
+		s.Process.Capabilities.Inheritable = slices.Clone(caps)
+		s.Process.Capabilities.Ambient = slices.Clone(caps)
 		return nil
 	}
 }
