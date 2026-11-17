@@ -26,11 +26,9 @@ import (
 // StreamImages streams all existing images.
 func (c *GRPCCRIImageService) StreamImages(r *runtime.StreamImagesRequest, s grpc.ServerStreamingServer[runtime.StreamImagesResponse]) error {
 	ctx := s.Context()
-	imagesInStore := c.imageStore.List()
-
-	var images []*runtime.Image
-	for _, image := range imagesInStore {
-		images = append(images, toCRIImage(image))
+	images, err := c.listImages(r.GetFilter())
+	if err != nil {
+		return err
 	}
 
 	return criutil.SendInBatches(ctx, images, criutil.DefaultStreamBatchSize, func(batch []*runtime.Image) error {

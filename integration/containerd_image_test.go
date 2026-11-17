@@ -26,6 +26,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
@@ -222,15 +223,15 @@ func TestContainerdSandboxImage(t *testing.T) {
 	ctx := context.Background()
 
 	t.Log("make sure the pause image exist")
-	pauseImg, err := containerdClient.GetImage(ctx, pauseImage)
+	pimg, err := imageService.ImageStatus(&runtime.ImageSpec{Image: pauseImage})
+	require.NoError(t, err)
+	require.NotNil(t, pimg)
+	pauseImg, err := containerdClient.GetImage(ctx, imagestore.Name(pauseImage, pimg.Spec.GetRuntimeHandler()))
 	require.NoError(t, err)
 	t.Log("ensure correct labels are set on pause image")
 	assert.Equal(t, "pinned", pauseImg.Labels()["io.cri-containerd.pinned"])
 
 	t.Log("pause image should be seen by cri plugin")
-	pimg, err := imageService.ImageStatus(&runtime.ImageSpec{Image: pauseImage})
-	require.NoError(t, err)
-	require.NotNil(t, pimg)
 	t.Log("verify pinned field is set for pause image")
 	assert.True(t, pimg.Pinned)
 }

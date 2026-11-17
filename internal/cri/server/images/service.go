@@ -26,12 +26,15 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"golang.org/x/sync/semaphore"
@@ -44,9 +47,10 @@ import (
 
 type imageClient interface {
 	ListImages(context.Context, ...string) ([]containerd.Image, error)
-	GetImage(context.Context, string) (containerd.Image, error)
 	GetImageWithPlatform(context.Context, string, platforms.MatchComparer) (containerd.Image, error)
+	ImageFromRecord(images.Image, platforms.MatchComparer) containerd.Image
 	Pull(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+	WithLease(context.Context, ...leases.Opt) (context.Context, func(context.Context) error, error)
 }
 
 type platformImageClient struct {
@@ -59,6 +63,13 @@ func (c *platformImageClient) GetImageWithPlatform(ctx context.Context, ref stri
 		return nil, err
 	}
 	return containerd.NewImageWithPlatform(c.Client, i, platform), nil
+}
+
+func (c *platformImageClient) ImageFromRecord(image images.Image, platform platforms.MatchComparer) containerd.Image {
+	if platform == nil {
+		return containerd.NewImage(c.Client, image)
+	}
+	return containerd.NewImageWithPlatform(c.Client, image, platform)
 }
 
 type ImagePlatform struct {
@@ -74,7 +85,10 @@ type CRIImageService struct {
 	config criconfig.ImageConfig
 	// images is the lower level image store used for raw storage,
 	// no event publishing should currently be assumed
-	images images.Store
+	images   images.Store
+	content  content.Provider
+	metadata *metadata.DB
+	gc       func(context.Context) (gc.Stats, error)
 	// client is a subset of the containerd client
 	// and will be replaced by image store and transfer service
 	client imageClient
@@ -88,19 +102,22 @@ type CRIImageService struct {
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
-	snapshotStore *snapshotstore.Store
+	snapshotStore   *snapshotstore.Store
+	snapshotsSyncer *snapshotsSyncer
 	// transferrer is used to pull image with transfer service
 	transferrer transfer.Transferrer
 	// unpackDuplicationSuppressor is used to make sure that there is only
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.
 	unpackDuplicationSuppressor kmutex.KeyedLocker
+	imageMutationLocker         kmutex.KeyedLocker
 
 	// downloadLimiter is used to limit the number of concurrent downloads.
 	downloadLimiter *semaphore.Weighted
 }
 
 type resolvedRuntimeHandler struct {
+	Name        string
 	Platform    *imagespec.Platform
 	Snapshotter string
 }
@@ -113,6 +130,10 @@ type CRIImageServiceOptions struct {
 	Content content.Store
 
 	Images images.Store
+
+	Metadata *metadata.DB
+
+	GC func(context.Context) (gc.Stats, error)
 
 	ImageFSPaths map[string]string
 
@@ -143,6 +164,9 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
+		content:                     options.Content,
+		metadata:                    options.Metadata,
+		gc:                          options.GC,
 		client:                      &platformImageClient{Client: options.Client},
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
@@ -150,16 +174,23 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		snapshotStore:               snapshotstore.NewStore(),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
+		imageMutationLocker:         kmutex.New(),
 		downloadLimiter:             downloadLimiter,
 	}
 
 	log.L.Info("Start snapshots syncer")
-	snapshotsSyncer := newSnapshotsSyncer(
+	svc.snapshotsSyncer = newSnapshotsSyncer(
 		svc.snapshotStore,
 		options.Snapshotters,
 		time.Duration(svc.config.StatsCollectPeriod)*time.Second,
 	)
-	snapshotsSyncer.start()
+	svc.snapshotsSyncer.enable(config.Snapshotter)
+	for _, p := range svc.runtimePlatforms {
+		if p != nil {
+			svc.snapshotsSyncer.enable(p.Snapshotter)
+		}
+	}
+	svc.snapshotsSyncer.start()
 
 	return &svc, nil
 }
@@ -175,11 +206,19 @@ func (c *CRIImageService) UpdateRuntime(runtimeName string, imagePlatform *Image
 			existing.Snapshotter = imagePlatform.Snapshotter
 		}
 		log.L.Debugf("Runtime %q already configured, preserving image settings", runtimeName)
-		return
+	} else {
+		c.runtimePlatforms[runtimeName] = imagePlatform
+		if imagePlatform != nil {
+			log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
+		}
 	}
-	c.runtimePlatforms[runtimeName] = imagePlatform
-	if imagePlatform != nil {
-		log.L.Infof("Registered runtime %q with snapshotter %q", runtimeName, imagePlatform.Snapshotter)
+	if c.snapshotsSyncer != nil {
+		if imagePlatform != nil {
+			c.snapshotsSyncer.enable(imagePlatform.Snapshotter)
+		}
+		if p := c.runtimePlatforms[runtimeName]; p != nil {
+			c.snapshotsSyncer.enable(p.Snapshotter)
+		}
 	}
 }
 
@@ -201,6 +240,7 @@ func (c *CRIImageService) resolveRuntimeHandler(handler string) (resolvedRuntime
 		name = c.defaultRuntimeName
 	}
 	h := resolvedRuntimeHandler{
+		Name:        name,
 		Snapshotter: c.config.Snapshotter,
 	}
 	if p, ok := c.runtimePlatforms[name]; ok && p != nil {
@@ -214,32 +254,23 @@ func (c *CRIImageService) resolveRuntimeHandler(handler string) (resolvedRuntime
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
-	getImageID := func(refOrId string) string {
-		if _, err := imagedigest.Parse(refOrID); err == nil {
-			return refOrID
+func (c *CRIImageService) LocalResolve(refOrID, runtimeHandler string) (imagestore.Image, error) {
+	if runtimeHandler == "" {
+		runtimeHandler = c.defaultRuntimeName
+	}
+	id := refOrID
+	if _, err := imagedigest.Parse(refOrID); err != nil {
+		if normalized, err := docker.ParseDockerRef(refOrID); err == nil {
+			id, err = c.imageStore.ResolveForRuntime(normalized.String(), runtimeHandler)
+			if err != nil && errdefs.IsNotFound(err) && runtimeHandler == c.defaultRuntimeName {
+				id, err = c.imageStore.Resolve(normalized.String())
+			}
+			if err != nil {
+				id = refOrID
+			}
 		}
-		return func(ref string) string {
-			// ref is not image id, try to resolve it locally.
-			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := docker.ParseDockerRef(ref)
-			if err != nil {
-				return ""
-			}
-			id, err := c.imageStore.Resolve(normalized.String())
-			if err != nil {
-				return ""
-			}
-			return id
-		}(refOrID)
 	}
-
-	imageID := getImageID(refOrID)
-	if imageID == "" {
-		// Try to treat ref as imageID
-		imageID = refOrID
-	}
-	return c.imageStore.Get(imageID)
+	return c.GetImage(id, runtimeHandler)
 }
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.
@@ -255,8 +286,30 @@ func (c *CRIImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cri
 }
 
 // GetImage gets image metadata by image id.
-func (c *CRIImageService) GetImage(id string) (imagestore.Image, error) {
-	return c.imageStore.Get(id)
+func (c *CRIImageService) GetImage(id, runtimeHandler string) (imagestore.Image, error) {
+	if runtimeHandler == "" {
+		runtimeHandler = c.defaultRuntimeName
+	}
+	image, err := c.imageStore.GetForRuntime(id, runtimeHandler)
+	if runtimeHandler == "" || runtimeHandler != c.defaultRuntimeName || (err != nil && !errdefs.IsNotFound(err)) {
+		return image, err
+	}
+	legacyID := id
+	if err == nil {
+		legacyID = image.ID
+	}
+	legacy, legacyErr := c.imageStore.Get(legacyID)
+	if err != nil {
+		if legacyErr != nil {
+			return image, err
+		}
+		image = legacy
+	} else if legacyErr == nil {
+		image.References = append(append([]string{}, image.References...), legacy.References...)
+		image.Pinned = image.Pinned || legacy.Pinned
+	}
+	image.RuntimeHandler = runtimeHandler
+	return image, nil
 }
 
 // GetSnapshot returns the snapshot with specified key.

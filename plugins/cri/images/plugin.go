@@ -30,6 +30,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
+	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
@@ -50,6 +51,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.LeasePlugin,
 			plugins.MetadataPlugin,
+			plugins.GCPlugin,
 			plugins.SandboxStorePlugin,
 			plugins.ServicePlugin,  // For client
 			plugins.SnapshotPlugin, // For root directory properties
@@ -62,6 +64,10 @@ func init() {
 				return nil, err
 			}
 			mdb := m.(*metadata.DB)
+			g, err := ic.GetSingle(plugins.GCPlugin)
+			if err != nil {
+				return nil, err
+			}
 
 			// only set the default value of config path, if both mirrors and
 			// config path are empty and we are on Linux.
@@ -96,7 +102,12 @@ func init() {
 			}
 
 			options := &images.CRIImageServiceOptions{
-				Content:          mdb.ContentStore(),
+				Content:  mdb.ContentStore(),
+				Images:   metadata.NewImageStore(mdb),
+				Metadata: mdb,
+				GC: g.(interface {
+					ScheduleAndWait(context.Context) (gc.Stats, error)
+				}).ScheduleAndWait,
 				RuntimePlatforms: map[string]*images.ImagePlatform{},
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
@@ -112,16 +123,14 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
 			}
-			options.Images = ctrdCli.ImageService()
 			options.Client = ctrdCli
 
 			allSnapshotters := mdb.Snapshotters()
 			defaultSnapshotter := config.Snapshotter
-			if s, ok := allSnapshotters[defaultSnapshotter]; ok {
-				options.Snapshotters[defaultSnapshotter] = s
-			} else {
+			if _, ok := allSnapshotters[defaultSnapshotter]; !ok {
 				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 			}
+			options.Snapshotters = allSnapshotters
 
 			snapshotRoot := func(snapshotter string) (snapshotRoot string) {
 				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
@@ -134,17 +143,12 @@ func init() {
 				return snapshotRoot
 			}
 
-			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot(defaultSnapshotter)
-			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
+			for name := range allSnapshotters {
+				options.ImageFSPaths[name] = snapshotRoot(name)
+				log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[name], name)
+			}
 
 			for runtimeName, rp := range config.RuntimePlatforms {
-				if rp.Snapshotter != "" {
-					if _, ok := options.ImageFSPaths[rp.Snapshotter]; !ok {
-						options.ImageFSPaths[rp.Snapshotter] = snapshotRoot(rp.Snapshotter)
-						log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[rp.Snapshotter], rp.Snapshotter)
-					}
-				}
-
 				// Left unset when runtime_platforms doesn't configure a platform.
 				var platform *imagespec.Platform
 				if rp.Platform != "" {

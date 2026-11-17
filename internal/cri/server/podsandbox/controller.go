@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -87,6 +88,7 @@ func init() {
 				client:         client,
 				config:         criRuntimePlugin.(interface{ Config() criconfig.Config }).Config(),
 				imageConfig:    criImagePlugin.(interface{ Config() criconfig.ImageConfig }).Config(),
+				imageService:   criImagePlugin.(imageService),
 				os:             osinterface.RealOS{},
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
@@ -106,11 +108,16 @@ func init() {
 	})
 }
 
+type imageService interface {
+	LocalResolve(refOrID, runtimeHandler string) (imagestore.Image, error)
+}
+
 type Controller struct {
 	// config contains all configurations.
 	config criconfig.Config
 	// imageConfig contains CRI image configuration.
-	imageConfig criconfig.ImageConfig
+	imageConfig  criconfig.ImageConfig
+	imageService imageService
 	// client is an instance of the containerd client
 	client *containerd.Client
 	// warningService is used to emit deprecation warnings.

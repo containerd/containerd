@@ -183,6 +183,14 @@ func WithPullSnapshotter(snapshotterName string, opts ...snapshots.Opt) RemoteOp
 	}
 }
 
+// WithPullImageName sets the metadata name for the pulled image, leaving the registry reference unchanged.
+func WithPullImageName(name string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.ImageName = name
+		return nil
+	}
+}
+
 // WithPullLabel sets a label to be associated with a pulled reference
 func WithPullLabel(key, value string) RemoteOpt {
 	return func(_ *Client, rc *RemoteContext) error {

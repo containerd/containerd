@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"testing"
 	"time"
@@ -26,19 +27,132 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/imagetest"
+	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	bolt "go.etcd.io/bbolt"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestToContainerdImage(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	cs := imagetest.NewContentStore(ctx, t)
+	db, err := bolt.Open(filepath.Join(t.TempDir(), "metadata.db"), 0o600, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, db.Close()) })
+	store := metadata.NewImageStore(metadata.NewDB(db, cs.Store, nil))
+	client, err := containerd.New("", containerd.WithServices(containerd.WithImageStore(store), containerd.WithContentStore(cs.Store)),
+		containerd.WithDefaultPlatform(platforms.OnlyStrict(imagespec.Platform{OS: "linux", Architecture: "amd64"})))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, client.Close()) })
+	var configs, manifests []imagetest.Content
+	for _, arch := range []string{"amd64", "arm64"} {
+		platform := imagespec.Platform{OS: "linux", Architecture: arch}
+		config := cs.JSONObject(imagespec.MediaTypeImageConfig, imagespec.Image{Platform: platform,
+			RootFS: imagespec.RootFS{Type: "layers", DiffIDs: []digest.Digest{digest.FromString(arch)}}})
+		configs = append(configs, config)
+		manifests = append(manifests, imagetest.AddPlatform(cs.Manifest(config), platform))
+	}
+	index := cs.Index(append([]imagetest.Content{{Descriptor: imagespec.Descriptor{MediaType: imagespec.MediaTypeImageIndex,
+		Digest: digest.FromString("missing-index"), Platform: &imagespec.Platform{OS: "windows", Architecture: "amd64"}}}}, manifests...)...)
+	for _, handler := range []string{"", "runc"} {
+		t.Run(handler, func(t *testing.T) {
+			name := imagestore.Name("example.com/image:latest", handler)
+			selected := imagestore.Image{ID: configs[1].Descriptor.Digest.String(), RuntimeHandler: handler}
+			c := &criService{client: client}
+			stableID := imagestore.Name(selected.ID, handler)
+			repoDigest := imagestore.Name("example.com/image@"+index.Descriptor.Digest.String(), handler)
+			selected.References = []string{name, stableID, repoDigest}
+			for _, ref := range selected.References {
+				_, err := store.Create(ctx, images.Image{Name: ref, Target: index.Descriptor})
+				require.NoError(t, err)
+			}
+			for _, mutation := range []struct {
+				ref     string
+				deleted bool
+			}{
+				{ref: name},
+				{ref: name, deleted: true},
+				{ref: stableID},
+			} {
+				if mutation.deleted {
+					require.NoError(t, store.Delete(ctx, mutation.ref))
+				} else {
+					_, err := store.Update(ctx, images.Image{Name: mutation.ref, Target: manifests[0].Descriptor}, "target")
+					require.NoError(t, err)
+				}
+				converted, originalDigest, err := c.toContainerdImage(ctx, selected)
+				require.NoError(t, err)
+				config, err := converted.Config(ctx)
+				require.NoError(t, err)
+				assert.Equal(t, selected.ID, config.Digest.String())
+				assert.Equal(t, index.Descriptor.Digest.String(), originalDigest)
+				assert.Equal(t, manifests[1].Descriptor, converted.Target())
+			}
+			selected.ID = digest.FromString("stale").String()
+			_, _, err = c.toContainerdImage(ctx, selected)
+			require.ErrorIs(t, err, errdefs.ErrNotFound)
+		})
+	}
+}
+
+func TestEffectiveSandboxRuntimeHandler(t *testing.T) {
+	c := newTestCRIService()
+	c.config.DefaultRuntimeName = "default"
+	c.config.Runtimes = map[string]criconfig.Runtime{
+		"default":                  {},
+		"alternate":                {},
+		criconfig.RuntimeUntrusted: {},
+	}
+	for _, test := range []struct {
+		name      string
+		handler   string
+		untrusted bool
+		expected  string
+		expectErr bool
+	}{
+		{name: "legacy default", expected: "default"},
+		{name: "explicit default", handler: "default", expected: "default"},
+		{name: "alternate", handler: "alternate", expected: "alternate"},
+		{name: "implicit untrusted", untrusted: true, expected: criconfig.RuntimeUntrusted},
+		{name: "explicit untrusted", handler: criconfig.RuntimeUntrusted, untrusted: true, expected: criconfig.RuntimeUntrusted},
+		{name: "untrusted rejects explicit default", handler: "default", untrusted: true, expectErr: true},
+		{name: "unknown", handler: "unknown", expectErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			config := &runtime.PodSandboxConfig{}
+			if test.untrusted {
+				config.Annotations = map[string]string{annotations.UntrustedWorkload: "true"}
+			}
+			handler, err := c.effectiveSandboxRuntimeHandler(config, test.handler)
+			if test.expectErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, handler)
+		})
+	}
+}
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
 func TestGetUserFromImage(t *testing.T) {

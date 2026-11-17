@@ -422,7 +422,11 @@ func (c *criService) ensurePauseImageExists(ctx context.Context, config *runtime
 		ref = img
 	}
 
-	_, err := c.ImageService.LocalResolve(ref)
+	runtimeHandler, err := c.effectiveSandboxRuntimeHandler(config, runtimeHandler)
+	if err != nil {
+		return fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	_, err = c.ImageService.LocalResolve(ref, runtimeHandler)
 	if err == nil {
 		return nil
 	} else if !errdefs.IsNotFound(err) {

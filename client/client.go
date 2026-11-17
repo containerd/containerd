@@ -423,6 +423,9 @@ type RemoteContext struct {
 	// SnapshotterOpts are additional options to be passed to a snapshotter during pull
 	SnapshotterOpts []snapshots.Opt
 
+	// ImageName overrides the metadata name without changing the registry reference.
+	ImageName string
+
 	// Labels to be applied to the created image
 	Labels map[string]string
 

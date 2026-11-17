@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/v2/core/images"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 )
@@ -36,12 +37,21 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 		return fmt.Errorf("unable to list images: %w", err)
 	}
 
-	// TODO: Support all snapshotter
-	snapshotter := c.config.Snapshotter
 	var wg sync.WaitGroup
 	for _, i := range cImages {
 		wg.Go(func() {
 			name := i.Name()
+			_, handler, err := imagestore.ParseName(name)
+			if err != nil {
+				log.G(ctx).WithError(err).Warnf("Failed to read image runtime handler for %q", name)
+				return
+			}
+			snapshotter := c.config.Snapshotter
+			if handler != "" {
+				if p := c.runtimePlatforms[handler]; p != nil && p.Snapshotter != "" {
+					snapshotter = p.Snapshotter
+				}
+			}
 			platform, err := imagePlatformFromLabels(i.Labels())
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to get platform for image %q", name)

@@ -27,10 +27,12 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/integration/images"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/errdefs"
+	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/require"
@@ -154,10 +156,10 @@ func TestImageVolumeBasic(t *testing.T) {
 				}
 			}()
 
-			volumeImg, err := containerdClient.GetImage(ctx, tc.imageVolumeImage)
+			volumeImg, err := imageService.ImageStatus(&criruntime.ImageSpec{Image: tc.imageVolumeImage})
 			require.NoError(t, err)
-
-			volumeImgTarget := filepath.Join(podCtx.imageVolumeDir(), volumeImg.Target().Digest.Encoded())
+			require.NotNil(t, volumeImg)
+			volumeImgTarget := filepath.Join(podCtx.imageVolumeDir(), digest.Digest(volumeImg.Id).Encoded())
 			_, err = snSrv.Mounts(ctx, volumeImgTarget)
 			require.NoError(t, err)
 
@@ -196,12 +198,13 @@ func TestImageVolumeReusableAfterFailure(t *testing.T) {
 	image := images.Get(images.Alpine)
 	pullImagesByCRI(t, imageService, image)
 
-	img, err := containerdClient.GetImage(ctx, image)
+	img, err := imageService.ImageStatus(&criruntime.ImageSpec{Image: image})
 	require.NoError(t, err)
+	require.NotNil(t, img)
 	podCtx := newPodTCtx(t, runtimeService, t.Name(), "image-volume")
 	defer podCtx.stop(true)
 
-	target := filepath.Join(podCtx.imageVolumeDir(), img.Target().Digest.Encoded())
+	target := filepath.Join(podCtx.imageVolumeDir(), digest.Digest(img.Id).Encoded())
 
 	cfg := ContainerConfig("invalid-image-subpath", image,
 		WithImageVolumeMount(image, "does-not-exist", "/image-mount"))
@@ -290,14 +293,17 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 	alpineImage := images.Get(images.Alpine)
 	pullImagesByCRI(t, imageService, alpineImage)
 
-	img, err := containerdClient.GetImage(ctx, alpineImage)
+	image, err := imageService.ImageStatus(&criruntime.ImageSpec{Image: alpineImage})
+	require.NoError(t, err)
+	require.NotNil(t, image)
+	img, err := containerdClient.GetImage(ctx, imagestore.Name(alpineImage, image.Spec.GetRuntimeHandler()))
 	require.NoError(t, err)
 
 	diffIDs, err := img.RootFS(ctx)
 	require.NoError(t, err)
 
 	alpineImageChainID := identity.ChainID(diffIDs).String()
-	alpineImageTarget := img.Target().Digest.Encoded()
+	alpineImageTarget := digest.Digest(image.Id).Encoded()
 
 	snSrv := containerdClient.SnapshotService("overlayfs")
 	for _, tc := range []struct {

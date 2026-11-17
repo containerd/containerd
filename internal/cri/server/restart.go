@@ -284,6 +284,9 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 		return container, nil, 0, fmt.Errorf("failed to unmarshal metadata extension %q: %w", ext, err)
 	}
 	meta := data.(*containerstore.Metadata)
+	if meta.Config.GetImage() != nil && meta.Config.Image.RuntimeHandler == "" {
+		meta.Config.Image.RuntimeHandler = c.config.DefaultRuntimeName
+	}
 
 	// Load status from checkpoint.
 	status, err := containerstore.LoadStatus(containerDir, id)

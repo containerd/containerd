@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -30,6 +31,8 @@ import (
 	"github.com/containerd/typeurl/v2"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
@@ -276,7 +279,49 @@ func TestContainerStatus(t *testing.T) {
 			expected.Reason = test.reason
 			expected.StopSignal = runtime.Signal_SIGNAL_SIGTERM
 			patchExceptedWithState(expected, test.expectedState)
-			assert.Equal(t, expected, resp.GetStatus())
+			assert.True(t, proto.Equal(expected, resp.GetStatus()), "expected %v, got %v", expected, resp.GetStatus())
+		})
+	}
+}
+
+func TestContainerStatusRuntimeHandler(t *testing.T) {
+	for _, imageRemoved := range []bool{false, true} {
+		t.Run(fmt.Sprintf("image removed=%t", imageRemoved), func(t *testing.T) {
+			c := newTestCRIService()
+			metadata, ctnr, status, image, _ := getContainerStatusTestData(t)
+			metadata.Config.Image.RuntimeHandler = "alternate"
+			metadata.Config.Image.UserSpecifiedImage = "busybox"
+			image.RuntimeHandler = "alternate"
+			tag, repoDigest := image.References[0], image.References[1]
+			for i, ref := range image.References {
+				image.References[i] = imagestore.Name(ref, image.RuntimeHandler)
+			}
+			otherImage := *image
+			otherImage.RuntimeHandler = "other"
+			otherImage.References = []string{imagestore.Name("example.com/other:latest", "other")}
+			images := []imagestore.Image{otherImage}
+			if !imageRemoved {
+				images = append(images, *image)
+			}
+			imageStore, err := imagestore.NewFakeStore(images)
+			require.NoError(t, err)
+			c.ImageService = &fakeImageService{imageStore: imageStore}
+			container, err := containerstore.NewContainer(*metadata,
+				containerstore.WithFakeStatus(*status), containerstore.WithContainer(ctnr))
+			require.NoError(t, err)
+			require.NoError(t, c.containerStore.Add(container))
+			resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
+			require.NoError(t, err)
+			assert.Equal(t, "alternate", resp.Status.Image.RuntimeHandler)
+			assert.Equal(t, "busybox", resp.Status.Image.UserSpecifiedImage)
+			if imageRemoved {
+				assert.Equal(t, metadata.Config.Image.Image, resp.Status.Image.Image)
+				assert.Equal(t, image.ID, resp.Status.ImageRef)
+			} else {
+				assert.Equal(t, tag, resp.Status.Image.Image)
+				assert.Equal(t, repoDigest, resp.Status.ImageRef)
+			}
+			assert.Equal(t, "test-image", metadata.Config.Image.Image)
 		})
 	}
 }
@@ -375,13 +420,15 @@ func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { re
 
 func (s *fakeImageService) CheckImages(ctx context.Context) error { return nil }
 
-func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
+func (s *fakeImageService) GetImage(id, runtimeHandler string) (imagestore.Image, error) {
+	return s.imageStore.GetForRuntime(id, runtimeHandler)
+}
 
 func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
 
-func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+func (s *fakeImageService) LocalResolve(refOrID, runtimeHandler string) (imagestore.Image, error) {
 	return imagestore.Image{}, errors.New("not implemented")
 }
 

@@ -36,8 +36,70 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/unpack"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 )
+
+// ImageForConfig selects a manifest for a previously resolved config ID.
+// It does not change the persisted image target.
+func ImageForConfig(ctx context.Context, client *containerd.Client, image images.Image, configID string) (containerd.Image, error) {
+	matcher := containerd.NewImage(client, image).Platform()
+	if value := image.Labels[crilabels.ImagePlatformLabelKey]; value != "" {
+		platform, err := platforms.Parse(value)
+		if err != nil {
+			return nil, err
+		}
+		matcher = platforms.Only(platform)
+	}
+	var manifest imagespec.Descriptor
+	var complete bool
+	err := images.Walk(ctx, images.LimitManifests(images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+		if complete {
+			return nil, nil
+		}
+		if images.IsManifestType(desc.MediaType) {
+			config, err := images.Config(ctx, client.ContentStore(), desc, nil)
+			if err != nil {
+				if errdefs.IsNotFound(err) {
+					return nil, nil
+				}
+				return nil, err
+			}
+			if config.Digest.String() == configID {
+				if manifest.MediaType == "" {
+					manifest = desc
+				}
+				if desc.Digest == image.Target.Digest {
+					complete = true
+					return nil, nil
+				}
+				_, _, _, missing, err := images.Check(ctx, client.ContentStore(), desc, nil)
+				if err != nil {
+					return nil, err
+				}
+				if len(missing) == 0 {
+					manifest = desc
+					complete = true
+				}
+			}
+			return nil, nil
+		}
+		children, err := images.Children(ctx, client.ContentStore(), desc)
+		if errdefs.IsNotFound(err) && desc.Digest != image.Target.Digest {
+			return nil, nil
+		}
+		return children, err
+	}), matcher, 0), image.Target)
+	if err != nil {
+		return nil, err
+	}
+	if manifest.MediaType == "" {
+		return nil, fmt.Errorf("image %q has no manifest for config %q: %w", image.Name, configID, errdefs.ErrNotFound)
+	}
+	image.Target = manifest
+	return containerd.NewImageWithPlatform(client, image, platforms.All), nil
+}
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the
 // snapshot fails we make sure the image is actually unpacked and retry.
@@ -65,7 +127,7 @@ func unpackImage(ctx context.Context, client *containerd.Client, i containerd.Im
 	}
 	defer done(ctx)
 
-	matcher := platforms.Default()
+	matcher := i.Platform()
 
 	capabilities, err := client.GetSnapshotterCapabilities(ctx, snapshotter)
 	if err != nil {
@@ -94,7 +156,11 @@ func unpackImage(ctx context.Context, client *containerd.Client, i containerd.Im
 
 	var h images.Handler = childrenHandler
 	if appendSnapshotLabels {
-		h = snpkg.AppendInfoHandlerWrapper(i.Name())(h)
+		ref, _, err := imagestore.ParseName(i.Name())
+		if err != nil {
+			return err
+		}
+		h = snpkg.AppendInfoHandlerWrapper(ref)(h)
 	}
 
 	if err := images.Dispatch(ctx, u.Unpack(h), nil, i.Target()); err != nil {

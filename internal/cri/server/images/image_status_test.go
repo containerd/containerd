@@ -71,6 +71,22 @@ func TestImageStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Equal(t, expected, resp.GetImage())
+
+	c.defaultRuntimeName = "runc"
+	variant := image
+	variant.RuntimeHandler = "runc"
+	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image, variant})
+	require.NoError(t, err)
+	expected.Spec = &runtime.ImageSpec{RuntimeHandler: "runc"}
+	resp, err = g.ImageStatus(context.Background(), &runtime.ImageStatusRequest{Image: &runtime.ImageSpec{Image: testID}})
+	require.NoError(t, err)
+	assert.Equal(t, expected, resp.GetImage())
+	listed, err := g.ListImages(context.Background(), &runtime.ListImagesRequest{})
+	require.NoError(t, err)
+	assert.Equal(t, []*runtime.Image{expected}, listed.Images)
+	stream := newFakeStreamServer[runtime.StreamImagesResponse](context.Background())
+	require.NoError(t, g.StreamImages(&runtime.StreamImagesRequest{}, stream))
+	assert.Equal(t, []*runtime.StreamImagesResponse{{Images: []*runtime.Image{expected}}}, stream.sent)
 }
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.

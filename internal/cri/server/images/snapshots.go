@@ -19,6 +19,8 @@ package images
 import (
 	"context"
 	"fmt"
+	"maps"
+	"sync"
 	"time"
 
 	snapshot "github.com/containerd/containerd/v2/core/snapshots"
@@ -36,6 +38,8 @@ type snapshotsSyncer struct {
 	store        *snapshotstore.Store
 	snapshotters map[string]snapshot.Snapshotter
 	syncPeriod   time.Duration
+	mu           sync.Mutex
+	enabled      map[string]snapshot.Snapshotter
 }
 
 // newSnapshotsSyncer creates a snapshot syncer.
@@ -45,6 +49,15 @@ func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snap
 		store:        store,
 		snapshotters: snapshotters,
 		syncPeriod:   period,
+		enabled:      make(map[string]snapshot.Snapshotter),
+	}
+}
+
+func (s *snapshotsSyncer) enable(name string) {
+	if snapshotter, ok := s.snapshotters[name]; ok {
+		s.mu.Lock()
+		s.enabled[name] = snapshotter
+		s.mu.Unlock()
 	}
 }
 
@@ -85,7 +98,11 @@ func (s *snapshotsSyncer) sync() error {
 	ctx := ctrdutil.NamespacedContext()
 	start := time.Now().UnixNano()
 
-	for key, snapshotter := range s.snapshotters {
+	s.mu.Lock()
+	snapshotters := maps.Clone(s.enabled)
+	s.mu.Unlock()
+
+	for key, snapshotter := range snapshotters {
 		var snapshots []snapshot.Info
 		// Do not call `Usage` directly in collect function, because
 		// `Usage` takes time, we don't want `Walk` to hold read lock

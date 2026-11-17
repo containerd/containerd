@@ -174,6 +174,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		unpackSpan.End()
 	}
 
+	if pullCtx.ImageName != "" {
+		img.Name = pullCtx.ImageName
+	}
 	img, err = c.createNewImage(ctx, img)
 	if err != nil {
 		return nil, err

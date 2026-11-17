@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -36,7 +37,7 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
 func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+	image, err := c.LocalResolve(r.GetImage().GetImage(), r.GetImage().GetRuntimeHandler())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			// return empty without error when image not found.
@@ -47,7 +48,7 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 
-	runtimeImage := toCRIImage(image)
+	runtimeImage := c.toCRIImage(image)
 	info, err := c.toCRIImageInfo(ctx, &image, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate image info: %w", err)
@@ -60,14 +61,29 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 }
 
 // toCRIImage converts internal image object to CRI runtime.Image.
-func toCRIImage(image imagestore.Image) *runtime.Image {
-	repoTags, repoDigests := util.ParseImageReferences(image.References)
+func (c *CRIImageService) toCRIImage(image imagestore.Image) *runtime.Image {
+	refs := make([]string, 0, len(image.References))
+	for _, name := range image.References {
+		ref, handler, err := imagestore.ParseName(name)
+		if err == nil && handler == "" && image.RuntimeHandler == c.defaultRuntimeName {
+			if id, err := c.imageStore.ResolveForRuntime(ref, image.RuntimeHandler); err == nil && id != image.ID {
+				continue
+			}
+		}
+		if err == nil && !slices.Contains(refs, ref) {
+			refs = append(refs, ref)
+		}
+	}
+	repoTags, repoDigests := util.ParseImageReferences(refs)
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
 		RepoTags:    repoTags,
 		RepoDigests: repoDigests,
 		Size:        uint64(image.Size),
 		Pinned:      image.Pinned,
+	}
+	if image.RuntimeHandler != "" {
+		runtimeImage.Spec = &runtime.ImageSpec{RuntimeHandler: image.RuntimeHandler}
 	}
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {

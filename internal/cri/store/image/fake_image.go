@@ -27,10 +27,20 @@ import (
 func NewFakeStore(images []Image) (*Store, error) {
 	s := NewStore(nil, nil, platforms.Default())
 	for _, i := range images {
-		for _, ref := range i.References {
-			s.refCache[ref] = i.ID
+		i.References = append([]string(nil), i.References...)
+		for n, ref := range i.References {
+			decoded, handler, err := ParseName(ref)
+			if err != nil {
+				return nil, err
+			}
+			if handler != "" && handler != i.RuntimeHandler {
+				return nil, fmt.Errorf("image reference %q has a different runtime handler", ref)
+			}
+			ref = Name(decoded, i.RuntimeHandler)
+			i.References[n] = ref
+			s.refCache[ref] = imageReference{id: i.ID}
 		}
-		if err := s.store.add(i); err != nil {
+		if err := s.runtimeStore(i.RuntimeHandler).add(i); err != nil {
 			return nil, fmt.Errorf("add image %+v: %w", i, err)
 		}
 	}
