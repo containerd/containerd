@@ -605,6 +605,14 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 // []{}         []{"2"}     []{"2"}
 // Maps merged by keys, but values are replaced entirely.
 func mergeConfig(to, from *Config) error {
+	// Plugin configuration is stored as map[string]any, and mergo's map
+	// branch replaces slices nested inside maps without consulting
+	// sliceTransformer, so an imported nested plugin array would replace
+	// the earlier array instead of being appended as documented. Merge
+	// those slices up front (deduplicated, like the top-level
+	// transformer) so mergo's replacement writes back the combined slice.
+	mergePluginSlices(to.Plugins, from.Plugins)
+
 	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithTransformers(sliceTransformer{}))
 	if err != nil {
 		return err
@@ -621,6 +629,51 @@ func mergeConfig(to, from *Config) error {
 }
 
 type sliceTransformer struct{}
+
+// mergePluginSlices appends (deduplicated) slices found at the same path
+// in both plugin configuration maps, recursing into nested maps. Only the
+// imported ("from") side is rewritten: after this runs, mergo's
+// replacement of the slice writes the combined value into "to". Slices
+// whose elements are maps are compared as whole elements, matching the
+// top-level sliceTransformer, so arrays nested inside an array element are
+// not merged element-wise. An empty imported slice leaves the earlier
+// array untouched, matching the documented top-level rule that
+// []{"1"} + []{} stays []{"1"}; this removes the previous escape hatch of
+// clearing an earlier array with an empty imported array.
+func mergePluginSlices(to, from map[string]any) {
+	for key, fromVal := range from {
+		toVal, ok := to[key]
+		if !ok {
+			continue
+		}
+		switch fromTyped := fromVal.(type) {
+		case map[string]any:
+			if toTyped, ok := toVal.(map[string]any); ok {
+				mergePluginSlices(toTyped, fromTyped)
+			}
+		case []any:
+			if toSlice, ok := toVal.([]any); ok {
+				from[key] = appendPluginSlice(toSlice, fromTyped)
+			}
+		}
+	}
+}
+
+func appendPluginSlice(dst, src []any) []any {
+	for _, sv := range src {
+		found := false
+		for _, dv := range dst {
+			if reflect.DeepEqual(sv, dv) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			dst = append(dst, sv)
+		}
+	}
+	return dst
+}
 
 func (sliceTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value) error {
 	if t.Kind() != reflect.Slice {
