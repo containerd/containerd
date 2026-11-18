@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -40,6 +41,17 @@ import (
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/log"
 )
+
+func statWithWatchdog(tag string, name string, fn func() error, duration time.Duration) error {
+	if duration <= 0 {
+		return fn()
+	}
+	t := time.AfterFunc(duration, func() {
+		log.G(context.Background()).Warnf("osi.Stat(%q) has been running for more than %v for container %s", tag, duration, name)
+	})
+	defer t.Stop()
+	return fn()
+}
 
 func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
@@ -134,7 +146,10 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 			)
 			// Create the host path if it doesn't exist.
 			// TODO(random-liu): Add CRI validation test for this case.
-			if _, err := osi.Stat(src); err != nil {
+			if err = statWithWatchdog(src, config.GetMetadata().GetName(), func() error {
+				_, err := osi.Stat(src)
+				return err
+			}, time.Minute); err != nil {
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
