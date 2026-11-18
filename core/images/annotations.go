@@ -26,4 +26,12 @@ const (
 	// If descriptor in image.json has this annotation, it will not create
 	// a new image.
 	AnnotationManifestSubject = "io.containerd.manifest.subject"
+
+	// AnnotationErofsUncompressedDigest is a layer descriptor annotation,
+	// defined by the EROFS image layer format specification
+	// (https://github.com/erofs/erofs-image-spec), carrying the digest of an
+	// application/vnd.erofs+zstd layer's decompressed content. When present
+	// it MUST be used as the layer's DiffID, taking precedence over any
+	// corresponding entry in the image config's rootfs.diff_ids.
+	AnnotationErofsUncompressedDigest = "org.erofs.uncompressed-digest"
 )

@@ -89,6 +89,15 @@ func LayerConvertFunc(opts ...ConvertOpt) converter.ConvertFunc {
 			return nil, nil
 		}
 
+		// A standalone chunk-index layer (see the EROFS image layer format
+		// specification, https://github.com/erofs/erofs-image-spec, §2.2)
+		// is not a mountable filesystem image and has nothing to convert;
+		// leave it untouched, matching how an EROFS-unaware consumer must
+		// skip it during composition (§8.2).
+		if images.IsSkippableLayerType(desc.MediaType) {
+			return nil, nil
+		}
+
 		if images.IsNonDistributable(desc.MediaType) {
 			return nil, nil
 		}
