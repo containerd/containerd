@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/internal/shimenv"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -106,7 +107,7 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
+	cmd.Env = shimenv.DaemonEnv(os.Environ(), "4")
 	// Preserve inherited resource attributes, but override the daemon's identity.
 	// The OpenTelemetry SDK uses the last value for duplicate resource keys.
 	var attrs []string

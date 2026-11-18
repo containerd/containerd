@@ -173,6 +173,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 			TTRPCAddress: b.containerdTTRPCAddress,
 			WorkDir:      bundlePath,
 			Opts:         nil,
+			Env:          b.env,
 			LogLevel:     log.GetLevel(),
 			Action:       "delete",
 		})
