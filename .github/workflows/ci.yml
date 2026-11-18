@@ -997,7 +997,7 @@ jobs:
     name: Report required job statuses
     runs-on: ubuntu-24.04
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
-    needs: [linters, project, protos, binaries, integration-linux, integration-windows, integration-runsc, tests-cri-in-userns, tests-mac-os, node-e2e]
+    needs: [linters, project, protos, man, crossbuild, binaries, integration-linux, integration-windows, integration-runsc, tests-cri-in-userns, tests-mac-os, node-e2e]
     if: ${{ always() }}
     steps:
       - run: exit 1
