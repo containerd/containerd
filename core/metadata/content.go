@@ -27,7 +27,6 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/google/uuid"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
@@ -437,14 +436,14 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 
 		brefb := bkt.Get(bucketKeyRef)
 		if brefb == nil {
-			// The identity must survive neither abort nor bucket recreation:
-			// a stale writer must not match a new ingest with the same ref.
-			id, err := uuid.NewRandom()
+			// Sequence from the parent bucket, so a stale writer never matches
+			// an ingest recreated with the same ref after an abort.
+			sid, err := getIngestsBucket(tx, ns).NextSequence()
 			if err != nil {
 				return err
 			}
 
-			bref = fmt.Sprintf("%s/%s/%s", ns, id, wOpts.Ref)
+			bref = createKey(sid, ns, wOpts.Ref)
 			if err := bkt.Put(bucketKeyRef, []byte(bref)); err != nil {
 				return err
 			}
@@ -589,6 +588,13 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	defer nw.l.RUnlock()
 	defer nw.Close()
 
+	// Finalization (e.g. fsverity) reads the whole blob, so run it only after
+	// the metadata write transaction commits and releases the database lock.
+	f, _ := nw.w.(finalizer)
+	if f != nil {
+		f.DeferFinalize()
+	}
+
 	var innerErr error
 	var actualDgst digest.Digest
 	var actualSize int64
@@ -604,56 +610,33 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 		return fmt.Errorf("failed to perform sync: %w", err)
 	}
 
-	// Validate before preparation can make the ingest immutable. Evaluate options
-	// only once; the resulting metadata is written in the transaction below.
-	var base content.Info
-	for _, opt := range opts {
-		if err := opt(&base); err != nil {
-			return err
-		}
-	}
-	if err := validateInfo(&base); err != nil {
-		return err
-	}
-	if nw.w != nil {
-		status, err := nw.w.Status()
-		if err != nil {
-			return err
-		}
-		if size != 0 && size != status.Offset {
-			return fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
-		}
-		size = status.Offset
-
-		// An externally owned transaction is already open, so leave preparation
-		// to Commit in that case. In particular, do not seal an ingest when the
-		// supplied transaction is read-only.
-		if _, inTransaction := boltutil.Transaction(ctx); !inTransaction {
-			if preparer, ok := nw.w.(content.Precommitter); ok {
-				if err := preparer.Precommit(ctx, size, expected); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
 	if err := update(ctx, nw.db, func(tx *bolt.Tx) error {
-		// Abort or ingest GC may have removed this upload during preparation.
-		// Do not publish it or remove metadata belonging to a replacement ref.
 		bkt := getIngestsBucket(tx, nw.namespace)
-		if bkt == nil {
-			return fmt.Errorf("ingest %q: %w", nw.ref, errdefs.ErrNotFound)
+		var ingest *bolt.Bucket
+		if bkt != nil {
+			ingest = bkt.Bucket([]byte(nw.ref))
 		}
-		ingest := bkt.Bucket([]byte(nw.ref))
 		if ingest == nil || string(ingest.Get(bucketKeyRef)) != nw.bref {
-			return fmt.Errorf("ingest %q is no longer active: %w", nw.ref, errdefs.ErrNotFound)
+			// Another writer for the same ref may have completed the upload.
+			dgst := nw.expectedDigest(expected)
+			if dgst == "" || getBlobBucket(tx, nw.namespace, dgst) == nil {
+				return fmt.Errorf("ingest %q is no longer active: %w", nw.ref, errdefs.ErrNotFound)
+			}
+			innerErr = fmt.Errorf("content %v: %w", dgst, errdefs.ErrAlreadyExists)
+			if err := removeIngestLease(ctx, tx, nw.ref); err != nil {
+				return err
+			}
+			return addContentLease(ctx, tx, dgst)
 		}
-		dgst, size, err := nw.commit(ctx, tx, size, expected, base)
+		dgst, size, err := nw.commit(ctx, tx, size, expected, opts...)
 		if err != nil {
 			if !errdefs.IsAlreadyExists(err) {
 				return err
 			}
 			innerErr = err
+		}
+		if f != nil {
+			tx.OnCommit(func() { f.Finalize(ctx) })
 		}
 		actualDgst = dgst
 		actualSize = size
@@ -684,6 +667,25 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	return nil
 }
 
+// finalizer is implemented by backend writers that do expensive work on a
+// published blob. DeferFinalize, called before Commit, moves that work out of
+// Commit into Finalize.
+type finalizer interface {
+	DeferFinalize()
+	Finalize(ctx context.Context)
+}
+
+func (nw *namespacedWriter) expectedDigest(expected digest.Digest) digest.Digest {
+	switch {
+	case expected != "":
+		return expected
+	case nw.w == nil:
+		return nw.desc.Digest
+	default:
+		return nw.w.Digest()
+	}
+}
+
 func (nw *namespacedWriter) Sync() error {
 	if syncer, ok := nw.w.(content.Syncer); ok {
 		return syncer.Sync()
@@ -691,7 +693,23 @@ func (nw *namespacedWriter) Sync() error {
 	return nil
 }
 
-func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, base content.Info) (digest.Digest, int64, error) {
+func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) (digest.Digest, int64, error) {
+	var base content.Info
+	for _, opt := range opts {
+		if err := opt(&base); err != nil {
+			if nw.w != nil {
+				nw.w.Close()
+			}
+			return "", 0, err
+		}
+	}
+	if err := validateInfo(&base); err != nil {
+		if nw.w != nil {
+			nw.w.Close()
+		}
+		return "", 0, err
+	}
+
 	var actual digest.Digest
 	if nw.w == nil {
 		if size != 0 && size != nw.desc.Size {
@@ -703,6 +721,17 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		size = nw.desc.Size
 		actual = nw.desc.Digest
 	} else {
+		status, err := nw.w.Status()
+		if err != nil {
+			nw.w.Close()
+			return "", 0, err
+		}
+		if size != 0 && size != status.Offset {
+			nw.w.Close()
+			return "", 0, fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
+		}
+		size = status.Offset
+
 		if err := nw.w.Commit(ctx, size, expected); err != nil && !errdefs.IsAlreadyExists(err) {
 			return "", 0, err
 		}

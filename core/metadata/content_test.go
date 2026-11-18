@@ -21,10 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -99,233 +96,153 @@ func TestContent(t *testing.T) {
 		}...))
 }
 
-// precommitStore instruments preparation without requiring an fs-verity capable
-// filesystem. Publication still goes through the real local content store.
-type precommitStore struct {
+// finalizeStore blocks backend finalization to observe when it runs.
+type finalizeStore struct {
 	content.Store
-	prepare func(context.Context, int64, digest.Digest) error
+	finalize func(context.Context)
 }
 
-func (s *precommitStore) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
+func (s *finalizeStore) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
 	w, err := s.Store.Writer(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &precommitWriter{Writer: w, prepare: s.prepare}, nil
+	return &finalizeWriter{Writer: w, finalize: s.finalize}, nil
 }
 
-type precommitWriter struct {
+type finalizeWriter struct {
 	content.Writer
-	prepare func(context.Context, int64, digest.Digest) error
+	deferred bool
+	finalize func(context.Context)
 }
 
-func (w *precommitWriter) Precommit(ctx context.Context, size int64, expected digest.Digest) error {
-	if err := w.prepare(ctx, size, expected); err != nil {
-		w.Close()
-		return err
-	}
-	if p, ok := w.Writer.(content.Precommitter); ok {
-		return p.Precommit(ctx, size, expected)
-	}
-	return nil
-}
+func (w *finalizeWriter) DeferFinalize() { w.deferred = true }
 
-func TestContentPrecommitOutsideTransaction(t *testing.T) {
-	ctx, db := testDB(t)
-	cs := db.ContentStore().(*contentStore)
-	backend := cs.Store
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	var once sync.Once
-	unblock := func() { once.Do(func() { close(release) }) }
-	defer unblock()
-	cs.Store = &precommitStore{Store: backend, prepare: func(context.Context, int64, digest.Digest) error {
-		close(entered)
-		<-release
-		return nil
-	}}
+func (w *finalizeWriter) Finalize(ctx context.Context) { w.finalize(ctx) }
 
-	blob := []byte("prepare before metadata transaction")
-	dgst := digest.FromBytes(blob)
-	w, err := cs.Writer(ctx, content.WithRef("precommit"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Close()
-	if _, err := w.Write(blob); err != nil {
-		t.Fatal(err)
-	}
-	committed := make(chan error, 1)
-	go func() { committed <- w.Commit(ctx, int64(len(blob)), dgst) }()
-	select {
-	case <-entered:
-	case <-time.After(10 * time.Second):
-		t.Fatal("commit did not enter preparation")
-	}
-
-	// A completely unrelated write must finish while preparation is blocked.
-	updated := make(chan error, 1)
-	go func() {
-		updated <- db.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucketIfNotExists([]byte("precommit-test"))
-			return err
-		})
-	}()
-	select {
-	case err := <-updated:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(10 * time.Second):
-		unblock()
-		<-committed
-		<-updated
-		t.Fatal("preparation blocked an unrelated metadata write")
-	}
-	if _, err := backend.Info(ctx, dgst); !errdefs.IsNotFound(err) {
-		t.Errorf("backend content published before preparation finished: %v", err)
-	}
-	if _, err := cs.Info(ctx, dgst); !errdefs.IsNotFound(err) {
-		t.Errorf("namespace content published before preparation finished: %v", err)
-	}
-	if other, err := cs.Writer(ctx, content.WithRef("precommit")); !errdefs.IsUnavailable(err) {
-		if other != nil {
-			other.Close()
-		}
-		t.Errorf("ingest ownership lost during preparation: %v", err)
-	}
-	unblock()
-	if err := <-committed; err != nil {
-		t.Fatal(err)
-	}
-	if _, err := cs.Info(ctx, dgst); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestContentPrecommitValidation(t *testing.T) {
-	for _, tc := range []string{"options", "labels", "size", "prepare"} {
-		t.Run(tc, func(t *testing.T) {
+func TestContentFinalizeOutsideTransaction(t *testing.T) {
+	for _, callerTransaction := range []bool{false, true} {
+		t.Run(fmt.Sprintf("callerTransaction=%v", callerTransaction), func(t *testing.T) {
 			ctx, db := testDB(t)
 			cs := db.ContentStore().(*contentStore)
-			var prepared bool
-			prepareErr := errors.New("preparation failed")
-			cs.Store = &precommitStore{Store: cs.Store, prepare: func(context.Context, int64, digest.Digest) error {
-				prepared = true
-				return prepareErr
+			blob := []byte("finalize after metadata transaction")
+			dgst := digest.FromBytes(blob)
+			finalized := make(chan struct{})
+			cs.Store = &finalizeStore{Store: cs.Store, finalize: func(context.Context) {
+				defer close(finalized)
+				if _, err := cs.Info(ctx, dgst); err != nil {
+					t.Errorf("content not committed before finalization: %v", err)
+				}
+				// Fails if finalization runs while the write transaction is open.
+				done := make(chan error, 1)
+				go func() {
+					done <- db.Update(func(tx *bolt.Tx) error {
+						_, err := tx.CreateBucketIfNotExists([]byte("finalize-test"))
+						return err
+					})
+				}()
+				select {
+				case err := <-done:
+					if err != nil {
+						t.Error(err)
+					}
+				case <-time.After(10 * time.Second):
+					t.Error("finalization blocked an unrelated metadata write")
+				}
 			}}
-			w, err := cs.Writer(ctx, content.WithRef("validation"))
+
+			w, err := cs.Writer(ctx, content.WithRef("finalize"))
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer w.Close()
-			blob := []byte("retain upload on validation failure")
 			if _, err := w.Write(blob); err != nil {
 				t.Fatal(err)
 			}
-			size := int64(len(blob))
-			var opts []content.Opt
-			switch tc {
-			case "options":
-				opts = append(opts, func(*content.Info) error { return errors.New("invalid option") })
-			case "labels":
-				opts = append(opts, content.WithLabels(map[string]string{"invalid": strings.Repeat("x", 4096)}))
-			case "size":
-				size++
+			commit := func(ctx context.Context) error {
+				return w.Commit(ctx, int64(len(blob)), dgst)
 			}
-			if err := w.Commit(ctx, size, digest.FromBytes(blob), opts...); err == nil {
-				t.Fatal("expected commit failure")
+			if callerTransaction {
+				err = db.Update(func(tx *bolt.Tx) error {
+					if err := commit(boltutil.WithTransaction(ctx, tx)); err != nil {
+						return err
+					}
+					select {
+					case <-finalized:
+						t.Error("finalized before the caller's transaction committed")
+					default:
+					}
+					return nil
+				})
+			} else {
+				err = commit(ctx)
 			}
-			if prepared != (tc == "prepare") {
-				t.Fatalf("unexpected preparation: %v", prepared)
-			}
-			resumed, err := cs.Writer(ctx, content.WithRef("validation"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer resumed.Close()
-			st, err := resumed.Status()
-			if err != nil {
-				t.Fatal(err)
+			select {
+			case <-finalized:
+			case <-time.After(20 * time.Second):
+				t.Fatal("content was not finalized")
 			}
-			if st.Offset != int64(len(blob)) {
-				t.Fatalf("lost upload progress: %d", st.Offset)
+			if !w.(*namespacedWriter).w.(*finalizeWriter).deferred {
+				t.Error("finalization was not deferred by the metadata writer")
 			}
 		})
 	}
 }
 
-func TestContentPrecommitAbort(t *testing.T) {
+func TestContentSharedWritersSameRef(t *testing.T) {
 	ctx, db := testDB(t)
-	cs := db.ContentStore().(*contentStore)
-	backend := cs.Store
-	blob := []byte("existing backend content")
-	dgst := digest.FromBytes(blob)
-	// A duplicate backend makes publication return AlreadyExists even if the
-	// old ingest was removed. It must not hide a concurrent abort.
-	if err := content.WriteBlob(ctx, backend, "seed", bytes.NewReader(blob), ocispec.Descriptor{Digest: dgst, Size: int64(len(blob))}); err != nil {
-		t.Fatal(err)
-	}
-	cs.Store = &precommitStore{Store: backend, prepare: func(context.Context, int64, digest.Digest) error {
-		return cs.Abort(ctx, "reuse")
-	}}
-	old, err := cs.Writer(ctx, content.WithRef("reuse"))
+	cs := db.ContentStore()
+	lctx, _, err := createLease(ctx, db, "shared")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer old.Close()
-	if _, err := old.Write(blob); err != nil {
+	blob := []byte("shared content")
+	desc := ocispec.Descriptor{Digest: digest.FromBytes(blob), Size: int64(len(blob))}
+	// Content in the backend but not this namespace yields writers without
+	// a backend ingest, which do not lock the ref.
+	if err := content.WriteBlob(ctx, cs.(*contentStore).Store, "seed", bytes.NewReader(blob), desc); err != nil {
 		t.Fatal(err)
 	}
-	// Abort after real preparation has closed the file, but while the writer
-	// still owns the backend ref lock. Duplicate publication must not hide the
-	// abort when the metadata transaction checks the ingest identity.
-	nw := old.(*namespacedWriter)
-	nw.w = &abortPrecommitWriter{Writer: nw.w.(*precommitWriter).Writer, prepare: cs.Store.(*precommitStore).prepare}
-	if err := old.Commit(ctx, int64(len(blob)), dgst); !errdefs.IsNotFound(err) {
-		t.Fatalf("stale ingest commit returned %v", err)
-	}
-	if _, err := cs.Status(ctx, "reuse"); !errdefs.IsNotFound(err) {
-		t.Fatalf("aborted ingest metadata reappeared: %v", err)
-	}
-	if _, err := cs.Info(ctx, dgst); !errdefs.IsNotFound(err) {
-		t.Fatalf("aborted content published into namespace: %v", err)
-	}
-}
+	cs.(*contentStore).shared = true
 
-type abortPrecommitWriter struct {
-	content.Writer
-	prepare func(context.Context, int64, digest.Digest) error
-}
-
-func (w *abortPrecommitWriter) Precommit(ctx context.Context, size int64, expected digest.Digest) error {
-	if err := w.Writer.(content.Precommitter).Precommit(ctx, size, expected); err != nil {
-		return err
-	}
-	return w.prepare(ctx, size, expected)
-}
-
-func TestContentPrecommitAbortAndRecreate(t *testing.T) {
-	ctx, db := testDB(t)
-	cs := db.ContentStore().(*contentStore)
-	backend := cs.Store
-	blob := []byte("shared backend content")
-	dgst := digest.FromBytes(blob)
-	desc := ocispec.Descriptor{Digest: dgst, Size: int64(len(blob))}
-	if err := content.WriteBlob(ctx, backend, "seed", bytes.NewReader(blob), desc); err != nil {
-		t.Fatal(err)
-	}
-	var replacement content.Writer
-	cs.Store = &precommitStore{Store: backend, prepare: func(context.Context, int64, digest.Digest) error {
-		if err := cs.Abort(ctx, "recreated"); err != nil {
-			return err
+	var writers []content.Writer
+	for i := range 2 {
+		wctx := ctx
+		if i == 1 {
+			wctx = lctx
 		}
-		var err error
-		// Shared content has no backend writer, so its creation is not blocked
-		// by the old writer's backend ref lock.
-		replacement, err = cs.Writer(ctx, content.WithRef("recreated"), content.WithDescriptor(desc))
-		return err
-	}}
+		w, err := cs.Writer(wctx, content.WithRef("shared"), content.WithDescriptor(desc))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer w.Close()
+		if w.(*namespacedWriter).w != nil {
+			t.Fatal("expected a shared writer")
+		}
+		writers = append(writers, w)
+	}
+	if err := writers[0].Commit(ctx, desc.Size, desc.Digest); err != nil {
+		t.Fatal(err)
+	}
+	if err := writers[1].Commit(lctx, desc.Size, desc.Digest); !errdefs.IsAlreadyExists(err) {
+		t.Fatalf("second shared commit returned %v, want AlreadyExists", err)
+	}
+	if err := checkContentLeased(lctx, db, desc.Digest); err != nil {
+		t.Fatalf("second writer's lease does not hold the content: %v", err)
+	}
+	if err := checkIngestLeased(lctx, db, "shared"); !errdefs.IsNotFound(err) {
+		t.Fatalf("second writer's lease still holds the ingest: %v", err)
+	}
+}
+
+func TestContentAbortAndRecreate(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore()
+	blob := []byte("aborted upload")
+	dgst := digest.FromBytes(blob)
 	old, err := cs.Writer(ctx, content.WithRef("recreated"))
 	if err != nil {
 		t.Fatal(err)
@@ -334,41 +251,36 @@ func TestContentPrecommitAbortAndRecreate(t *testing.T) {
 	if _, err := old.Write(blob); err != nil {
 		t.Fatal(err)
 	}
-	nw := old.(*namespacedWriter)
-	nw.w = &abortPrecommitWriter{Writer: nw.w.(*precommitWriter).Writer, prepare: cs.Store.(*precommitStore).prepare}
-	if err := old.Commit(ctx, desc.Size, dgst); !errdefs.IsNotFound(err) {
-		t.Fatalf("stale ingest commit returned %v", err)
-	}
-	if replacement == nil {
-		t.Fatal("replacement writer not created")
-	}
-	defer replacement.Close()
-	if nw.bref == replacement.(*namespacedWriter).bref {
-		t.Fatal("replacement reused the aborted ingest identity")
-	}
-	if err := db.View(func(tx *bolt.Tx) error {
-		bkt := getIngestBucket(tx, "testing", "recreated")
-		if bkt == nil || string(bkt.Get(bucketKeyRef)) != replacement.(*namespacedWriter).bref {
-			return errors.New("replacement metadata was lost")
+	// Drop only the metadata, leaving the old backend writer open, then
+	// recreate the ingest under the same ref.
+	if err := db.Update(func(tx *bolt.Tx) error {
+		if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("recreated")); err != nil {
+			return err
 		}
-		return nil
+		return removeIngestLease(ctx, tx, "recreated")
 	}); err != nil {
 		t.Fatal(err)
+	}
+	replacement, err := cs.Writer(ctx, content.WithRef("recreated"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replacement.Close()
+	if old.(*namespacedWriter).bref == replacement.(*namespacedWriter).bref {
+		t.Fatal("replacement reused the aborted ingest identity")
+	}
+	if err := old.Commit(ctx, int64(len(blob)), dgst); !errdefs.IsNotFound(err) {
+		t.Fatalf("stale ingest commit returned %v", err)
 	}
 	if _, err := cs.Info(ctx, dgst); !errdefs.IsNotFound(err) {
 		t.Fatalf("aborted upload was published: %v", err)
 	}
-	if err := replacement.Commit(ctx, desc.Size, dgst); err != nil {
-		t.Fatalf("replacement commit failed: %v", err)
+	if _, err := cs.Status(ctx, "recreated"); err != nil {
+		t.Fatalf("replacement metadata was lost: %v", err)
 	}
 }
 
-// Embedding only Writer hides the backend's optional preparation capability.
-type nonPrecommitWriter struct {
-	content.Writer
-}
-
-func TestContentCommitClosesWithoutPrecommit(t *testing.T) {
+func TestContentCommitClosesInactiveIngest(t *testing.T) {
 	for _, callerTransaction := range []bool{false, true} {
 		t.Run(fmt.Sprintf("callerTransaction=%v", callerTransaction), func(t *testing.T) {
 			ctx, db := testDB(t)
@@ -383,9 +295,8 @@ func TestContentCommitClosesWithoutPrecommit(t *testing.T) {
 				t.Fatal(err)
 			}
 			nw := w.(*namespacedWriter)
-			nw.w = &nonPrecommitWriter{Writer: nw.w}
-			// Remove only metadata so the unprepared backend writer stays open
-			// and locked. Windows cannot abort an ingest with an open data file.
+			// Remove only metadata so the backend writer stays open and locked.
+			// Windows cannot abort an ingest with an open data file.
 			if err := db.Update(func(tx *bolt.Tx) error {
 				if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("closed")); err != nil {
 					return err
@@ -412,127 +323,6 @@ func TestContentCommitClosesWithoutPrecommit(t *testing.T) {
 				t.Fatalf("commit left backend ref locked: %v", err)
 			}
 			resumed.Close()
-		})
-	}
-}
-
-func TestContentPrecommitTransactionFailure(t *testing.T) {
-	ctx, db := testDB(t)
-	cs := db.ContentStore().(*contentStore)
-	// Force publication to fail after preparation, while leaving the ingest
-	// available. A new writer must recover its bytes even if verity sealed it.
-	root := t.TempDir()
-	backend, err := local.NewStore(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cs.Store = backend
-	blob := []byte("resume after failed publication")
-	dgst := digest.FromBytes(blob)
-	w, err := cs.Writer(ctx, content.WithRef("recovery"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Close()
-	if _, err := w.Write(blob); err != nil {
-		t.Fatal(err)
-	}
-	// A file in place of the blobs directory makes the publication fail.
-	if err := os.WriteFile(filepath.Join(root, "blobs"), nil, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Commit(ctx, int64(len(blob)), dgst); err == nil {
-		t.Fatal("expected publication failure")
-	}
-	if err := os.Remove(filepath.Join(root, "blobs")); err != nil {
-		t.Fatal(err)
-	}
-	resumed, err := cs.Writer(ctx, content.WithRef("recovery"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resumed.Close()
-	st, err := resumed.Status()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st.Offset != int64(len(blob)) {
-		t.Fatalf("lost upload progress: %d", st.Offset)
-	}
-	if err := resumed.Commit(ctx, int64(len(blob)), dgst); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestContentPrecommitOptionsOnce(t *testing.T) {
-	ctx, db := testDB(t)
-	cs := db.ContentStore()
-	blob := []byte("evaluate commit options once")
-	w, err := cs.Writer(ctx, content.WithRef("options"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Close()
-	if _, err := w.Write(blob); err != nil {
-		t.Fatal(err)
-	}
-	var calls int
-	if err := w.Commit(ctx, int64(len(blob)), digest.FromBytes(blob), func(info *content.Info) error {
-		calls++
-		info.Labels = map[string]string{"test": "value"}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if calls != 1 {
-		t.Fatalf("evaluated commit option %d times", calls)
-	}
-	info, err := cs.Info(ctx, digest.FromBytes(blob))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Labels["test"] != "value" {
-		t.Fatalf("lost commit labels: %v", info.Labels)
-	}
-}
-
-func TestContentPrecommitCallerTransaction(t *testing.T) {
-	for _, writable := range []bool{false, true} {
-		t.Run(fmt.Sprintf("writable=%v", writable), func(t *testing.T) {
-			ctx, db := testDB(t)
-			cs := db.ContentStore().(*contentStore)
-			cs.Store = &precommitStore{Store: cs.Store, prepare: func(context.Context, int64, digest.Digest) error {
-				t.Error("preparation must not run ahead of a caller-owned transaction")
-				return nil
-			}}
-			blob := []byte("caller-owned transaction")
-			dgst := digest.FromBytes(blob)
-			w, err := cs.Writer(ctx, content.WithRef("caller"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer w.Close()
-			if _, err := w.Write(blob); err != nil {
-				t.Fatal(err)
-			}
-			commit := func(tx *bolt.Tx) error {
-				return w.Commit(boltutil.WithTransaction(ctx, tx), int64(len(blob)), dgst)
-			}
-			if writable {
-				if err := db.Update(commit); err != nil {
-					t.Fatal(err)
-				}
-				if _, err := cs.Info(ctx, dgst); err != nil {
-					t.Fatal(err)
-				}
-			} else {
-				if err := db.View(commit); err == nil {
-					t.Fatal("commit with a read-only transaction succeeded")
-				}
-				if _, err := cs.Store.Info(ctx, dgst); !errdefs.IsNotFound(err) {
-					t.Fatalf("read-only transaction published backend content: %v", err)
-				}
-			}
 		})
 	}
 }
