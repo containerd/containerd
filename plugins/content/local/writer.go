@@ -23,7 +23,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -31,7 +30,6 @@ import (
 	"github.com/opencontainers/go-digest"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/internal/fsverity"
 )
 
 // writer represents a write transaction against the blob store.
@@ -47,8 +45,6 @@ type writer struct {
 	updatedAt time.Time
 
 	deferFinalize bool
-	published     string      // blob path published by Commit
-	publishedMode os.FileMode // permissions of the published blob
 }
 
 func (w *writer) Status() (content.Status, error) {
@@ -149,18 +145,10 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		return err
 	}
 
-	if tfi, err := os.Stat(target); err == nil {
+	if _, err := os.Stat(target); err == nil {
 		// collision with the target file!
 		if err := os.RemoveAll(w.path); err != nil {
 			log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
-		}
-		// A previous commit may have published the blob without finalizing it.
-		if w.needsFinalize(target, tfi) {
-			w.published = target
-			w.publishedMode = tfi.Mode() & os.ModePerm
-			if !w.deferFinalize {
-				w.Finalize(ctx)
-			}
 		}
 		return fmt.Errorf("content %v: %w", dgst, errdefs.ErrAlreadyExists)
 	}
@@ -192,53 +180,17 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		}
 	}
 
-	w.published = target
-	w.publishedMode = fi.Mode() & os.ModePerm
 	if !w.deferFinalize {
-		w.Finalize(ctx)
+		w.s.finalize(ctx, target, fi.Mode()&os.ModePerm)
 	}
 
 	return nil
 }
 
-func (w *writer) needsFinalize(target string, fi os.FileInfo) bool {
-	if w.s.integritySupported {
-		if enabled, err := fsverity.IsEnabled(target); err == nil && !enabled {
-			return true
-		}
-	}
-	return runtime.GOOS != "windows" && fi.Mode()&0222 != 0
-}
-
-// DeferFinalize makes Commit leave integrity setup to a later Finalize call.
+// DeferFinalize makes Commit leave integrity setup to a later
+// FinalizeBlob call on the store.
 func (w *writer) DeferFinalize() {
 	w.deferFinalize = true
-}
-
-// Finalize enables integrity verification on the published blob if supported,
-// then makes it read-only. Enabling fsverity requires write permission.
-func (w *writer) Finalize(ctx context.Context) {
-	if w.published == "" {
-		return
-	}
-	if w.s.integritySupported {
-		if err := fsverity.Enable(w.published); err != nil {
-			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", w.published, err.Error())
-		}
-	}
-
-	// change to readonly, more important for read, but provides _some_
-	// protection from this point on. We use the existing perms with a mask
-	// only allowing reads honoring the umask on creation.
-	//
-	// This removes write and exec, only allowing read per the creation umask.
-	//
-	// NOTE: Windows does not support this operation
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(w.published, w.publishedMode&^0333); err != nil {
-			log.G(ctx).WithField("ref", w.ref).Error("failed to make readonly")
-		}
-	}
 }
 
 // Close the writer, flushing any unwritten data and leaving the progress in

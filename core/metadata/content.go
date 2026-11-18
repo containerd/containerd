@@ -436,9 +436,7 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 
 		brefb := bkt.Get(bucketKeyRef)
 		if brefb == nil {
-			// Sequence from the parent bucket, so a stale writer never matches
-			// an ingest recreated with the same ref after an abort.
-			sid, err := getIngestsBucket(tx, ns).NextSequence()
+			sid, err := bkt.NextSequence()
 			if err != nil {
 				return err
 			}
@@ -586,13 +584,12 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 
 	nw.l.RLock()
 	defer nw.l.RUnlock()
-	defer nw.Close()
 
 	// Finalization (e.g. fsverity) reads the whole blob, so run it only after
 	// the metadata write transaction commits and releases the database lock.
-	f, _ := nw.w.(finalizer)
-	if f != nil {
-		f.DeferFinalize()
+	bf, finalize := nw.provider.(blobFinalizer)
+	if d, ok := nw.w.(interface{ DeferFinalize() }); ok && finalize {
+		d.DeferFinalize()
 	}
 
 	var innerErr error
@@ -607,30 +604,11 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	// REF:
 	// [1]: https://github.com/containerd/containerd/blob/c4c3c6ea568ce0cfbcf754863abadeea37d77c8f/plugins/content/local/writer.go#L95
 	if err := nw.Sync(); err != nil {
+		nw.Close()
 		return fmt.Errorf("failed to perform sync: %w", err)
 	}
 
 	if err := update(ctx, nw.db, func(tx *bolt.Tx) error {
-		bkt := getIngestsBucket(tx, nw.namespace)
-		var ingest *bolt.Bucket
-		if bkt != nil {
-			ingest = bkt.Bucket([]byte(nw.ref))
-		}
-		if ingest == nil || string(ingest.Get(bucketKeyRef)) != nw.bref {
-			// Another writer for the same ref may have completed the upload.
-			dgst := nw.expectedDigest(expected)
-			if dgst == "" || getBlobBucket(tx, nw.namespace, dgst) == nil {
-				return fmt.Errorf("ingest %q is no longer active: %w", nw.ref, errdefs.ErrNotFound)
-			}
-			innerErr = fmt.Errorf("content %v: %w", dgst, errdefs.ErrAlreadyExists)
-			// Ingest leases are keyed by ref, so a replacement ingest owns it.
-			if ingest == nil {
-				if err := removeIngestLease(ctx, tx, nw.ref); err != nil {
-					return err
-				}
-			}
-			return addContentLease(ctx, tx, dgst)
-		}
 		dgst, size, err := nw.commit(ctx, tx, size, expected, opts...)
 		if err != nil {
 			if !errdefs.IsAlreadyExists(err) {
@@ -638,13 +616,17 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 			}
 			innerErr = err
 		}
-		if f != nil {
-			tx.OnCommit(func() { f.Finalize(ctx) })
+		if finalize {
+			// Also repairs a blob published by a commit that rolled back.
+			tx.OnCommit(func() { bf.FinalizeBlob(ctx, dgst) })
 		}
 		actualDgst = dgst
 		actualSize = size
-		if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
-			return err
+		bkt := getIngestsBucket(tx, nw.namespace)
+		if bkt != nil {
+			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
+				return err
+			}
 		}
 		if err := removeIngestLease(ctx, tx, nw.ref); err != nil {
 			return err
@@ -670,23 +652,10 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	return nil
 }
 
-// finalizer is implemented by backend writers that do expensive work on a
-// published blob. DeferFinalize, called before Commit, moves that work out of
-// Commit into Finalize.
-type finalizer interface {
-	DeferFinalize()
-	Finalize(ctx context.Context)
-}
-
-func (nw *namespacedWriter) expectedDigest(expected digest.Digest) digest.Digest {
-	switch {
-	case expected != "":
-		return expected
-	case nw.w == nil:
-		return nw.desc.Digest
-	default:
-		return nw.w.Digest()
-	}
+// blobFinalizer is implemented by backends that do expensive work on a
+// published blob. Their writers' DeferFinalize moves that work out of Commit.
+type blobFinalizer interface {
+	FinalizeBlob(ctx context.Context, dgst digest.Digest)
 }
 
 func (nw *namespacedWriter) Sync() error {

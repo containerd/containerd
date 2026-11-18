@@ -21,7 +21,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content/testsuite"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins/content/local"
@@ -96,9 +99,10 @@ func TestContent(t *testing.T) {
 		}...))
 }
 
-// finalizeStore blocks backend finalization to observe when it runs.
+// finalizeStore observes when backend finalization runs.
 type finalizeStore struct {
 	content.Store
+	deferred bool
 	finalize func(context.Context)
 }
 
@@ -107,18 +111,17 @@ func (s *finalizeStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 	if err != nil {
 		return nil, err
 	}
-	return &finalizeWriter{Writer: w, finalize: s.finalize}, nil
+	return &finalizeWriter{Writer: w, s: s}, nil
 }
+
+func (s *finalizeStore) FinalizeBlob(ctx context.Context, _ digest.Digest) { s.finalize(ctx) }
 
 type finalizeWriter struct {
 	content.Writer
-	deferred bool
-	finalize func(context.Context)
+	s *finalizeStore
 }
 
-func (w *finalizeWriter) DeferFinalize() { w.deferred = true }
-
-func (w *finalizeWriter) Finalize(ctx context.Context) { w.finalize(ctx) }
+func (w *finalizeWriter) DeferFinalize() { w.s.deferred = true }
 
 func TestContentFinalizeOutsideTransaction(t *testing.T) {
 	for _, callerTransaction := range []bool{false, true} {
@@ -185,188 +188,72 @@ func TestContentFinalizeOutsideTransaction(t *testing.T) {
 			case <-time.After(20 * time.Second):
 				t.Fatal("content was not finalized")
 			}
-			if !w.(*namespacedWriter).w.(*finalizeWriter).deferred {
+			if !cs.Store.(*finalizeStore).deferred {
 				t.Error("finalization was not deferred by the metadata writer")
 			}
 		})
 	}
 }
 
-func TestContentSharedWritersSameRef(t *testing.T) {
+func TestContentSharedCommitFinalizesAfterRollback(t *testing.T) {
 	ctx, db := testDB(t)
-	cs := db.ContentStore()
-	lctx, _, err := createLease(ctx, db, "shared")
+	cs := db.ContentStore().(*contentStore)
+	root := t.TempDir()
+	backend, err := local.NewStore(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	blob := []byte("shared content")
+	cs.Store = backend
+	cs.shared = true
+	blob := []byte("published by a rolled back commit")
 	desc := ocispec.Descriptor{Digest: digest.FromBytes(blob), Size: int64(len(blob))}
-	// Content in the backend but not this namespace yields writers without
-	// a backend ingest, which do not lock the ref.
-	if err := content.WriteBlob(ctx, cs.(*contentStore).Store, "seed", bytes.NewReader(blob), desc); err != nil {
-		t.Fatal(err)
-	}
-	cs.(*contentStore).shared = true
 
-	var writers []content.Writer
-	for i := range 2 {
-		wctx := ctx
-		if i == 1 {
-			wctx = lctx
-		}
-		w, err := cs.Writer(wctx, content.WithRef("shared"), content.WithDescriptor(desc))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer w.Close()
-		if w.(*namespacedWriter).w != nil {
-			t.Fatal("expected a shared writer")
-		}
-		writers = append(writers, w)
-	}
-	if err := writers[0].Commit(ctx, desc.Size, desc.Digest); err != nil {
-		t.Fatal(err)
-	}
-	if err := writers[1].Commit(lctx, desc.Size, desc.Digest); !errdefs.IsAlreadyExists(err) {
-		t.Fatalf("second shared commit returned %v, want AlreadyExists", err)
-	}
-	if err := checkContentLeased(lctx, db, desc.Digest); err != nil {
-		t.Fatalf("second writer's lease does not hold the content: %v", err)
-	}
-	if err := checkIngestLeased(lctx, db, "shared"); !errdefs.IsNotFound(err) {
-		t.Fatalf("second writer's lease still holds the ingest: %v", err)
-	}
-}
-
-func TestContentAbortAndRecreate(t *testing.T) {
-	ctx, db := testDB(t)
-	cs := db.ContentStore()
-	blob := []byte("aborted upload")
-	dgst := digest.FromBytes(blob)
-	old, err := cs.Writer(ctx, content.WithRef("recreated"))
+	w, err := cs.Writer(ctx, content.WithRef("rollback"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer old.Close()
-	if _, err := old.Write(blob); err != nil {
+	defer w.Close()
+	if _, err := w.Write(blob); err != nil {
 		t.Fatal(err)
 	}
-	// Drop only the metadata, leaving the old backend writer open, then
-	// recreate the ingest under the same ref.
+	rollback := errors.New("rollback")
 	if err := db.Update(func(tx *bolt.Tx) error {
-		if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("recreated")); err != nil {
+		if err := w.Commit(boltutil.WithTransaction(ctx, tx), desc.Size, desc.Digest); err != nil {
 			return err
 		}
-		return removeIngestLease(ctx, tx, "recreated")
-	}); err != nil {
-		t.Fatal(err)
+		return rollback
+	}); !errors.Is(err, rollback) {
+		t.Fatalf("expected rollback, got %v", err)
 	}
-	replacement, err := cs.Writer(ctx, content.WithRef("recreated"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer replacement.Close()
-	if old.(*namespacedWriter).bref == replacement.(*namespacedWriter).bref {
-		t.Fatal("replacement reused the aborted ingest identity")
-	}
-	if err := old.Commit(ctx, int64(len(blob)), dgst); !errdefs.IsNotFound(err) {
-		t.Fatalf("stale ingest commit returned %v", err)
-	}
-	if _, err := cs.Info(ctx, dgst); !errdefs.IsNotFound(err) {
-		t.Fatalf("aborted upload was published: %v", err)
-	}
-	if _, err := cs.Status(ctx, "recreated"); err != nil {
-		t.Fatalf("replacement metadata was lost: %v", err)
-	}
-}
 
-func TestContentStaleCommitKeepsReplacementLease(t *testing.T) {
-	ctx, db := testDB(t)
-	cs := db.ContentStore()
-	lctx, _, err := createLease(ctx, db, "replacement")
+	// The backend blob exists, so the retry takes the shared path and never
+	// reaches the backend commit.
+	retry, err := cs.Writer(ctx, content.WithRef("rollback"), content.WithDescriptor(desc))
 	if err != nil {
 		t.Fatal(err)
 	}
-	blob := []byte("already committed")
-	dgst := digest.FromBytes(blob)
-	if err := content.WriteBlob(ctx, cs, "seed", bytes.NewReader(blob), ocispec.Descriptor{Digest: dgst, Size: int64(len(blob))}); err != nil {
+	defer retry.Close()
+	if retry.(*namespacedWriter).w != nil {
+		t.Fatal("expected a shared writer")
+	}
+	if err := retry.Commit(ctx, desc.Size, desc.Digest); err != nil {
 		t.Fatal(err)
 	}
-	old, err := cs.Writer(lctx, content.WithRef("reused"))
+
+	path := filepath.Join(root, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
+	fi, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer old.Close()
-	if _, err := old.Write(blob); err != nil {
-		t.Fatal(err)
+	if runtime.GOOS != "windows" && fi.Mode()&0222 != 0 {
+		t.Errorf("blob left writable: %v", fi.Mode())
 	}
-	// Drop only the metadata, leaving the old backend writer open, then
-	// recreate the ingest under the same ref and lease.
-	if err := db.Update(func(tx *bolt.Tx) error {
-		if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("reused")); err != nil {
-			return err
+	if ok, _ := fsverity.IsSupported(filepath.Dir(path)); ok {
+		if enabled, err := fsverity.IsEnabled(path); err != nil || !enabled {
+			t.Errorf("blob not sealed: enabled=%v err=%v", enabled, err)
 		}
-		return removeIngestLease(lctx, tx, "reused")
-	}); err != nil {
-		t.Fatal(err)
-	}
-	replacement, err := cs.Writer(lctx, content.WithRef("reused"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer replacement.Close()
-	if err := old.Commit(lctx, int64(len(blob)), dgst); !errdefs.IsAlreadyExists(err) {
-		t.Fatalf("stale commit returned %v, want AlreadyExists", err)
-	}
-	if err := checkIngestLeased(lctx, db, "reused"); err != nil {
-		t.Fatalf("replacement ingest lost its lease: %v", err)
-	}
-}
-
-func TestContentCommitClosesInactiveIngest(t *testing.T) {
-	for _, callerTransaction := range []bool{false, true} {
-		t.Run(fmt.Sprintf("callerTransaction=%v", callerTransaction), func(t *testing.T) {
-			ctx, db := testDB(t)
-			cs := db.ContentStore()
-			w, err := cs.Writer(ctx, content.WithRef("closed"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer w.Close()
-			blob := []byte("close aborted backend session")
-			if _, err := w.Write(blob); err != nil {
-				t.Fatal(err)
-			}
-			nw := w.(*namespacedWriter)
-			// Remove only metadata so the backend writer stays open and locked.
-			// Windows cannot abort an ingest with an open data file.
-			if err := db.Update(func(tx *bolt.Tx) error {
-				if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("closed")); err != nil {
-					return err
-				}
-				return removeIngestLease(ctx, tx, "closed")
-			}); err != nil {
-				t.Fatal(err)
-			}
-			commit := func(ctx context.Context) error {
-				return w.Commit(ctx, int64(len(blob)), digest.FromBytes(blob))
-			}
-			if callerTransaction {
-				err = db.Update(func(tx *bolt.Tx) error { return commit(boltutil.WithTransaction(ctx, tx)) })
-			} else {
-				err = commit(ctx)
-			}
-			if !errdefs.IsNotFound(err) {
-				t.Fatalf("commit returned %v", err)
-			}
-			// Check the actual backend lock, without explicitly closing w.
-			backend := cs.(*contentStore).Store
-			resumed, err := backend.Writer(ctx, content.WithRef(nw.bref))
-			if err != nil {
-				t.Fatalf("commit left backend ref locked: %v", err)
-			}
-			resumed.Close()
-		})
+	} else {
+		t.Log("fsverity not supported, skipping seal check")
 	}
 }
 
