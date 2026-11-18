@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -135,11 +136,21 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 	}
 }
 
+var refLocker = kmutex.New()
+
 // Fetch fetches the given digest into the provided ingester
 func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
 
-	cw, err := content.OpenWriter(ctx, ingester, content.WithRef(MakeRefKey(ctx, desc)), content.WithDescriptor(desc))
+	ref := MakeRefKey(ctx, desc)
+	// Hold the per-ref lock for the whole fetch, including any cleanup after a
+	// failed commit, so a concurrent fetch of the same ref is serialized behind.
+	if err := refLocker.Lock(ctx, ref); err != nil {
+		return err
+	}
+	defer refLocker.Unlock(ref)
+
+	cw, err := content.OpenWriter(ctx, ingester, content.WithRef(ref), content.WithDescriptor(desc))
 	if err != nil {
 		return err
 	}
@@ -160,9 +171,23 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 		return fmt.Errorf("unable to fetch descriptor (%s) which reports negative content size (%d): %w", desc.Digest, desc.Size, errdefs.ErrInvalidArgument)
 	}
 	if ws.Offset == desc.Size {
-		// If writer is already complete, commit and return
+		// If the writer is already complete, commit it; on digest mismatch
+		// abort the stale ingest so a later fetch re-downloads it.
 		err := cw.Commit(ctx, desc.Size, desc.Digest)
 		if err != nil && !errdefs.IsAlreadyExists(err) {
+			if errdefs.IsFailedPrecondition(err) {
+				// Commit released the store's writer lock, so another client
+				// (e.g. via a proxy content store) may hold this ref by now.
+				// Abort only the very ingest whose commit failed, never a
+				// replacement.
+				if im, ok := ingester.(content.IngestManager); ok {
+					if st, err := im.Status(ctx, ref); err == nil && st.StartedAt.Equal(ws.StartedAt) {
+						if err := im.Abort(ctx, ref); err != nil && !errdefs.IsNotFound(err) {
+							log.G(ctx).WithError(err).WithField("ref", ref).Warn("failed to abort stale ingest after failed commit")
+						}
+					}
+				}
+			}
 			return fmt.Errorf("failed commit on ref %q: %w", ws.Ref, err)
 		}
 		return err
