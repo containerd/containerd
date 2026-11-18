@@ -19,6 +19,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,6 +46,13 @@ func TestSendInBatches(t *testing.T) {
 		// expected sizes of each batch
 		expectBatchSizes []int
 	}{
+		{
+			desc:             "maximum batch size",
+			numItems:         3,
+			batchSize:        math.MaxInt,
+			expectBatches:    1,
+			expectBatchSizes: []int{3},
+		},
 		{
 			desc:             "empty items",
 			numItems:         0,
@@ -109,6 +117,20 @@ func TestSendInBatches(t *testing.T) {
 				assert.Empty(t, allItems)
 			} else {
 				assert.Equal(t, items, allItems)
+			}
+		})
+	}
+}
+
+func TestSendInBatchesInvalidBatchSize(t *testing.T) {
+	for _, batchSize := range []int{0, -1} {
+		t.Run(fmt.Sprint(batchSize), func(t *testing.T) {
+			for _, items := range [][]*int{nil, {new(int)}} {
+				err := SendInBatches(context.Background(), items, batchSize, func([]*int) error {
+					t.Fatal("invalid batch size must not send any messages")
+					return nil
+				})
+				require.ErrorContains(t, err, "batch size must be positive")
 			}
 		})
 	}

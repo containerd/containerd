@@ -186,6 +186,7 @@ func TestStreamPodSandboxesEmpty(t *testing.T) {
 
 func TestStreamPodSandboxesBatching(t *testing.T) {
 	c := newTestCRIService()
+	c.listStreaming.BatchSize = 2
 
 	// Add more sandboxes than the batch size to verify batching
 	for i := 0; i < 3; i++ {
@@ -211,7 +212,7 @@ func TestStreamPodSandboxesBatching(t *testing.T) {
 	err := c.StreamPodSandboxes(&runtime.StreamPodSandboxesRequest{}, stream)
 	assert.NoError(t, err)
 
-	// With 3 sandboxes and batch size of 5000, should be 1 batch
-	require.Len(t, stream.sent, 1)
-	assert.Len(t, stream.sent[0].PodSandboxes, 3)
+	require.Len(t, stream.sent, 2)
+	assert.Len(t, stream.sent[0].PodSandboxes, 2)
+	assert.Len(t, stream.sent[1].PodSandboxes, 1)
 }

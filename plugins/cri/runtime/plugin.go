@@ -243,7 +243,8 @@ func migrateConfig(dst, src map[string]any) {
 			"stream_server_port",
 			"stream_idle_timeout",
 			"enable_tls_streaming",
-			"x509_key_pair_streaming":
+			"x509_key_pair_streaming",
+			"list_streaming":
 			// skip (moved to cri ServerConfig)
 			continue
 		case "enable_cdi":
