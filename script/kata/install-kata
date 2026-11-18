@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+
+#   Copyright The containerd Authors.
+
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+
+#       http://www.apache.org/licenses/LICENSE-2.0
+
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+#
+# Installs Kata Containers (Rust runtime, amd64) from the official release
+# tarball into /opt/kata.
+#
+# The version comes from script/kata/kata-version (or $KATA_VERSION) and the
+# tarball is verified against script/kata/kata-checksums. When bumping the
+# version, update both; the digests are listed per asset in
+# https://api.github.com/repos/kata-containers/kata-containers/releases/tags/<version>
+#
+set -eu -o pipefail
+
+script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
+
+SUDO=''
+if [[ "$(id -u)" != "0" ]]; then
+    SUDO='sudo'
+fi
+
+: "${KATA_VERSION:=$(cat "${script_dir}/kata-version")}"
+: "${KATA_REPO:=https://github.com/kata-containers/kata-containers/releases/download}"
+
+case "$(uname -m)" in
+	x86_64|amd64) ;;
+	*) echo >&2 "unsupported arch for kata: $(uname -m) (only amd64)"; exit 1 ;;
+esac
+
+asset="kata-static-${KATA_VERSION}-amd64.tar.zst"
+
+tmpdir="$(mktemp -d /tmp/kata-XXXXXX)"
+trap 'rm -rf "${tmpdir}"' EXIT
+
+curl -fsSL --retry 5 -o "${tmpdir}/${asset}" "${KATA_REPO}/${KATA_VERSION}/${asset}"
+
+# Verify against the pinned checksum.
+expected_sha256="$(awk -v a="${asset}" '$2 == a {print $1}' "${script_dir}/kata-checksums")"
+if [[ -z "${expected_sha256}" ]]; then
+	echo >&2 "no pinned checksum for ${asset} in ${script_dir}/kata-checksums"
+	exit 1
+fi
+actual_sha256="$(sha256sum "${tmpdir}/${asset}" | awk '{print $1}')"
+if [[ "${actual_sha256}" != "${expected_sha256}" ]]; then
+	echo >&2 "sha256 mismatch for ${asset}: expected ${expected_sha256}, got ${actual_sha256}"
+	exit 1
+fi
+
+# The archive contains ./opt/kata/..., so extract to /.
+$SUDO tar --zstd -xf "${tmpdir}/${asset}" -C /
+
+# containerd looks up io.containerd.kata.v2 as containerd-shim-kata-v2 in PATH.
+$SUDO ln -sf /opt/kata/runtime-rs/bin/containerd-shim-kata-v2 /usr/local/bin/containerd-shim-kata-v2
