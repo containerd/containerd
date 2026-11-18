@@ -172,7 +172,7 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			assert.IsType(t, &sandboxstore.Metadata{}, data)
 			curMeta, ok := data.(*sandboxstore.Metadata)
 			assert.True(t, ok)
-			assert.Equal(t, meta, curMeta)
+			assert.EqualExportedValues(t, meta, curMeta)
 		})
 	}
 }
