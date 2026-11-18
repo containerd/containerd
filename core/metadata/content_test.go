@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -254,6 +255,76 @@ func TestContentSharedCommitFinalizesAfterRollback(t *testing.T) {
 		}
 	} else {
 		t.Log("fsverity not supported, skipping seal check")
+	}
+}
+
+func TestContentFinalizeOutsideMetadataLocks(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore().(*contentStore)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	cs.Store = &finalizeStore{Store: cs.Store, finalize: func(context.Context) {
+		close(entered)
+		<-release
+	}}
+
+	blob := []byte("finalize outside metadata locks")
+	w, err := cs.Writer(ctx, content.WithRef("locks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if _, err := w.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	committed := make(chan error, 1)
+	go func() { committed <- w.Commit(ctx, int64(len(blob)), digest.FromBytes(blob)) }()
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("commit did not finalize")
+	}
+
+	// Garbage collection takes both locks exclusively. Neither may wait on
+	// finalization, or unrelated writes queue behind it.
+	for name, l := range map[string]*sync.RWMutex{"db": &db.wlock, "content": &cs.l} {
+		locked := make(chan struct{})
+		go func() {
+			l.Lock()
+			l.Unlock()
+			close(locked)
+		}()
+		select {
+		case <-locked:
+		case <-time.After(10 * time.Second):
+			unblock()
+			<-committed
+			t.Fatalf("%s lock held during finalization", name)
+		}
+	}
+	updated := make(chan error, 1)
+	go func() {
+		updated <- db.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucketIfNotExists([]byte("finalize-locks"))
+			return err
+		})
+	}()
+	select {
+	case err := <-updated:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		unblock()
+		<-committed
+		t.Fatal("finalization blocked an unrelated metadata write")
+	}
+	unblock()
+	if err := <-committed; err != nil {
+		t.Fatal(err)
 	}
 }
 
