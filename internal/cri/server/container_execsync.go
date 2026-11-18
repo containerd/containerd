@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"syscall"
 	"time"
 
@@ -207,6 +208,10 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 			log.G(ctx).WithError(err).Errorf("Failed to resize process %q console for container %q", execID, id)
 		}
 	})
+	// Close exited on every return path to avoid leaking the stdin copy.
+	exited := make(chan struct{})
+	closeExited := sync.OnceFunc(func() { close(exited) })
+	defer closeExited()
 
 	attachDone := execIO.Attach(cio.AttachOptions{
 		Stdin:     opts.stdin,
@@ -217,7 +222,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		CloseStdin: func() error {
 			return process.CloseIO(ctx, containerd.WithStdinCloser)
 		},
-	})
+	}, exited)
 
 	execCtx := ctx
 	if opts.timeout > 0 {
@@ -234,6 +239,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		}
 		// Wait for the process to be killed.
 		exitRes := <-exitCh
+		closeExited()
 		log.G(ctx).Debugf("Timeout received while waiting for exec process kill %q code %d and error %v",
 			execID, exitRes.ExitCode(), exitRes.Error())
 
@@ -243,6 +249,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 
 		return nil, fmt.Errorf("timeout %v exceeded: %w", opts.timeout, execCtx.Err())
 	case exitRes := <-exitCh:
+		closeExited()
 		code, _, err := exitRes.Result()
 		log.G(ctx).Debugf("Exec process %q exits with exit code %d and error %v", execID, code, err)
 		if err != nil {
