@@ -23,7 +23,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -31,7 +30,6 @@ import (
 	"github.com/opencontainers/go-digest"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/internal/fsverity"
 )
 
 // writer represents a write transaction against the blob store.
@@ -45,6 +43,8 @@ type writer struct {
 	digester  digest.Digester
 	startedAt time.Time
 	updatedAt time.Time
+
+	deferFinalize bool
 }
 
 func (w *writer) Status() (content.Status, error) {
@@ -160,14 +160,6 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	if err := syncDir(filepath.Dir(target)); err != nil {
 		return err
 	}
-	// Enable content blob integrity verification if supported
-
-	if w.s.integritySupported {
-		if err := fsverity.Enable(target); err != nil {
-			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", target, err.Error())
-		}
-	}
-
 	// Ingest has now been made available in the content store, attempt to complete
 	// setting metadata but errors should only be logged and not returned since
 	// the content store cannot be cleanly rolled back.
@@ -188,20 +180,17 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		}
 	}
 
-	// change to readonly, more important for read, but provides _some_
-	// protection from this point on. We use the existing perms with a mask
-	// only allowing reads honoring the umask on creation.
-	//
-	// This removes write and exec, only allowing read per the creation umask.
-	//
-	// NOTE: Windows does not support this operation
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(target, (fi.Mode()&os.ModePerm)&^0333); err != nil {
-			log.G(ctx).WithField("ref", w.ref).Error("failed to make readonly")
-		}
+	if !w.deferFinalize {
+		w.s.finalize(ctx, target, fi.Mode()&os.ModePerm)
 	}
 
 	return nil
+}
+
+// DeferFinalize makes Commit leave integrity setup to a later
+// FinalizeBlob call on the store.
+func (w *writer) DeferFinalize() {
+	w.deferFinalize = true
 }
 
 // Close the writer, flushing any unwritten data and leaving the progress in
