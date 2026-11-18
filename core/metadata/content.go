@@ -472,7 +472,10 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 			// available in the current namespace.
 			desc := wOpts.Desc
 			desc.Digest = ""
-			w, err = cs.Store.Writer(ctx, content.WithRef(bref), content.WithDescriptor(desc))
+			w, err = cs.Store.Writer(ctx,
+				content.WithRef(bref),
+				content.WithDescriptor(desc),
+				content.WithBlobDigestAlgorithm(wOpts.Algorithm))
 		}
 		return err
 	}); err != nil {
@@ -493,6 +496,7 @@ func (cs *contentStore) Writer(ctx context.Context, opts ...content.WriterOpt) (
 		bref:      bref,
 		started:   time.Now(),
 		desc:      wOpts.Desc,
+		algorithm: wOpts.Algorithm,
 	}, nil
 }
 
@@ -509,9 +513,10 @@ type namespacedWriter struct {
 
 	w content.Writer
 
-	bref    string
-	started time.Time
-	desc    ocispec.Descriptor
+	bref      string
+	started   time.Time
+	desc      ocispec.Descriptor
+	algorithm digest.Algorithm
 }
 
 func (nw *namespacedWriter) Close() error {
@@ -556,7 +561,10 @@ func (nw *namespacedWriter) Truncate(size int64) error {
 func (nw *namespacedWriter) createAndCopy(ctx context.Context, desc ocispec.Descriptor) error {
 	nwDescWithoutDigest := desc
 	nwDescWithoutDigest.Digest = ""
-	w, err := nw.provider.Writer(ctx, content.WithRef(nw.bref), content.WithDescriptor(nwDescWithoutDigest))
+	w, err := nw.provider.Writer(ctx,
+		content.WithRef(nw.bref),
+		content.WithDescriptor(nwDescWithoutDigest),
+		content.WithBlobDigestAlgorithm(nw.algorithm))
 	if err != nil {
 		return err
 	}

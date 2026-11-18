@@ -489,7 +489,7 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 		return nil, err
 	}
 
-	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
+	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest, wOpts.Algorithm)
 	if err != nil {
 		s.unlock(wOpts.Ref)
 		return nil, err
@@ -530,7 +530,7 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 
 // writer provides the main implementation of the Writer method. The caller
 // must hold the lock correctly and release on error if there is a problem.
-func (s *store) writer(ctx context.Context, ref string, total int64, expected digest.Digest) (content.Writer, error) {
+func (s *store) writer(ctx context.Context, ref string, total int64, expected digest.Digest, requested digest.Algorithm) (content.Writer, error) {
 	// TODO(stevvooe): Need to actually store expected here. We have
 	// code in the service that shouldn't be dealing with this.
 	if expected != "" {
@@ -545,10 +545,21 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 	path, refp, data := s.ingestPaths(ref)
 
-	// if we get passed an expected digest, we need to use the same algorithm (sha512, etc)
+	// Algorithm precedence:
+	//  1. expected digest's algorithm — the caller already knows the answer
+	//     they want, so honour it (sha512, etc).
+	//  2. caller-requested algorithm via content.WithBlobDigestAlgorithm —
+	//     used when the digest is not yet known (e.g. fresh ingests where
+	//     the caller wants a specific algorithm).
+	//  3. canonical (sha256) for backwards compatibility.
 	digestAlg := digest.Canonical
-	if expected != "" && expected.Algorithm().Available() {
+	switch {
+	case expected != "" && expected.Algorithm().Available():
 		digestAlg = expected.Algorithm()
+	case requested != "" && requested.Available():
+		digestAlg = requested
+	case requested != "":
+		return nil, fmt.Errorf("requested digest algorithm %q is not available: %w", requested, errdefs.ErrInvalidArgument)
 	}
 	var (
 		digester  = digestAlg.Digester()
