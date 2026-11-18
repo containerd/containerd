@@ -364,7 +364,8 @@ func TestToCRISignal(t *testing.T) {
 }
 
 type fakeImageService struct {
-	imageStore *imagestore.Store
+	imageStore  *imagestore.Store
+	snapshotter string
 }
 
 func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
@@ -388,7 +389,7 @@ func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error
 func (s *fakeImageService) ImageFSPaths() map[string]string { return make(map[string]string) }
 
 func (s *fakeImageService) Config() criconfig.ImageConfig {
-	return criconfig.ImageConfig{}
+	return criconfig.ImageConfig{Snapshotter: s.snapshotter}
 }
 
 func (s *fakeImageService) PullImage(context.Context, string, func(string) (string, string, error), *runtime.PodSandboxConfig, string) (string, error) {

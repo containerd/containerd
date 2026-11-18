@@ -19,7 +19,6 @@
 package config
 
 import (
-	"github.com/containerd/containerd/v2/defaults"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -29,7 +28,6 @@ func defaultNetworkPluginBinDirs() []string {
 
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
-		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
 		Registry:                   Registry{},

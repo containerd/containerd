@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/defaults"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
@@ -71,6 +72,11 @@ func init() {
 				if config.Registry.ConfigPath == "" && len(config.Registry.Mirrors) == 0 {
 					config.Registry.ConfigPath = "/etc/containerd/certs.d:/etc/docker/certs.d"
 				}
+			}
+
+			if config.Snapshotter == "" {
+				config.Snapshotter = defaultSnapshotter(ic)
+				log.G(ic.Context).Infof("Using default snapshotter %q for CRI", config.Snapshotter)
 			}
 
 			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
@@ -175,6 +181,17 @@ func init() {
 		},
 		ConfigMigration: configMigration,
 	})
+}
+
+func defaultSnapshotter(ic *plugin.InitContext) string {
+	if runtime.GOOS == "linux" {
+		_, snErr := ic.GetByID(plugins.SnapshotPlugin, "erofs")
+		_, diffErr := ic.GetByID(plugins.DiffPlugin, "erofs")
+		if snErr == nil && diffErr == nil {
+			return "erofs"
+		}
+	}
+	return defaults.DefaultSnapshotter
 }
 
 func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {

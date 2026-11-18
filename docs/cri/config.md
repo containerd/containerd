@@ -79,7 +79,7 @@ kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/
 
 ### Snapshotter
 
-The default snapshotter is set to `overlayfs` (akin to Docker's `overlay2` storage driver):
+The default snapshotter is set to `erofs` on linux. If erofs is not supported, we fallback to `overlayfs`.
 + In containerd 2.x
 ```toml
 version = 3
@@ -247,7 +247,6 @@ version = 3
 
 [plugins]
   [plugins.'io.containerd.cri.v1.images']
-    snapshotter = 'overlayfs'
     disable_snapshot_annotations = true
     discard_unpacked_layers = false
     max_concurrent_downloads = 3
@@ -484,10 +483,6 @@ version = 2
 
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
-
-    # snapshotter is the default snapshotter used by containerd
-    # for all runtimes, if not overridden by an experimental runtime's snapshotter config.
-    snapshotter = "overlayfs"
 
     # no_pivot disables pivot-root (linux only), required when running a container in a RamDisk with runc.
     # This only works for runtime type "io.containerd.runtime.v1.linux".
