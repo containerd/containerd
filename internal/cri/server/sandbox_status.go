@@ -27,6 +27,7 @@ import (
 	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
@@ -114,25 +115,43 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 }
 
 // setUpdatedResources sets updated pod sandbox resources in the sandbox info.
+// Fields set by the sandbox controller are kept, and info that is not a JSON
+// object is left unchanged.
 func setUpdatedResources(ctx context.Context, sandbox sandboxstore.Sandbox, info map[string]string) error {
-	var sbInfo podsandboxtypes.SandboxInfo
 	if info == nil {
 		return nil
 	}
+	status := sandbox.Status.Get()
+	if status.Overhead == nil && status.Resources == nil {
+		return nil
+	}
+
+	var fields map[string]json.RawMessage
 	if i, ok := info["info"]; ok {
-		if err := json.Unmarshal([]byte(i), &sbInfo); err != nil {
-			return fmt.Errorf("failed to unmarshal sandbox info: %w", err)
+		if err := json.Unmarshal([]byte(i), &fields); err != nil {
+			log.G(ctx).WithError(err).Debug("sandbox info is not a JSON object, skip updated resources")
+			return nil
 		}
 	}
-
-	if overhead := sandbox.Status.Get().Overhead; overhead != nil {
-		sbInfo.Overhead = overhead
-	}
-	if resources := sandbox.Status.Get().Resources; resources != nil {
-		sbInfo.Resources = resources
+	if fields == nil {
+		fields = make(map[string]json.RawMessage)
 	}
 
-	infoBytes, err := json.Marshal(sbInfo)
+	for key, res := range map[string]*runtime.ContainerResources{
+		"overhead":  status.Overhead,
+		"resources": status.Resources,
+	} {
+		if res == nil {
+			continue
+		}
+		b, err := json.Marshal(res)
+		if err != nil {
+			return fmt.Errorf("failed to marshal sandbox %s: %w", key, err)
+		}
+		fields[key] = b
+	}
+
+	infoBytes, err := json.Marshal(fields)
 	if err != nil {
 		return fmt.Errorf("failed to marshal sandbox info: %w", err)
 	}
