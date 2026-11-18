@@ -125,7 +125,9 @@ documentation.
   Skipped if address is empty:
   - **address** (Default: "")
 - **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
-- **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
+- **[plugins."io.containerd.service.v1.diff-service"]** has two options:
+  - __default__, a list by default set to **["walking"]**
+  - __sync_fs__ (Default: **false**) syncs the underlying filesystem to stable storage after applying each layer during image unpack. Enable it when the storage may lose acknowledged-but-unflushed writes across a power failure (common on consumer SD/eMMC flash). Note that syncfs flushes the entire filesystem containing the snapshot directory, which on busy systems may also flush unrelated dirty data.
 - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
   - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
   - **deletion_threshold** guarantees GC is scheduled after n number of deletions (Default: **0** [not triggered]),
@@ -233,6 +235,7 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     no_prometheus = false
   [plugins."io.containerd.service.v1.diff-service"]
     default = ["walking"]
+    sync_fs = false
   [plugins."io.containerd.gc.v1.scheduler"]
     pause_threshold = 0.02
     deletion_threshold = 0
