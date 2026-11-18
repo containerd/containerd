@@ -512,7 +512,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		Debug("fetching layer")
 	req.setMediaType(mediatype)
 	req.header.Set("Accept-Encoding", "zstd;q=1.0, gzip;q=0.8, deflate;q=0.5")
-	if parallelism > 1 || offset > 0 {
+	if parallelism > 1 {
+		req.setRange(offset, offset+chunkSize-1)
+	} else if offset > 0 {
 		req.setOffset(offset)
 	}
 
@@ -521,10 +523,22 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	}
 	var remaining int64
 	resp, err := req.doWithRetries(ctx, lastHost, withErrorCheck, withOffsetCheck(offset, parallelism))
+	if err == nil && parallelism > 1 {
+		if size, ok := contentRangeSize(resp.Header.Get("Content-Range")); ok && size >= offset {
+			remaining = size - offset
+		} else {
+			log.G(ctx).Info("remote host did not report content size, forcing parallelism to 1")
+			resp.Body.Close()
+			parallelism = 1
+			req.setOffset(offset)
+			resp, err = req.doWithRetries(ctx, lastHost, withErrorCheck, withOffsetCheck(offset, parallelism))
+		}
+	}
 	switch err {
 	case nil:
-		// all good
-		remaining = resp.ContentLength
+		if parallelism <= 1 {
+			remaining = resp.ContentLength
+		}
 	case errContentRangeIgnored:
 		if parallelism != 1 {
 			log.G(ctx).WithError(err).Info("remote host ignored content range, forcing parallelism to 1")
@@ -637,7 +651,8 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 							}
 							defer r.Release(1)
 							reqClone := req.clone()
-							reqClone.setOffset(offset + c.i*chunkSize)
+							start := offset + c.i*chunkSize
+							reqClone.setRange(start, min(start+chunkSize, offset+remaining)-1)
 							nresp, err := reqClone.doWithRetries(ctx, lastHost, withErrorCheck)
 							if err != nil {
 								_ = c.w.CloseWithError(err)
