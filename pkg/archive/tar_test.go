@@ -852,6 +852,73 @@ func TestBreakouts(t *testing.T) {
 	}
 }
 
+// TestApplySymlinkWriteDoesNotEscape verifies that applying an archive which
+// tries to write a file through a symlink pointing outside the root tree
+// never creates anything outside the root. Parent directories are resolved
+// with fs.RootPath and every subsequent operation is confined to *os.Root,
+// so a malicious absolute or relative symlink cannot redirect the write
+// outside the root tree (either the apply is rejected or the write lands
+// inside the root).
+func TestApplySymlinkWriteDoesNotEscape(t *testing.T) {
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0o755))
+
+	outsideDir := filepath.Join(td, "outside")
+	require.NoError(t, os.MkdirAll(outsideDir, 0o755))
+
+	tc := tartest.TarContext{}.WithUIDGID(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC())
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "etc", "escape"), 0o755))
+	w := tartest.TarAll(tc.File("etc/escape/pwned", []byte("x"), 0o644))
+
+	replaced := false
+	convertWhiteout := func(_ *tar.Header, path string) (bool, error) {
+		require.Equal(t, filepath.Join(root, "etc", "escape", "pwned"), path)
+		require.NoError(t, os.Remove(filepath.Dir(path)))
+		require.NoError(t, os.Symlink(outsideDir, filepath.Dir(path)))
+		replaced = true
+		return true, nil
+	}
+	if _, err := Apply(context.Background(), root, tartest.TarFromWriterTo(w), WithConvertWhiteout(convertWhiteout)); err != nil {
+		t.Logf("apply rejected the escaping symlink: %v", err)
+	}
+	require.True(t, replaced, "the post-resolution symlink replacement was not reached")
+	if _, err := os.Lstat(filepath.Join(outsideDir, "pwned")); !os.IsNotExist(err) {
+		t.Fatalf("file was written outside the root: %v", err)
+	}
+}
+
+// TestApplyHardlinkSourceOutsideRoot verifies that a hard link whose source
+// resolves through a symlink pointing outside the root tree does not create
+// anything outside the root. The link is created on the symlink inode itself
+// (linkat does not follow the final symlink), staying inside the root.
+func TestApplyHardlinkSourceOutsideRoot(t *testing.T) {
+	td := t.TempDir()
+	root := filepath.Join(td, "root")
+	require.NoError(t, os.MkdirAll(root, 0o755))
+
+	outside := filepath.Join(td, "outside.txt")
+	require.NoError(t, os.WriteFile(outside, []byte("secret"), 0o600))
+
+	tc := tartest.TarContext{}.WithUIDGID(os.Getuid(), os.Getgid()).WithModTime(time.Now().UTC())
+	w := tartest.TarAll(
+		tc.File("/etc/passwd", []byte("inside"), 0o644),
+		tc.Symlink(outside, "escape"),
+		tc.Link("/escape", "linked"),
+	)
+
+	if _, err := Apply(context.Background(), root, tartest.TarFromWriterTo(w)); err != nil {
+		t.Fatalf("apply failed: %v", err)
+	}
+	// linked must be a symlink (a hard link to the escape symlink inode) and
+	// must live inside the root.
+	fi, err := os.Lstat(filepath.Join(root, "linked"))
+	require.NoError(t, err)
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("linked is not a symlink: %v", fi.Mode())
+	}
+}
+
 func TestDiffApply(t *testing.T) {
 	fstest.FSSuite(t, diffApplier{})
 }
