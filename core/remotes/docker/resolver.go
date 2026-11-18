@@ -292,6 +292,9 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		// error created furthest through the resolution process is returned.
 		firstErr         error
 		firstErrPriority int
+
+		// allNotFound reports whether every host tried so far answered 404.
+		allNotFound = true
 	)
 
 	nextHostOrFail := func(i int) string {
@@ -304,10 +307,11 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	for _, u := range paths {
 		// falling back to /blobs endpoint should happen in extreme cases - those to
 		// support legacy registries. we want to limit the fallback to when /manifests endpoint
-		// returned 404. Falling back on transient errors could do more harm, like polluting
-		// the local content store with incorrectly typed descriptors as /blobs endpoint tends
-		// always return with application/octet-stream.
-		if firstErrPriority > 2 {
+		// returned 404 on every host. Falling back on transient errors (timeouts, reset
+		// connections, 5xx) could do more harm, like polluting the local content store with
+		// incorrectly typed descriptors as /blobs endpoint tends always return with
+		// application/octet-stream.
+		if !allNotFound {
 			break
 		}
 		for i, host := range hosts {
@@ -339,6 +343,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					firstErr = err
 					firstErrPriority = 1
 				}
+				allNotFound = false
 				log.G(ctx).WithError(err).Info(nextHostOrFail(i))
 				continue // try another host
 			}
@@ -379,6 +384,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = err
 						firstErrPriority = 3
 					}
+					allNotFound = false
 					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue // try another host
 				}
@@ -463,6 +469,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					firstErr = fmt.Errorf("rejecting %d byte manifest for %s: %w", size, ref, errdefs.ErrNotFound)
 					firstErrPriority = 4
 				}
+				allNotFound = false
 				continue
 			}
 
