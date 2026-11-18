@@ -126,3 +126,54 @@ func TestSocketSyscalls(t *testing.T) {
 		t.Errorf("socketSyscalls() = %#v, want %#v", got, want)
 	}
 }
+
+func TestFanotifyInitIsAllowed(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		bounding []string
+	}{
+		{
+			name:     "no capabilities",
+			bounding: []string{},
+		},
+		{
+			name:     "CAP_SYS_ADMIN",
+			bounding: []string{"CAP_SYS_ADMIN"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := DefaultProfile(&specs.Spec{
+				Process: &specs.Process{
+					Capabilities: &specs.LinuxCapabilities{
+						Bounding: tt.bounding,
+					},
+				},
+			})
+
+			allowed := false
+			for _, config := range got.Syscalls {
+				for _, name := range config.Names {
+					if name != "fanotify_init" {
+						continue
+					}
+					if config.Action != specs.ActAllow {
+						t.Errorf("fanotify_init has action %s, want %s", config.Action, specs.ActAllow)
+					}
+					if len(config.Args) != 0 {
+						t.Errorf("fanotify_init has argument restrictions %#v, want none", config.Args)
+					}
+					allowed = true
+				}
+			}
+			if !allowed {
+				t.Error("fanotify_init is not allowed")
+			}
+		})
+	}
+}
