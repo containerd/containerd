@@ -156,13 +156,13 @@ func init() {
 					}
 
 					log.G(ic.Context).WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
+				}
 
-					if cfg.NoSync {
-						options.NoSync = true
-						options.NoGrowSync = true
+				if cfg.NoSync {
+					options.NoSync = true
+					options.NoGrowSync = true
 
-						log.G(ic.Context).Warn("using async mode for boltdb")
-					}
+					log.G(ic.Context).Warn("using async mode for boltdb")
 				}
 			}
 
