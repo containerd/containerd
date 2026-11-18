@@ -477,3 +477,52 @@ func TestWriterDeferFinalize(t *testing.T) {
 		t.Fatalf("blob not sealed by Finalize: enabled=%v err=%v", enabled, err)
 	}
 }
+
+func TestWriterFinalizesExistingUnfinalizedBlob(t *testing.T) {
+	root := t.TempDir()
+	if ok, err := fsverity.IsSupported(root); !ok {
+		t.Skipf("fsverity not supported: %v", err)
+	}
+	cs, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	blob := []byte("published but never finalized")
+	dgst := digest.FromBytes(blob)
+	commit := func(ref string, deferFinalize bool) error {
+		cw, err := cs.Writer(ctx, content.WithRef(ref))
+		if err != nil {
+			t.Fatal(err)
+		}
+		w := cw.(*writer)
+		if deferFinalize {
+			w.DeferFinalize()
+		}
+		if _, err := w.Write(blob); err != nil {
+			t.Fatal(err)
+		}
+		return w.Commit(ctx, int64(len(blob)), dgst)
+	}
+	// A deferred commit whose Finalize never runs, as on transaction rollback.
+	if err := commit("first", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := commit("retry", false); !errdefs.IsAlreadyExists(err) {
+		t.Fatalf("retry returned %v, want AlreadyExists", err)
+	}
+	path, err := cs.(*store).blobPath(dgst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled, err := fsverity.IsEnabled(path); err != nil || !enabled {
+		t.Fatalf("retry did not seal the existing blob: enabled=%v err=%v", enabled, err)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode()&0222 != 0 {
+		t.Fatalf("retry did not make the existing blob read-only: %v", fi.Mode())
+	}
+}

@@ -623,8 +623,11 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 				return fmt.Errorf("ingest %q is no longer active: %w", nw.ref, errdefs.ErrNotFound)
 			}
 			innerErr = fmt.Errorf("content %v: %w", dgst, errdefs.ErrAlreadyExists)
-			if err := removeIngestLease(ctx, tx, nw.ref); err != nil {
-				return err
+			// Ingest leases are keyed by ref, so a replacement ingest owns it.
+			if ingest == nil {
+				if err := removeIngestLease(ctx, tx, nw.ref); err != nil {
+					return err
+				}
 			}
 			return addContentLease(ctx, tx, dgst)
 		}

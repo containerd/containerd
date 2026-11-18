@@ -149,10 +149,18 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		return err
 	}
 
-	if _, err := os.Stat(target); err == nil {
+	if tfi, err := os.Stat(target); err == nil {
 		// collision with the target file!
 		if err := os.RemoveAll(w.path); err != nil {
 			log.G(ctx).WithField("ref", w.ref).WithField("path", w.path).Error("failed to remove ingest directory")
+		}
+		// A previous commit may have published the blob without finalizing it.
+		if w.needsFinalize(target, tfi) {
+			w.published = target
+			w.publishedMode = tfi.Mode() & os.ModePerm
+			if !w.deferFinalize {
+				w.Finalize(ctx)
+			}
 		}
 		return fmt.Errorf("content %v: %w", dgst, errdefs.ErrAlreadyExists)
 	}
@@ -191,6 +199,15 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	}
 
 	return nil
+}
+
+func (w *writer) needsFinalize(target string, fi os.FileInfo) bool {
+	if w.s.integritySupported {
+		if enabled, err := fsverity.IsEnabled(target); err == nil && !enabled {
+			return true
+		}
+	}
+	return runtime.GOOS != "windows" && fi.Mode()&0222 != 0
 }
 
 // DeferFinalize makes Commit leave integrity setup to a later Finalize call.

@@ -280,6 +280,49 @@ func TestContentAbortAndRecreate(t *testing.T) {
 	}
 }
 
+func TestContentStaleCommitKeepsReplacementLease(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore()
+	lctx, _, err := createLease(ctx, db, "replacement")
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob := []byte("already committed")
+	dgst := digest.FromBytes(blob)
+	if err := content.WriteBlob(ctx, cs, "seed", bytes.NewReader(blob), ocispec.Descriptor{Digest: dgst, Size: int64(len(blob))}); err != nil {
+		t.Fatal(err)
+	}
+	old, err := cs.Writer(lctx, content.WithRef("reused"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer old.Close()
+	if _, err := old.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	// Drop only the metadata, leaving the old backend writer open, then
+	// recreate the ingest under the same ref and lease.
+	if err := db.Update(func(tx *bolt.Tx) error {
+		if err := getIngestsBucket(tx, "testing").DeleteBucket([]byte("reused")); err != nil {
+			return err
+		}
+		return removeIngestLease(lctx, tx, "reused")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	replacement, err := cs.Writer(lctx, content.WithRef("reused"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replacement.Close()
+	if err := old.Commit(lctx, int64(len(blob)), dgst); !errdefs.IsAlreadyExists(err) {
+		t.Fatalf("stale commit returned %v, want AlreadyExists", err)
+	}
+	if err := checkIngestLeased(lctx, db, "reused"); err != nil {
+		t.Fatalf("replacement ingest lost its lease: %v", err)
+	}
+}
+
 func TestContentCommitClosesInactiveIngest(t *testing.T) {
 	for _, callerTransaction := range []bool{false, true} {
 		t.Run(fmt.Sprintf("callerTransaction=%v", callerTransaction), func(t *testing.T) {
