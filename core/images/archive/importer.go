@@ -323,7 +323,13 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 				layers[i].MediaType = images.MediaTypeDockerSchema2Layer
 			}
 		} else {
-			layers[i].MediaType = images.MediaTypeDockerSchema2LayerGzip
+			mediaType, err := layerMediaType(s.GetCompression())
+			if err != nil {
+				s.Close()
+				ra.Close()
+				return nil, err
+			}
+			layers[i].MediaType = mediaType
 		}
 		s.Close()
 		ra.Close()
@@ -395,7 +401,6 @@ func writeManifest(ctx context.Context, cs content.Ingester, manifest any, media
 }
 
 func detectLayerMediaType(ctx context.Context, store content.Store, desc ocispec.Descriptor) (string, error) {
-	var mediaType string
 	// need to parse existing blob to use the proper media type
 	bytes := make([]byte, 10)
 	ra, err := store.ReaderAt(ctx, desc)
@@ -411,11 +416,22 @@ func detectLayerMediaType(ctx context.Context, store content.Store, desc ocispec
 		// in the case of an empty layer then the media type should be uncompressed
 		return images.MediaTypeDockerSchema2Layer, nil
 	}
-	switch c := compression.DetectCompression(bytes); c {
+	return layerMediaType(compression.DetectCompression(bytes))
+}
+
+// layerMediaType maps the detected compression of a layer blob to the media
+// type recorded for it in the synthesized Docker manifest. Compressions that
+// have no Docker layer media type are an explicit error rather than being
+// silently labelled gzip.
+func layerMediaType(c compression.Compression) (string, error) {
+	switch c {
 	case compression.Uncompressed:
-		mediaType = images.MediaTypeDockerSchema2Layer
+		return images.MediaTypeDockerSchema2Layer, nil
+	case compression.Gzip:
+		return images.MediaTypeDockerSchema2LayerGzip, nil
+	case compression.Zstd:
+		return images.MediaTypeDockerSchema2LayerZstd, nil
 	default:
-		mediaType = images.MediaTypeDockerSchema2LayerGzip
+		return "", fmt.Errorf("unsupported layer compression %v: %w", c, errdefs.ErrNotImplemented)
 	}
-	return mediaType, nil
 }
