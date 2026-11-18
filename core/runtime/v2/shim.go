@@ -202,10 +202,10 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 // which by then may be cancelled or out of budget.
 //
 // A failed delete returns before shutting the shim down and closing its client,
-// so both are done here. It also leaves the bundle in place (only a successful
-// delete removes it), so callers that own one must remove it on error. The shim
-// map is untouched: callers reach this having already removed the task, or never
-// added it.
+// so both are done here, including waiting for the on-close callback. It also
+// leaves the bundle in place (only a successful delete removes it), so callers
+// that own one must remove it on error. The shim map is untouched: callers reach
+// this having already removed the task, or never added it.
 func cleanupShimTask(ctx context.Context, st *shimTask) error {
 	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
@@ -225,9 +225,25 @@ func cleanupShimTask(ctx context.Context, st *shimTask) error {
 	}
 
 	st.Shutdown(dctx)
-	st.Close()
+
+	// Wait for the on-close callback, so a delayed one cannot clean up a task
+	// that reuses the ID once the caller deletes the bundle.
+	if cw, ok := st.ShimInstance.(closeWaiter); ok {
+		wctx, wcancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+		defer wcancel()
+		if werr := cw.closeWait(wctx); werr != nil {
+			log.G(ctx).WithError(werr).WithField("id", st.ID()).Warn("failed to wait for shim close")
+		}
+	} else {
+		st.Close()
+	}
 
 	return err
+}
+
+// closeWaiter closes a shim client and waits for its on-close callback.
+type closeWaiter interface {
+	closeWait(ctx context.Context) error
 }
 
 // CurrentShimVersion is the latest shim version supported by containerd (e.g. TaskService v3).
@@ -543,6 +559,18 @@ func (s *shim) Close() error {
 }
 
 func (s *shim) Delete(ctx context.Context) error {
+	result := []error{s.closeWait(ctx)}
+
+	if err := s.bundle.Delete(); err != nil {
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
+		result = append(result, fmt.Errorf("failed to delete bundle: %w", err))
+	}
+
+	return errors.Join(result...)
+}
+
+// closeWait closes the client and waits for its on-close callback.
+func (s *shim) closeWait(ctx context.Context) error {
 	var result []error
 
 	if ttrpcClient, ok := s.client.(*ttrpc.Client); ok {
@@ -563,11 +591,6 @@ func (s *shim) Delete(ctx context.Context) error {
 		if err := grpcClient.UserOnCloseWait(ctx); err != nil {
 			result = append(result, fmt.Errorf("close wait error: %w", err))
 		}
-	}
-
-	if err := s.bundle.Delete(); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
-		result = append(result, fmt.Errorf("failed to delete bundle: %w", err))
 	}
 
 	return errors.Join(result...)

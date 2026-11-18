@@ -17,7 +17,274 @@
 package v2
 
 import (
+	"context"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 	// When testutil is imported for one platform (bundle_linux_test.go) it
 	// should be imported for all platforms.
 	_ "github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// bundleDirs returns a context and the root and state dirs to create bundles in.
+func bundleDirs(t *testing.T) (context.Context, string, string) {
+	dir := t.TempDir()
+	ctx := namespaces.WithNamespace(context.Background(), namespaces.Default)
+	return ctx, filepath.Join(dir, "root"), filepath.Join(dir, "state")
+}
+
+// setReclaimLeftover sets reclaimLeftover for the test. True is how Windows runs.
+func setReclaimLeftover(t *testing.T, v bool) {
+	old := reclaimLeftover
+	reclaimLeftover = v
+	t.Cleanup(func() { reclaimLeftover = old })
+}
+
+// failDelete makes b.Delete fail, as it does on Windows when a shim that is
+// still exiting holds files in the bundle, and returns a function that undoes
+// that. A rootfs with content cannot be removed, but is not a live mount.
+func failDelete(t *testing.T, b *Bundle) (release func()) {
+	busy := filepath.Join(b.Path, "rootfs", "busy")
+	require.NoError(t, os.WriteFile(busy, []byte("x"), 0600))
+	require.ErrorContains(t, b.Delete(), "failed to remove bundle rootfs")
+	return func() { require.NoError(t, os.Remove(busy)) }
+}
+
+// TestNewBundleRejectsExistingBundle verifies that a second create for the ID of
+// a live bundle fails and leaves that bundle alone.
+func TestNewBundleRejectsExistingBundle(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "existing"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	live := filepath.Join(b.Path, "live")
+	require.NoError(t, os.WriteFile(live, []byte("x"), 0600))
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+	require.ErrorContains(t, err, "bundle for "+id)
+	assert.FileExists(t, live)
+	_, err = os.Stat(filepath.Join(b.Path, "work"))
+	assert.NoError(t, err, "work link of the live bundle must be kept")
+
+	require.NoError(t, b.Delete())
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.NoError(t, err, "ID must be reusable once the bundle is deleted")
+}
+
+// TestNewBundleReplacesLeftoverBundle verifies that NewBundle recovers when the
+// Delete of a previous bundle left its directory behind. On Windows,
+// atomicDelete's os.Rename can fail while a still-exiting shim holds files in
+// the bundle, and the next NewTask must not fail with "file already exists".
+func TestNewBundleReplacesLeftoverBundle(t *testing.T) {
+	setReclaimLeftover(t, true)
+	ctx, root, state := bundleDirs(t)
+	const id = "leftover"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	release := failDelete(t, b)
+	release()
+	stale := filepath.Join(b.Path, "stale")
+	require.NoError(t, os.WriteFile(stale, []byte("x"), 0600))
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err, "NewBundle should replace the leftover bundle")
+	assert.NoFileExists(t, stale)
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.ErrorIs(t, err, errdefs.ErrAlreadyExists, "the new bundle is live and must not be replaced")
+}
+
+// TestNewBundleKeepsLeftoverOffWindows verifies that without reclaiming, a
+// leftover bundle keeps failing with "file exists" and is left alone.
+func TestNewBundleKeepsLeftoverOffWindows(t *testing.T) {
+	setReclaimLeftover(t, false)
+	ctx, root, state := bundleDirs(t)
+	const id = "no-reclaim"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	failDelete(t, b)()
+	stale := filepath.Join(b.Path, "stale")
+	require.NoError(t, os.WriteFile(stale, []byte("x"), 0600))
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+	assert.FileExists(t, stale)
+}
+
+// TestNewBundleKeepsBusyLeftover verifies that a leftover bundle is not removed
+// through a rootfs that is still in use, and can be replaced once it is not.
+func TestNewBundleKeepsBusyLeftover(t *testing.T) {
+	setReclaimLeftover(t, true)
+	ctx, root, state := bundleDirs(t)
+	const id = "busy-leftover"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	release := failDelete(t, b)
+
+	_, err = NewBundle(ctx, root, state, id, nil)
+	require.ErrorContains(t, err, "failed to remove bundle rootfs")
+	assert.FileExists(t, filepath.Join(b.Path, "rootfs", "busy"))
+
+	release()
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.NoError(t, err)
+}
+
+// TestNewBundleConcurrentLeftover verifies that of several creates racing for a
+// leftover bundle, exactly one replaces it.
+func TestNewBundleConcurrentLeftover(t *testing.T) {
+	setReclaimLeftover(t, true)
+	ctx, root, state := bundleDirs(t)
+	const id = "concurrent-leftover"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	failDelete(t, b)()
+
+	var (
+		wg      sync.WaitGroup
+		created atomic.Int32
+	)
+	for range 8 {
+		wg.Go(func() {
+			if _, err := NewBundle(ctx, root, state, id, nil); err == nil {
+				created.Add(1)
+			} else {
+				assert.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+			}
+		})
+	}
+	wg.Wait()
+	assert.EqualValues(t, 1, created.Load())
+	_, err = os.Stat(filepath.Join(b.Path, "work"))
+	assert.NoError(t, err, "work link of the new bundle must be kept")
+}
+
+// TestStaleBundleDeleteKeepsReplacement verifies that a Delete from the owner of
+// a bundle that was replaced after its failed Delete leaves the replacement
+// alone, as a cleanup that runs twice can do during a failed create.
+func TestStaleBundleDeleteKeepsReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		old  func(ctx context.Context, t *testing.T, root, state, id string) *Bundle
+	}{
+		{"created", func(ctx context.Context, t *testing.T, root, state, id string) *Bundle {
+			b, err := NewBundle(ctx, root, state, id, nil)
+			require.NoError(t, err)
+			return b
+		}},
+		{"loaded", func(ctx context.Context, t *testing.T, root, state, id string) *Bundle {
+			require.NoError(t, os.MkdirAll(filepath.Join(state, namespaces.Default, id, "rootfs"), 0700))
+			b, err := LoadBundle(ctx, state, id)
+			require.NoError(t, err)
+			return b
+		}},
+		{"created then loaded", func(ctx context.Context, t *testing.T, root, state, id string) *Bundle {
+			_, err := NewBundle(ctx, root, state, id, nil)
+			require.NoError(t, err)
+			b, err := LoadBundle(ctx, state, id)
+			require.NoError(t, err)
+			return b
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setReclaimLeftover(t, true)
+			ctx, root, state := bundleDirs(t)
+			const id = "stale-owner"
+
+			old := tc.old(ctx, t, root, state, id)
+			failDelete(t, old)()
+
+			repl, err := NewBundle(ctx, root, state, id, nil)
+			require.NoError(t, err)
+			live := filepath.Join(repl.Path, "live")
+			require.NoError(t, os.WriteFile(live, []byte("x"), 0600))
+
+			require.NoError(t, old.Delete())
+			assert.FileExists(t, live)
+			_, err = os.Stat(filepath.Join(repl.Path, "work"))
+			assert.NoError(t, err, "work link of the replacement must be kept")
+			_, err = NewBundle(ctx, root, state, id, nil)
+			assert.ErrorIs(t, err, errdefs.ErrAlreadyExists, "the replacement must stay live")
+
+			require.NoError(t, repl.Delete())
+			assert.NoDirExists(t, repl.Path)
+		})
+	}
+}
+
+// TestLoadedBundleDeletesCreatedBundle verifies that a bundle created in this
+// process can be deleted through a handle loaded afterwards.
+func TestLoadedBundleDeletesCreatedBundle(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "create-load-delete"
+
+	b, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	loaded, err := LoadBundle(ctx, state, id)
+	require.NoError(t, err)
+
+	require.NoError(t, loaded.Delete())
+	assert.NoDirExists(t, b.Path)
+	assert.NoDirExists(t, filepath.Join(root, namespaces.Default, id))
+	_, err = NewBundle(ctx, root, state, id, nil)
+	assert.NoError(t, err, "ID must be reusable once the bundle is deleted")
+}
+
+// TestBundleLocksSamePath verifies that create and delete of one bundle path
+// wait for each other, so a Delete cannot publish a stale leftover marker after
+// a create. Other paths must not wait.
+func TestBundleLocksSamePath(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+
+	b, err := NewBundle(ctx, root, state, "locked", nil)
+	require.NoError(t, err)
+	require.NoError(t, bundleLocks.Lock(ctx, b.Path))
+
+	_, err = NewBundle(ctx, root, state, "other", nil)
+	assert.NoError(t, err, "other paths must not wait")
+
+	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	_, err = NewBundle(short, root, state, "locked", nil)
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "create must wait for the lock")
+
+	done := make(chan error, 1)
+	go func() { done <- b.Delete() }()
+	select {
+	case err := <-done:
+		t.Fatalf("Delete must wait for the lock, got %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	bundleLocks.Unlock(b.Path)
+	require.NoError(t, <-done)
+}
+
+// TestBundleDeleteWithStaleAtomicPath verifies that a removal left behind by an
+// earlier failed Delete does not make later Deletes fail.
+func TestBundleDeleteWithStaleAtomicPath(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+
+	b, err := NewBundle(ctx, root, state, "stale-atomic", nil)
+	require.NoError(t, err)
+	hidden := filepath.Join(filepath.Dir(b.Path), "."+b.ID)
+	require.NoError(t, os.MkdirAll(filepath.Join(hidden, "rootfs"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(hidden, "rootfs", "x"), []byte("x"), 0600))
+
+	require.NoError(t, b.Delete())
+	assert.NoDirExists(t, b.Path)
+	assert.NoDirExists(t, hidden)
+}
