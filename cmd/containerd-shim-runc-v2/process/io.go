@@ -210,9 +210,12 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 	if stdin == "" {
 		return nil
 	}
-	f, err := fifo.OpenFifo(context.Background(), stdin, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
+	// Wait for the stdin reader to open before setup returns, so CloseIO
+	// cannot remove the last writer before the reader is connected.
+	// openStdin supplies a writer even when no client is attached.
+	f, err := fifo.OpenFifo(ctx, stdin, syscall.O_RDONLY, 0)
 	if err != nil {
-		return fmt.Errorf("containerd-shim: opening %s failed: %s", stdin, err)
+		return fmt.Errorf("containerd-shim: opening %s failed: %w", stdin, err)
 	}
 	cwg.Add(1)
 	go func() {
