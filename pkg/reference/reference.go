@@ -119,6 +119,17 @@ func Parse(s string) (Spec, error) {
 		return Spec{}, ErrInvalid
 	}
 
+	// Reject percent-encoded sequences: url.Parse decodes them, which would
+	// silently rewrite the path (e.g. "foo%2Fbar" would alias the unrelated
+	// repository "foo/bar", "%41" would inject "A"). Percent is not a valid
+	// character in a distribution repository path, so there is nothing to
+	// preserve. u.RawPath is set by url.Parse exactly when the input's
+	// escaping differs from the canonical encoding of the decoded path, i.e.
+	// when a percent-encoded (or otherwise escaped) sequence was present.
+	if u.RawPath != "" {
+		return Spec{}, ErrInvalid
+	}
+
 	return Spec{
 		Locator: path.Join(u.Host, u.Path),
 		Object:  object,
