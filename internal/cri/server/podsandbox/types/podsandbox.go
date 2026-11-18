@@ -33,6 +33,8 @@ type PodSandbox struct {
 	Runtime   sandbox.RuntimeOpts
 	Status    sandboxstore.StatusStorage
 	stopChan  *store.StopCh
+	// cancelWait reclaims the goroutines waiting for the sandbox exit.
+	cancelWait func()
 }
 
 func NewPodSandbox(id string, status sandboxstore.Status) *PodSandbox {
@@ -60,6 +62,23 @@ func (p *PodSandbox) Exit(code uint32, exitTime time.Time) error {
 	}
 	p.stopChan.Stop()
 	return nil
+}
+
+// RegisterCancelWait registers cancel to reclaim the goroutines waiting for
+// the sandbox exit. It is invoked by CancelWait.
+func (p *PodSandbox) RegisterCancelWait(cancel func()) {
+	p.cancelWait = cancel
+}
+
+// CancelWait reclaims the goroutines waiting for the sandbox exit, if any.
+// It must only be called once the sandbox can no longer deliver an exit
+// event, i.e. after it has been removed from the store. Without it, a task
+// wait request that the shim never answers would park the waiters for the
+// remaining lifetime of the daemon.
+func (p *PodSandbox) CancelWait() {
+	if p.cancelWait != nil {
+		p.cancelWait()
+	}
 }
 
 func (p *PodSandbox) Wait(ctx context.Context) (containerd.ExitStatus, error) {
