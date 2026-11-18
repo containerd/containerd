@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/errdefs"
@@ -79,8 +80,8 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 	if err != nil {
 		return nil, err
 	}
-	if strings.ToLower(fsType) != "ntfs" {
-		return nil, fmt.Errorf("%s is not on an NTFS volume - only NTFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
+	if !snapshotters.IsSupportedWindowsFileSystem(fsType) {
+		return nil, fmt.Errorf("%s is not on an NTFS or ReFS volume - only NTFS and ReFS volumes are supported: %w", root, errdefs.ErrInvalidArgument)
 	}
 
 	if err := os.MkdirAll(root, 0700); err != nil {
