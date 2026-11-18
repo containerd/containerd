@@ -428,6 +428,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
+    if: github.event_name != 'merge_group'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     needs: [project, linters, protos, man]
@@ -789,6 +790,7 @@ jobs:
 
   integration-runsc:
     name: runsc (gVisor) integration
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [project, linters, protos, man]
@@ -896,7 +898,7 @@ jobs:
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
-
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
