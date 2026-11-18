@@ -123,6 +123,48 @@ func TestTimedStoreHalfCoreUsage(t *testing.T) {
 	}
 }
 
+func TestTimedStoreUsageNanoCoresWindow(t *testing.T) {
+	store := NewTimedStore(2*time.Minute, 120)
+	now := time.Now()
+
+	// One core for the first second, then idle. A one-second rate would be 0
+	// by the end; the conformance summary samples for longer than that.
+	store.Add(now, 0)
+	store.Add(now.Add(time.Second), 1000000000)
+	for i := 2; i <= 20; i++ {
+		store.Add(now.Add(time.Duration(i)*time.Second), 1000000000)
+	}
+
+	usageNanoCores, ok := store.GetLatestUsageNanoCores()
+	if !ok {
+		t.Fatal("expected a rate from the buffered window")
+	}
+	// 1s of CPU over 20s is 0.05 cores.
+	expected := uint64(50000000)
+	if usageNanoCores != expected {
+		t.Errorf("expected UsageNanoCores %d, got %d", expected, usageNanoCores)
+	}
+}
+
+func TestTimedStoreUsageNanoCoresAfterCounterReset(t *testing.T) {
+	store := NewTimedStore(2*time.Minute, 120)
+	now := time.Now()
+
+	store.Add(now, 5000000000)
+	// Restart resets the counter, then the new process uses half a core for 2s.
+	store.Add(now.Add(time.Second), 0)
+	store.Add(now.Add(3*time.Second), 1000000000)
+
+	usageNanoCores, ok := store.GetLatestUsageNanoCores()
+	if !ok {
+		t.Fatal("expected a rate after the counter reset")
+	}
+	expected := uint64(500000000)
+	if usageNanoCores != expected {
+		t.Errorf("expected UsageNanoCores %d, got %d", expected, usageNanoCores)
+	}
+}
+
 func TestTimedStoreMaxItems(t *testing.T) {
 	store := NewTimedStore(time.Hour, 3) // Keep at most 3 samples
 
