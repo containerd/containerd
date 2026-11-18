@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -108,6 +109,21 @@ func TestCompactLowerdirOption(t *testing.T) {
 		if !reflect.DeepEqual(opts, tc.newopts) {
 			t.Fatalf("[%d case] expected options (%v), but got (%v)", i+1, tc.newopts, opts)
 		}
+	}
+}
+
+func TestReplaceOverlayLowerdir(t *testing.T) {
+	options := []string{"lowerdir=/a:/b", "upperdir=/u", "workdir=/w"}
+	orig := slices.Clone(options)
+
+	got := replaceOverlayLowerdir(options, 0, []string{"/tmp/1", "/tmp/2"})
+
+	want := []string{"upperdir=/u", "workdir=/w", "lowerdir=/tmp/1:/tmp/2"}
+	if !slices.Equal(got, want) {
+		t.Errorf("replaceOverlayLowerdir(%q) = %q, want %q", orig, got, want)
+	}
+	if !slices.Equal(options, orig) {
+		t.Errorf("replaceOverlayLowerdir modified its input: got %q, want %q", options, orig)
 	}
 }
 

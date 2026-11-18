@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/containerd/log"
@@ -67,10 +68,14 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
 
-	options = append(options[:lowerIdx], options[lowerIdx+1:]...)
-	options = append(options, "lowerdir="+strings.Join(tmpLowerdirs, ":"))
+	return replaceOverlayLowerdir(options, lowerIdx, tmpLowerdirs), idMapCleanUp, nil
+}
 
-	return options, idMapCleanUp, nil
+// replaceOverlayLowerdir returns a copy of options with the option at idx
+// removed and a "lowerdir=" option for lowerdirs appended.
+func replaceOverlayLowerdir(options []string, idx int, lowerdirs []string) []string {
+	options = slices.Delete(slices.Clone(options), idx, idx+1)
+	return append(options, "lowerdir="+strings.Join(lowerdirs, ":"))
 }
 
 // Mount to the provided target path.
