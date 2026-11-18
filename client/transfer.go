@@ -25,6 +25,18 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer/proxy"
 )
 
+// Transfer executes a transfer operation between a source (src) and a destination (dest).
+//
+// Transfer operations execute on the daemon side within a client lease and support streaming
+// callbacks for progress and credentials.
+//
+// Standard source and destination pairings:
+//   - Pull: [github.com/containerd/containerd/v2/core/transfer/registry.OCIRegistry] to [github.com/containerd/containerd/v2/core/transfer/image.Store]
+//   - Push: [github.com/containerd/containerd/v2/core/transfer/image.Store] to [github.com/containerd/containerd/v2/core/transfer/registry.OCIRegistry]
+//   - Import: [github.com/containerd/containerd/v2/core/transfer/archive.ImageImportStream] to [github.com/containerd/containerd/v2/core/transfer/image.Store]
+//   - Export: [github.com/containerd/containerd/v2/core/transfer/image.Store] to [github.com/containerd/containerd/v2/core/transfer/archive.ImageExportStream]
+//
+// Callers can provide [transfer.WithProgress] to track transfer progress events.
 func (c *Client) Transfer(ctx context.Context, src any, dest any, opts ...transfer.Opt) error {
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
