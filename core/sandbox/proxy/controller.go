@@ -232,3 +232,38 @@ func (s *remoteSandboxController) Update(
 	}
 	return nil
 }
+
+func (s *remoteSandboxController) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	_, err := s.client.Checkpoint(ctx, &api.ControllerCheckpointRequest{
+		SandboxID: sandboxID,
+		Path:      opts.Path,
+		Options:   typeurl.MarshalProto(opts.Options),
+		Sandboxer: s.sandboxerName,
+	})
+	if err != nil {
+		return errgrpc.ToNative(err)
+	}
+	return nil
+}
+
+func (s *remoteSandboxController) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error) {
+	resp, err := s.client.Restore(ctx, &api.ControllerRestoreRequest{
+		SandboxID: sandboxID,
+		Path:      opts.Path,
+		Options:   typeurl.MarshalProto(opts.Options),
+		Sandboxer: s.sandboxerName,
+	})
+	if err != nil {
+		return sandbox.ControllerInstance{}, errgrpc.ToNative(err)
+	}
+
+	return sandbox.ControllerInstance{
+		SandboxID: sandboxID,
+		Pid:       resp.GetPid(),
+		CreatedAt: resp.GetCreatedAt().AsTime(),
+		Labels:    resp.GetLabels(),
+		Address:   resp.GetAddress(),
+		Version:   resp.GetVersion(),
+		Spec:      resp.GetSpec(),
+	}, nil
+}

@@ -28,6 +28,7 @@ import (
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	apitypes "github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,12 @@ type stubController struct {
 	lastUpdateID      string
 	lastUpdateSandbox sandbox.Sandbox
 	lastUpdateFields  []string
+
+	lastCheckpointID   string
+	lastCheckpointOpts sandbox.CheckpointOptions
+	lastRestoreOpts    sandbox.RestoreOptions
+	checkpointErr      error
+	restoreErr         error
 
 	createErr   error
 	startErr    error
@@ -140,6 +147,28 @@ func (s *stubController) Update(_ context.Context, id string, sb sandbox.Sandbox
 	s.lastUpdateSandbox = sb
 	s.lastUpdateFields = fields
 	return s.updateErr
+}
+
+func (s *stubController) Checkpoint(_ context.Context, id string, opts sandbox.CheckpointOptions) error {
+	s.lastCheckpointID = id
+	s.lastCheckpointOpts = opts
+	return s.checkpointErr
+}
+
+func (s *stubController) Restore(_ context.Context, id string, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error) {
+	s.lastRestoreOpts = opts
+	if s.restoreErr != nil {
+		return sandbox.ControllerInstance{}, s.restoreErr
+	}
+	return sandbox.ControllerInstance{
+		SandboxID: id,
+		Pid:       42,
+		CreatedAt: createdAt,
+		Labels:    map[string]string{"env": "test"},
+		Address:   "ttrpc+unix:///run/sb-1.sock",
+		Version:   3,
+		Spec:      &anypb.Any{TypeUrl: "spec"},
+	}, nil
 }
 
 func newTestService(t *testing.T) (*controllerService, *stubController) {
@@ -398,4 +427,79 @@ func TestUpdate(t *testing.T) {
 		})
 		require.Error(t, err)
 	})
+}
+
+func TestCheckpoint(t *testing.T) {
+	t.Run("forwards path and options to controller", func(t *testing.T) {
+		svc, ctrl := newTestService(t)
+		options := &anypb.Any{TypeUrl: "checkpoint-options", Value: []byte("o")}
+
+		_, err := svc.Checkpoint(nsCtx(), &api.ControllerCheckpointRequest{
+			SandboxID: "sb-1",
+			Sandboxer: "test",
+			Path:      "/checkpoints/sb-1",
+			Options:   options,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "sb-1", ctrl.lastCheckpointID)
+		assert.Equal(t, sandbox.CheckpointOptions{Path: "/checkpoints/sb-1", Options: options}, ctrl.lastCheckpointOpts)
+	})
+
+	t.Run("returns Unimplemented when controller does not support it", func(t *testing.T) {
+		svc, ctrl := newTestService(t)
+		ctrl.checkpointErr = errdefs.ErrNotImplemented
+
+		_, err := svc.Checkpoint(nsCtx(), &api.ControllerCheckpointRequest{
+			SandboxID: "sb-1",
+			Sandboxer: "test",
+		})
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	})
+}
+
+func TestRestore(t *testing.T) {
+	t.Run("forwards path and options and returns the instance", func(t *testing.T) {
+		svc, ctrl := newTestService(t)
+		options := &anypb.Any{TypeUrl: "restore-options", Value: []byte("o")}
+
+		resp, err := svc.Restore(nsCtx(), &api.ControllerRestoreRequest{
+			SandboxID: "sb-1",
+			Sandboxer: "test",
+			Path:      "/checkpoints/sb-1",
+			Options:   options,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, sandbox.RestoreOptions{Path: "/checkpoints/sb-1", Options: options}, ctrl.lastRestoreOpts)
+
+		assert.Equal(t, "sb-1", resp.GetSandboxID())
+		assert.Equal(t, uint32(42), resp.GetPid())
+		assert.Equal(t, createdAt, resp.GetCreatedAt().AsTime())
+		assert.Equal(t, map[string]string{"env": "test"}, resp.GetLabels())
+		assert.Equal(t, "ttrpc+unix:///run/sb-1.sock", resp.GetAddress())
+		assert.Equal(t, uint32(3), resp.GetVersion())
+		assert.Equal(t, "spec", resp.GetSpec().GetTypeUrl())
+	})
+
+	t.Run("returns Unimplemented when controller does not support it", func(t *testing.T) {
+		svc, ctrl := newTestService(t)
+		ctrl.restoreErr = errdefs.ErrNotImplemented
+
+		_, err := svc.Restore(nsCtx(), &api.ControllerRestoreRequest{
+			SandboxID: "sb-1",
+			Sandboxer: "test",
+		})
+		assert.Equal(t, codes.Unimplemented, status.Code(err))
+	})
+}
+
+func TestCheckpointRestoreWithoutOptions(t *testing.T) {
+	svc, ctrl := newTestService(t)
+
+	_, err := svc.Checkpoint(nsCtx(), &api.ControllerCheckpointRequest{SandboxID: "sb-1", Sandboxer: "test"})
+	require.NoError(t, err)
+	assert.Nil(t, ctrl.lastCheckpointOpts.Options)
+
+	_, err = svc.Restore(nsCtx(), &api.ControllerRestoreRequest{SandboxID: "sb-1", Sandboxer: "test"})
+	require.NoError(t, err)
+	assert.Nil(t, ctrl.lastRestoreOpts.Options)
 }

@@ -117,6 +117,14 @@ func (f *fakeSandboxController) Update(
 	return errdefs.ErrNotImplemented
 }
 
+func (f fakeSandboxController) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.ControllerInstance, error) {
+	return sandbox.ControllerInstance{}, errdefs.ErrNotImplemented
+}
+
 type fakeRuntimeService struct {
 	ocispecs map[string]*oci.Spec
 }

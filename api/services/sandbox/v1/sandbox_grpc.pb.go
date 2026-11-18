@@ -263,6 +263,13 @@ type ControllerClient interface {
 	Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error)
 	Metrics(ctx context.Context, in *ControllerMetricsRequest, opts ...grpc.CallOption) (*ControllerMetricsResponse, error)
 	Update(ctx context.Context, in *ControllerUpdateRequest, opts ...grpc.CallOption) (*ControllerUpdateResponse, error)
+	// Checkpoint saves the state of a started sandbox.
+	// Controllers that do not support checkpoints return `codes.Unimplemented`.
+	Checkpoint(ctx context.Context, in *ControllerCheckpointRequest, opts ...grpc.CallOption) (*ControllerCheckpointResponse, error)
+	// Restore starts a created sandbox from a checkpoint. Clients call it in
+	// place of Start.
+	// Controllers that do not support checkpoints return `codes.Unimplemented`.
+	Restore(ctx context.Context, in *ControllerRestoreRequest, opts ...grpc.CallOption) (*ControllerRestoreResponse, error)
 }
 
 type controllerClient struct {
@@ -354,6 +361,24 @@ func (c *controllerClient) Update(ctx context.Context, in *ControllerUpdateReque
 	return out, nil
 }
 
+func (c *controllerClient) Checkpoint(ctx context.Context, in *ControllerCheckpointRequest, opts ...grpc.CallOption) (*ControllerCheckpointResponse, error) {
+	out := new(ControllerCheckpointResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Checkpoint", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controllerClient) Restore(ctx context.Context, in *ControllerRestoreRequest, opts ...grpc.CallOption) (*ControllerRestoreResponse, error) {
+	out := new(ControllerRestoreResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Restore", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControllerServer is the server API for Controller service.
 // All implementations must embed UnimplementedControllerServer
 // for forward compatibility
@@ -367,6 +392,13 @@ type ControllerServer interface {
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error)
 	Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error)
+	// Checkpoint saves the state of a started sandbox.
+	// Controllers that do not support checkpoints return `codes.Unimplemented`.
+	Checkpoint(context.Context, *ControllerCheckpointRequest) (*ControllerCheckpointResponse, error)
+	// Restore starts a created sandbox from a checkpoint. Clients call it in
+	// place of Start.
+	// Controllers that do not support checkpoints return `codes.Unimplemented`.
+	Restore(context.Context, *ControllerRestoreRequest) (*ControllerRestoreResponse, error)
 	mustEmbedUnimplementedControllerServer()
 }
 
@@ -400,6 +432,12 @@ func (UnimplementedControllerServer) Metrics(context.Context, *ControllerMetrics
 }
 func (UnimplementedControllerServer) Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedControllerServer) Checkpoint(context.Context, *ControllerCheckpointRequest) (*ControllerCheckpointResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Checkpoint not implemented")
+}
+func (UnimplementedControllerServer) Restore(context.Context, *ControllerRestoreRequest) (*ControllerRestoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Restore not implemented")
 }
 func (UnimplementedControllerServer) mustEmbedUnimplementedControllerServer() {}
 
@@ -576,6 +614,42 @@ func _Controller_Update_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Controller_Checkpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerCheckpointRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).Checkpoint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Checkpoint",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).Checkpoint(ctx, req.(*ControllerCheckpointRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Controller_Restore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerRestoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).Restore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Restore",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).Restore(ctx, req.(*ControllerRestoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Controller_ServiceDesc is the grpc.ServiceDesc for Controller service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -618,6 +692,14 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Update",
 			Handler:    _Controller_Update_Handler,
+		},
+		{
+			MethodName: "Checkpoint",
+			Handler:    _Controller_Checkpoint_Handler,
+		},
+		{
+			MethodName: "Restore",
+			Handler:    _Controller_Restore_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

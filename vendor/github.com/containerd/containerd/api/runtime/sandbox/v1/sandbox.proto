@@ -66,6 +66,21 @@ service Sandbox {
   // return a `github.com/containerd/errdefs.ErrNotImplemented` error (gRPC
   // `codes.Unimplemented`), which callers are expected to tolerate.
   rpc UpdateSandbox(UpdateSandboxRequest) returns (UpdateSandboxResponse);
+
+  // CheckpointSandbox saves the state of a started sandbox.
+  // Implementing this RPC is optional. ttrpc and gRPC answer a call to a method
+  // the shim does not register with `codes.Unimplemented`. A shim that
+  // registers the method and does not support checkpoints MUST return the same
+  // status, for example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`.
+  rpc CheckpointSandbox(CheckpointSandboxRequest) returns (CheckpointSandboxResponse);
+
+  // RestoreSandbox starts a created sandbox from a checkpoint. containerd calls
+  // it in place of StartSandbox.
+  // Implementing this RPC is optional. ttrpc and gRPC answer a call to a method
+  // the shim does not register with `codes.Unimplemented`. A shim that
+  // registers the method and does not support checkpoints MUST return the same
+  // status, for example `errgrpc.ToGRPC(errdefs.ErrNotImplemented)`.
+  rpc RestoreSandbox(RestoreSandboxRequest) returns (RestoreSandboxResponse);
 }
 
 message CreateSandboxRequest {
@@ -162,4 +177,29 @@ message SandboxMetricsRequest {
 
 message SandboxMetricsResponse {
   containerd.types.Metric metrics = 1;
+}
+
+message CheckpointSandboxRequest {
+  string sandbox_id = 1;
+  // Path is the directory the shim writes the checkpoint to.
+  string path = 2;
+  // Options are runtime specific checkpoint options, such as what to capture
+  // and whether the sandbox keeps running afterwards.
+  google.protobuf.Any options = 3;
+}
+
+message CheckpointSandboxResponse {}
+
+message RestoreSandboxRequest {
+  string sandbox_id = 1;
+  // Path is the directory of a checkpoint written by CheckpointSandbox.
+  string path = 2;
+  // Options are runtime specific restore options.
+  google.protobuf.Any options = 3;
+}
+
+message RestoreSandboxResponse {
+  uint32 pid = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Any spec = 3;
 }

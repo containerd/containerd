@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
@@ -280,6 +281,14 @@ func (s *exampleService) ShutdownSandbox(ctx context.Context, req *sandboxapi.Sh
 
 func (s *exampleService) UpdateSandbox(ctx context.Context, req *sandboxapi.UpdateSandboxRequest) (*sandboxapi.UpdateSandboxResponse, error) {
 	return nil, errdefs.ErrNotImplemented
+}
+
+func (s *exampleService) CheckpointSandbox(ctx context.Context, req *sandboxapi.CheckpointSandboxRequest) (*sandboxapi.CheckpointSandboxResponse, error) {
+	return nil, errgrpc.ToGRPC(errdefs.ErrNotImplemented)
+}
+
+func (s *exampleService) RestoreSandbox(ctx context.Context, req *sandboxapi.RestoreSandboxRequest) (*sandboxapi.RestoreSandboxResponse, error) {
+	return nil, errgrpc.ToGRPC(errdefs.ErrNotImplemented)
 }
 
 func (s *exampleService) SandboxMetrics(ctx context.Context, req *sandboxapi.SandboxMetricsRequest) (*sandboxapi.SandboxMetricsResponse, error) {
