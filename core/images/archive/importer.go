@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -114,7 +115,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 				return ocispec.Descriptor{}, fmt.Errorf("untar manifest %q: %w", hdr.Name, err)
 			}
 		default:
-			dgst, err := onUntarBlob(ctx, tr, store, hdr.Size, "tar-"+hdrName)
+			dgst, err := onUntarBlob(ctx, tr, store, hdr.Size, "tar-"+hdrName, blobDigest(hdrName))
 			if err != nil {
 				return ocispec.Descriptor{}, fmt.Errorf("failed to ingest %q: %w", hdr.Name, err)
 			}
@@ -245,7 +246,37 @@ func onUntarJSON(r io.Reader, j any) error {
 	return json.NewDecoder(io.LimitReader(r, jsonLimit)).Decode(j)
 }
 
-func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, size int64, ref string) (digest.Digest, error) {
+// blobDigest returns the digest named by an OCI layout blob path, if any.
+func blobDigest(name string) digest.Digest {
+	rest, ok := strings.CutPrefix(name, "blobs/")
+	if !ok {
+		return ""
+	}
+	alg, encoded, ok := strings.Cut(rest, "/")
+	if !ok {
+		return ""
+	}
+	dgst := digest.NewDigestFromEncoded(digest.Algorithm(alg), encoded)
+	if dgst.Validate() != nil {
+		return ""
+	}
+	return dgst
+}
+
+func onUntarBlob(ctx context.Context, r io.Reader, store content.Store, size int64, ref string, expected digest.Digest) (digest.Digest, error) {
+	if expected != "" {
+		if err := content.WriteBlob(ctx, store, ref, r, ocispec.Descriptor{Size: size, Digest: expected}); err != nil {
+			if errdefs.IsFailedPrecondition(err) {
+				// Don't let a later import resume the rejected data.
+				if aerr := store.Abort(ctx, ref); aerr != nil && !errdefs.IsNotFound(aerr) {
+					log.G(ctx).WithError(aerr).WithField("ref", ref).Warn("failed to abort ingest")
+				}
+			}
+			return "", err
+		}
+		return expected, nil
+	}
+
 	dgstr := digest.Canonical.Digester()
 
 	if err := content.WriteBlob(ctx, store, ref, io.TeeReader(r, dgstr.Hash()), ocispec.Descriptor{Size: size}); err != nil {
