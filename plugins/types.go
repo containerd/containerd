@@ -110,4 +110,6 @@ const (
 
 const (
 	SnapshotterRootDir = "root"
+	// DiffServiceSyncFs is exported by the diff service with its sync_fs setting
+	DiffServiceSyncFs = "sync_fs"
 )
