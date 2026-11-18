@@ -31,11 +31,12 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	cniBinDir := "/opt/cni/bin"
 
 	grpcCri := map[string]any{
-		"enable_selinux":              true,
-		"max_container_log_line_size": 100,
-		"max_concurrent_downloads":    3,    // removed since it's moved to cri image service
-		"disable_tcp_service":         true, // removed since it's moved to cri grpc service
-		"enable_cdi":                  true,
+		"enable_selinux":                true,
+		"enable_container_identity_env": true,
+		"max_container_log_line_size":   100,
+		"max_concurrent_downloads":      3,    // removed since it's moved to cri image service
+		"disable_tcp_service":           true, // removed since it's moved to cri grpc service
+		"enable_cdi":                    true,
 		"containerd": map[string]any{
 			"runtimes": map[string]any{
 				"runc": map[string]any{
@@ -57,6 +58,7 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, runtimeConf)
 	assert.Equal(t, grpcCri["enable_selinux"], runtimeConf["enable_selinux"])
+	assert.Equal(t, grpcCri["enable_container_identity_env"], runtimeConf["enable_container_identity_env"])
 	assert.Equal(t, grpcCri["max_container_log_line_size"], runtimeConf["max_container_log_line_size"])
 	assert.NotContains(t, runtimeConf, "max_concurrent_downloads")
 	assert.NotContains(t, runtimeConf, "disable_tcp_service")
