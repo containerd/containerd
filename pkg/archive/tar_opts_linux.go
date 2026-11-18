@@ -41,6 +41,9 @@ func OverlayConvertWhiteout(hdr *tar.Header, path string) (bool, error) {
 		originalBase := base[len(whiteoutPrefix):]
 		originalPath := filepath.Join(dir, originalBase)
 
+		if err := validateHeaderIDs(hdr); err != nil {
+			return false, err
+		}
 		if err := unix.Mknod(originalPath, unix.S_IFCHR, 0); err != nil {
 			return false, err
 		}
