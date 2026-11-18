@@ -20,7 +20,9 @@ package oom
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -130,4 +132,23 @@ func TestWatcherStopRemovesFromMap(t *testing.T) {
 	// Should be able to add again with the same containerID
 	require.NoError(t, watchers.Add(containerID, cmd.Process.Pid, fn))
 	require.NoError(t, watchers.Stop(containerID))
+}
+
+// BenchmarkReadKVStatsFile confirms that reading the oom_kill counter from
+// memory.events via readKVStatsFile does not allocate on the reused-map path.
+// Run with: go test -bench=BenchmarkReadKVStatsFile -benchmem ./internal/oom/
+func BenchmarkReadKVStatsFile(b *testing.B) {
+	dir := b.TempDir()
+	content := "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+	require.NoError(b, os.WriteFile(filepath.Join(dir, "memory.events"), []byte(content), 0o644))
+
+	out := make(map[string]uint64)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		clear(out)
+		if err := readKVStatsFile(dir, "memory.events", out); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
