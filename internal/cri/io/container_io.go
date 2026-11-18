@@ -173,29 +173,6 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		// wrapper doesn't close the actual stdin, it only stops io.Copy.
 		// The actual stdin will be closed by stream server.
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
-		wg.Go(func() {
-			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
-				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
-			}
-			log.L.Infof("Attach stream %q closed", stdinKey)
-			if opts.StdinOnce && !opts.Tty {
-				// Due to kubectl requirements and current docker behavior, when (opts.StdinOnce &&
-				// opts.Tty) we have to close container stdin and keep stdout and stderr open until
-				// container stops.
-				c.stdin.Close()
-				// Also closes the containerd side.
-				if err := opts.CloseStdin(); err != nil {
-					log.L.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
-				}
-			} else {
-				if opts.Stdout != nil {
-					c.stdoutGroup.Remove(stdoutKey)
-				}
-				if opts.Stderr != nil {
-					c.stderrGroup.Remove(stderrKey)
-				}
-			}
-		})
 	}
 
 	attachStream := func(key string, close <-chan struct{}) {
@@ -226,6 +203,35 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
 		c.stderrGroup.Add(stderrKey, wc)
 		go attachStream(stderrKey, close)
+	}
+
+	// Start copying stdin only after the output writers have been registered.
+	// Output produced by the container in response to the first stdin bytes
+	// must be delivered to this attach stream as well as the container log.
+	if stdinStreamRC != nil {
+		wg.Go(func() {
+			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
+				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
+			}
+			log.L.Infof("Attach stream %q closed", stdinKey)
+			if opts.StdinOnce && !opts.Tty {
+				// Due to kubectl requirements and current docker behavior, when (opts.StdinOnce &&
+				// opts.Tty) we have to close container stdin and keep stdout and stderr open until
+				// container stops.
+				c.stdin.Close()
+				// Also closes the containerd side.
+				if err := opts.CloseStdin(); err != nil {
+					log.L.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
+				}
+			} else {
+				if opts.Stdout != nil {
+					c.stdoutGroup.Remove(stdoutKey)
+				}
+				if opts.Stderr != nil {
+					c.stderrGroup.Remove(stderrKey)
+				}
+			}
+		})
 	}
 	wg.Wait()
 }
