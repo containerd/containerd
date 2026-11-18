@@ -36,6 +36,7 @@ type remoteWriter struct {
 	client contentapi.TTRPCContent_WriteClient
 	offset int64
 	digest digest.Digest
+	cancel context.CancelFunc
 }
 
 // send performs a synchronous req-resp cycle on the client.
@@ -151,5 +152,10 @@ func (rw *remoteWriter) Truncate(size int64) error {
 }
 
 func (rw *remoteWriter) Close() error {
+	defer func() {
+		if rw.cancel != nil {
+			rw.cancel()
+		}
+	}()
 	return rw.client.CloseSend()
 }
