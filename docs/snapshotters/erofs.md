@@ -418,6 +418,22 @@ one on shared storage that's refreshed on its own schedule.
 Populating and maintaining a cache is the operator's responsibility: containerd
 never writes to these directories, so they can be mounted read-only.
 
+Unless the pull fetches all content, which blobs are downloaded depends on the
+unpack mode:
+
+- A parallel unpack downloads only the blobs of cache misses. EROFS unpacks in
+  parallel when the unpacker has an unpack limiter. Transfer service pulls have
+  one when `max_concurrent_unpacks` is greater than 1.
+- A sequential unpack also downloads the blobs above its first cache miss,
+  including the blobs of later cache hits. It cancels the downloads that are
+  still running after every layer is unpacked. A failed download fails the
+  unpack only if its layer needs extraction.
+
+A pull that fetches all content downloads every layer blob, including the blobs
+of cache hits. Otherwise, a blob that is not downloaded is missing from the
+content store. Exporting or pushing the image, or unpacking it into another
+snapshotter, can then fail.
+
 > [!IMPORTANT]
 > A hit mounts the blob from its location in the cache. An entry must stay in
 > place for as long as any snapshot references it. Removing an entry that is
