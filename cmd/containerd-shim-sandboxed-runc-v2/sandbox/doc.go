@@ -49,28 +49,32 @@
 // configured with CNI, and sets the pod up, without a process unless the pod
 // shares its PID namespace:
 //
-//   - Namespaces (namespaces.go). A locked OS thread enters the CRI network
-//     namespace, unshares an IPC and a UTS namespace, sets the pod hostname,
-//     writes the pod sysctls (net.* land in the pod network namespace,
-//     kernel.shm*, kernel.msg*, kernel.sem and fs.mqueue.* in the pod IPC
-//     namespace) and bind-mounts its /proc/self/task/<tid>/ns/{ipc,uts} onto
-//     files under <bundle>/ns. The thread is then discarded; the bind mounts,
-//     the pins, keep the namespaces alive the same way CRI keeps the network
-//     namespace alive under /var/run/netns. A namespace the pod shares with
-//     the host (hostNetwork, hostIPC) is neither created nor pinned.
+//   - Namespaces (setup.go). runc creates the namespaces as it did for the
+//     pause container. "runc create" of a one-time setup container joins the
+//     CRI network namespace, creates an IPC and a UTS namespace, sets the pod
+//     hostname and applies the pod sysctls, and its process then waits to
+//     exec its program. The shim bind-mounts /proc/<pid>/ns/{ipc,uts} of that
+//     process onto files under <bundle>/ns, called pins, and deletes the
+//     container. No process remains; the pins keep the namespaces alive as
+//     the mounts under /var/run/netns keep the CRI network namespaces alive.
+//     The shim neither creates nor pins a namespace the pod shares with the
+//     host (hostNetwork, hostIPC). It does not run runc for a pod that shares
+//     both with the host and does not share a PID namespace among its
+//     containers.
 //
 //   - Shared files (bundle.go). The shim writes hostname, copies the host
 //     hosts file, writes resolv.conf from the pod DNS config (or copies the
 //     host one) and mounts the pod shm tmpfs, all under its bundle instead of
 //     the CRI state directory, and lists them as Mounts of the sandbox spec.
 //
-//   - Shared PID namespace (init.go). A pod that shares its PID namespace
+//   - Shared PID namespace (setup.go). A pod that shares its PID namespace
 //     (shareProcessNamespace) needs a durable PID 1 for it, the role pause
-//     plays: the shim runs containerd-sandbox-init through runc, in the pod
-//     cgroup and the pod namespaces, and the spec names its PID namespace
-//     for the containers to join. Every other pod has no sandbox process.
+//     plays. The same setup container also creates the PID namespace, and
+//     the shim starts it, running containerd-sandbox-init in the pod cgroup.
+//     The spec names the pinned PID namespace for the containers to join.
+//     Every other pod does not have a sandbox process.
 //
-//   - Spec (buildSpec in config.go). StartSandbox returns pid 0 and a
+//   - Spec (sandboxSpec in config.go). StartSandbox returns pid 0 and a
 //     synthesized OCI spec that carries the namespace paths, the sysctls, the
 //     shared file mounts and the annotations of the request. It describes what
 //     the sandbox holds; there is no process it could describe.
@@ -95,11 +99,13 @@
 //
 // # Not supported yet
 //
-// User namespaced pods need their namespaces created inside the
-// pod user namespace, which a multithreaded shim cannot enter; they are
-// rejected, as are user.* sysctls. The shim requires cgroup v2 and does not
-// run rootless. SELinux labels are not applied yet: the pod label allocation
-// moves into the CRI layer with
+// User namespaced pods need their namespaces created inside the pod user
+// namespace. The setup runc container can do that, but the shim does not
+// configure it yet and rejects these pods. It also rejects user.* sysctls and
+// sysctls whose names contain a "." (runc maps every "." to "/"). The shim
+// requires cgroup v2, and runc 1.2 or newer on Linux 5.3 or newer to hand
+// over a pidfd. It does not run rootless. SELinux labels are not applied yet:
+// the pod label allocation moves into the CRI layer with
 // https://github.com/containerd/containerd/pull/14108, after which the shim
 // applies the labels it is handed (see the TODO in CreateSandbox).
 package sandbox

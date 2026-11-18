@@ -20,16 +20,19 @@ package sandbox
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/moby/sys/mountinfo"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/internal/cri/sandboxfiles"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
@@ -107,6 +110,7 @@ func TestCleanupWithoutMounts(t *testing.T) {
 	// before mounting anything) are removed, and nothing else is touched.
 	require.NoError(t, os.Mkdir(filepath.Join(bundle, pinDir), 0o700))
 	require.NoError(t, os.Mkdir(filepath.Join(bundle, "shm"), 0o700))
+	require.NoError(t, os.MkdirAll(filepath.Join(bundle, runcDir, runcRootfs), 0o700))
 	require.NoError(t, os.Mkdir(filepath.Join(bundle, "rootfs"), 0o700))
 	for _, f := range []string{"hostname", "hosts", "resolv.conf", "ns/ipc", "ns/uts", "address"} {
 		require.NoError(t, os.WriteFile(filepath.Join(bundle, f), []byte("x"), 0o600))
@@ -125,4 +129,29 @@ func TestCleanupWithoutMounts(t *testing.T) {
 	// Idempotent, including on a bundle that no longer exists.
 	require.NoError(t, Cleanup(ctx, bundle))
 	require.NoError(t, Cleanup(ctx, filepath.Join(bundle, "does-not-exist")))
+}
+
+func TestCleanupBusyMount(t *testing.T) {
+	testutil.RequiresRoot(t)
+	ctx := context.Background()
+	bundle := t.TempDir()
+	shm := filepath.Join(bundle, sandboxfiles.ShmDir)
+	require.NoError(t, os.Mkdir(shm, 0o700))
+	require.NoError(t, unix.Mount("shm", shm, "tmpfs", 0, ""))
+	t.Cleanup(func() { _ = unix.Unmount(shm, unix.MNT_DETACH) })
+	f, err := os.Create(filepath.Join(shm, "busy"))
+	require.NoError(t, err)
+	t.Cleanup(func() { f.Close() })
+
+	// A file open on the shm tmpfs keeps it busy: Cleanup reports EBUSY and
+	// leaves the mount and the files in place for the next attempt.
+	require.ErrorIs(t, Cleanup(ctx, bundle), unix.EBUSY)
+	mounted, err := mountinfo.Mounted(shm)
+	require.NoError(t, err)
+	assert.True(t, mounted)
+
+	require.NoError(t, f.Close())
+	require.NoError(t, Cleanup(ctx, bundle))
+	_, err = os.Stat(shm)
+	assert.ErrorIs(t, err, fs.ErrNotExist)
 }
