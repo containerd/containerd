@@ -26,7 +26,7 @@ import (
 func contentStoreEnv(t testing.TB) (context.Context, string, content.Store, func()) {
 	tmpdir := t.TempDir()
 
-	cs, err := NewStore(tmpdir)
+	cs, err := NewStore(tmpdir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

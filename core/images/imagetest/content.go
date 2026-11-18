@@ -54,7 +54,7 @@ type ContentStore struct {
 
 // NewContentStore creates a new content store in the testing's temporary directory
 func NewContentStore(ctx context.Context, t *testing.T) ContentStore {
-	cs, err := local.NewLabeledStore(t.TempDir(), newMemoryLabelStore())
+	cs, err := local.NewLabeledStore(t.TempDir(), newMemoryLabelStore(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
