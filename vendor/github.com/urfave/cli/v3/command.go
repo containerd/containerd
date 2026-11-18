@@ -67,6 +67,11 @@ type Command struct {
 	// An action to execute after any subcommands are run, but after the subcommand has finished
 	// It is run even if Action() panics
 	After AfterFunc `json:"-"`
+	// An action to validate arguments before the command is run. If non-nil, it
+	// is called before Before and Action. If the current command does not set
+	// ArgValidator, the nearest ancestor that does is used instead.
+	// Returning a non-nil error short-circuits the command.
+	ArgValidator ArgValidatorFunc `json:"-"`
 	// The function to call when this command is invoked
 	Action ActionFunc `json:"-"`
 	// Execute this function if the proper command cannot be found
@@ -77,6 +82,10 @@ type Command struct {
 	InvalidFlagAccessHandler InvalidFlagAccessFunc `json:"-"`
 	// Boolean to hide this command from help or completion
 	Hidden bool `json:"hidden"`
+	// Deprecation message for this command. If non-empty, a warning is
+	// printed to ErrWriter when the command is invoked. Setting it does not
+	// hide the command; set Hidden as well for that.
+	Deprecated string `json:"deprecated"`
 	// List of all authors who contributed (string or fmt.Stringer)
 	// TODO: ~string | fmt.Stringer when interface unions are available
 	Authors []any `json:"authors"`
@@ -160,12 +169,18 @@ type Command struct {
 	didSetupDefaults bool
 	// whether in shell completion mode
 	shellCompletion bool
+	// whether the shell completion request came after a "--" separator,
+	// after which only positional arguments are accepted and nothing is
+	// suggested. The request is still a completion, never a command run.
+	shellCompletionPastDoubleDash bool
 	// whether global help flag was added
 	globaHelpFlagAdded bool
 	// whether global version flag was added
 	globaVersionFlagAdded bool
 	// generated root version flag
 	versionFlag Flag
+	// generated help flag
+	helpFlag Flag
 	// whether this is a completion command
 	isCompletionCommand bool
 	// whether this is the built-in help command
@@ -185,7 +200,31 @@ func (cmd *Command) Command(name string) *Command {
 func (cmd *Command) checkHelp() bool {
 	tracef("checking if help is wanted (cmd=%[1]q)", cmd.Name)
 
-	return HelpFlag != nil && slices.ContainsFunc(HelpFlag.Names(), cmd.Bool)
+	helpFlag := cmd.helpFlag
+	if helpFlag == nil && HelpFlag != nil {
+		// A user flag that took the name of the help flag, such as
+		// HelpFlag itself listed in Flags, still shows help.
+		helpFlag = cmd.lFlag(HelpFlag.Names()[0])
+	}
+	return helpFlag != nil && slices.ContainsFunc(helpFlag.Names(), cmd.Bool)
+}
+
+func (cmd *Command) checkDuplicateFlagNames() error {
+	seen := map[string]struct{}{}
+	for _, fl := range cmd.allFlags() {
+		// Go flags from other packages (AllowExtFlags) can't be renamed
+		// by the user, so a user flag with the same name wins instead.
+		if _, ok := fl.(*extFlag); ok {
+			continue
+		}
+		for _, name := range fl.Names() {
+			if _, ok := seen[name]; ok {
+				return fmt.Errorf("flag %q defined multiple times in command %q", name, cmd.FullName())
+			}
+			seen[name] = struct{}{}
+		}
+	}
+	return nil
 }
 
 func (cmd *Command) allFlags() []Flag {
@@ -301,12 +340,25 @@ func (cmd *Command) VisiblePersistentFlags() []Flag {
 		return nil
 	}
 	var flags []Flag
-	for _, fl := range cmd.Root().Flags {
-		pfl, ok := fl.(LocalFlag)
-		if !ok || pfl.IsLocal() {
-			continue
+	lineage := cmd.Lineage()
+	for i := len(lineage) - 1; i > 0; i-- {
+		for _, fl := range lineage[i].allFlags() {
+			pfl, ok := fl.(LocalFlag)
+			if !ok || pfl.IsLocal() {
+				continue
+			}
+			applies := true
+			for _, name := range fl.Names() {
+				if cmd.lookupFlag(name) != fl {
+					applies = false
+					break
+				}
+			}
+			if !applies {
+				continue
+			}
+			flags = append(flags, fl)
 		}
-		flags = append(flags, fl)
 	}
 	return visibleFlags(flags)
 }
@@ -453,6 +505,40 @@ func (cmd *Command) checkRequiredFlags() requiredFlagsErr {
 	}
 
 	tracef("all required flags set (cmd=%[1]q)", cmd.Name)
+
+	return nil
+}
+
+func (cmd *Command) checkRequiredArguments() requiredArgumentsErr {
+	// The help and completion commands are allowed to run without
+	// enforcement of required arguments, since they do not invoke user
+	// actions that depend on those argument values.
+	if cmd.builtInHelp || cmd.isCompletionCommand {
+		return nil
+	}
+
+	tracef("checking for required arguments (cmd=%[1]q)", cmd.Name)
+
+	missingArguments := []string{}
+	// This count-based precheck relies on required single-value arguments
+	// being declared before optional or multi-value arguments, as documented.
+	// Argument.Parse remains the backstop for unsupported orderings.
+	providedArguments := cmd.Args().Len()
+
+	for index, arg := range cmd.Arguments {
+		requiredArg, ok := arg.(requiredArgument)
+		if ok && requiredArg.required() && index >= providedArguments {
+			missingArguments = append(missingArguments, requiredArg.name())
+		}
+	}
+
+	if len(missingArguments) != 0 {
+		tracef("found missing required arguments %[1]q (cmd=%[2]q)", missingArguments, cmd.Name)
+
+		return &errRequiredArguments{missingArguments: missingArguments}
+	}
+
+	tracef("all required arguments set (cmd=%[1]q)", cmd.Name)
 
 	return nil
 }
@@ -622,7 +708,9 @@ func (cmd *Command) Value(name string) any {
 }
 
 // Args returns the command line arguments associated with the
-// command.
+// command. If the command declares named Arguments, the arguments
+// consumed by them are not included in the returned Args and should
+// be retrieved via the command.{Type}Arg(name) functions instead.
 func (cmd *Command) Args() Args {
 	return cmd.parsedArgs
 }
