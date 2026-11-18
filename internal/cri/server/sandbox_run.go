@@ -185,7 +185,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	)
 	sandbox.Sandboxer = ociRuntime.Sandboxer
 
-	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+	if err := sandboxInfo.AddExtension(sandboxstore.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
 
@@ -258,7 +258,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 		}()
 
-		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+		if err := sandboxInfo.AddExtension(sandboxstore.MetadataKey, &sandbox.Metadata); err != nil {
 			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 		}
 		// Save sandbox metadata to store
@@ -299,7 +299,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 
-		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+		if err := sandboxInfo.AddExtension(sandboxstore.MetadataKey, &sandbox.Metadata); err != nil {
 			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 		}
 

@@ -192,17 +192,23 @@ func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, 
 	if err != nil {
 		return sandbox.ControllerStatus{}, errgrpc.ToNative(err)
 	}
-	return sandbox.ControllerStatus{
+	status := sandbox.ControllerStatus{
 		SandboxID: sandboxID,
 		Pid:       resp.GetPid(),
 		State:     resp.GetState(),
 		Info:      resp.GetInfo(),
-		CreatedAt: resp.GetCreatedAt().AsTime(),
-		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 		Address:   resp.GetAddress(),
 		Version:   resp.GetVersion(),
-	}, nil
+	}
+	// A timestamp that was not set stays the zero time, not the Unix epoch.
+	if t := resp.GetCreatedAt(); t != nil {
+		status.CreatedAt = t.AsTime()
+	}
+	if t := resp.GetExitedAt(); t != nil {
+		status.ExitedAt = t.AsTime()
+	}
+	return status, nil
 }
 
 func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
