@@ -104,19 +104,29 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 			}
 
 			for _, container := range sandboxContainerMap[sandbox.ID] {
-				containerMetrics, err := c.collectContainerMetrics(ctx, container, baseLabels)
+				containerMetrics, err := c.collectContainerMetrics(gctx, container, baseLabels)
 				if err != nil {
+					log := log.G(gctx).WithFields(log.Fields{
+						"podsandboxid": sandbox.ID,
+						"containerid":  container.ID,
+						"error":        err,
+					})
 					switch {
-					case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
-						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to get container metrics, this is likely a transient error")
+					case errdefs.IsNotFound(err):
+						// A completed Kubernetes init container has no task, which is fine.
+						// just log and continue
+						log.Debug("ignoring error, skipping along to any remaining container metrics")
+						continue
+					case errdefs.IsUnavailable(err):
+						log.Error("failed to get container metrics, this is likely a transient error")
 						// Don't return error for transient issues, just log and continue
 						continue
 					case errdefs.IsCanceled(err):
-						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Debug("metrics collection cancelled")
+						log.Debug("metrics collection cancelled")
 						// Return the cancellation error to stop other goroutines
 						return err
 					default:
-						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to collect container metrics")
+						log.Error("failed to collect container metrics")
 						// Don't return error for individual failures, just log and continue
 						continue
 					}
