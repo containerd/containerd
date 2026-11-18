@@ -17,12 +17,31 @@
 package opts
 
 import (
+	"context"
 	"sort"
 	"testing"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func TestAmbientCapabilitiesReplaceDefaults(t *testing.T) {
+	for _, sc := range []*runtime.LinuxContainerSecurityContext{nil, {}, {Capabilities: &runtime.Capability{AddCapabilities: []string{"CHOWN"}}}} {
+		spec := &runtimespec.Spec{Process: &runtimespec.Process{Capabilities: &runtimespec.LinuxCapabilities{Ambient: []string{"CAP_SYS_ADMIN"}}}}
+		require.NoError(t, WithAmbientCapabilities(sc, nil)(context.Background(), nil, nil, spec))
+		assert.Empty(t, spec.Process.Capabilities.Ambient)
+	}
+}
+
+func TestAmbientCapabilitiesPreserveInheritable(t *testing.T) {
+	spec := &runtimespec.Spec{Process: &runtimespec.Process{Capabilities: &runtimespec.LinuxCapabilities{Inheritable: []string{"CAP_CHOWN"}}}}
+	sc := &runtime.LinuxContainerSecurityContext{Capabilities: &runtime.Capability{AddAmbientCapabilities: []string{"NET_BIND_SERVICE"}}}
+	require.NoError(t, WithAmbientCapabilities(sc, []string{"CAP_NET_BIND_SERVICE"})(context.Background(), nil, nil, spec))
+	assert.Equal(t, []string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE"}, spec.Process.Capabilities.Inheritable)
+	assert.Equal(t, []string{"CAP_NET_BIND_SERVICE"}, spec.Process.Capabilities.Ambient)
+}
 
 func TestOrderedMounts(t *testing.T) {
 	mounts := []*runtime.Mount{
