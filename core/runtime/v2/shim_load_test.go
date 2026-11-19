@@ -19,13 +19,49 @@ package v2
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/v2/core/containers"
 	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 )
+
+// fakeContainerStore stubs containers.Store; only Get is used by the code under
+// test. The embedded nil interface panics if any other method is called.
+type fakeContainerStore struct {
+	containers.Store
+	container containers.Container
+	err       error
+}
+
+func (f fakeContainerStore) Get(context.Context, string) (containers.Container, error) {
+	return f.container, f.err
+}
+
+// fakeSandboxStore stubs sandbox.Store; only Get is used by the code under test.
+type fakeSandboxStore struct {
+	sandbox.Store
+	sandbox sandbox.Sandbox
+	err     error
+}
+
+func (f fakeSandboxStore) Get(context.Context, string) (sandbox.Sandbox, error) {
+	return f.sandbox, f.err
+}
+
+func container(name string) containers.Container {
+	return containers.Container{Runtime: containers.RuntimeInfo{Name: name}}
+}
+
+func sbox(name string) sandbox.Sandbox {
+	return sandbox.Sandbox{Runtime: sandbox.RuntimeOpts{Name: name}}
+}
 
 func TestShouldCleanupShim(t *testing.T) {
 	otherErr := errors.New("some other error")
@@ -93,5 +129,173 @@ func TestShouldCleanupShim(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			require.Equal(t, tc.Expected, shouldCleanupShim(tc.SgetErr, tc.PidErr, tc.PInfo))
 		})
+	}
+}
+
+func TestRuntimeName(t *testing.T) {
+	otherErr := errors.New("some other error")
+
+	testCases := []struct {
+		Name       string
+		Containers containers.Store
+		Sandboxes  sandbox.Store
+		Expected   string
+	}{
+		{
+			Name:       "container record wins",
+			Containers: fakeContainerStore{container: container("io.containerd.runc.v2")},
+			Sandboxes:  fakeSandboxStore{sandbox: sbox("io.containerd.other.v1")},
+			Expected:   "io.containerd.runc.v2",
+		},
+		{
+			Name:       "falls back to sandbox when no container",
+			Containers: fakeContainerStore{err: errdefs.ErrNotFound},
+			Sandboxes:  fakeSandboxStore{sandbox: sbox("io.containerd.runc.v2")},
+			Expected:   "io.containerd.runc.v2",
+		},
+		{
+			Name:       "empty when neither store has a record",
+			Containers: fakeContainerStore{err: errdefs.ErrNotFound},
+			Sandboxes:  fakeSandboxStore{err: errdefs.ErrNotFound},
+			Expected:   "",
+		},
+		{
+			// A non-NotFound container error is logged but still falls through
+			// to the sandbox store.
+			Name:       "container error still tries sandbox",
+			Containers: fakeContainerStore{err: otherErr},
+			Sandboxes:  fakeSandboxStore{sandbox: sbox("io.containerd.runc.v2")},
+			Expected:   "io.containerd.runc.v2",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			m := &ShimManager{containers: tc.Containers, sandboxStore: tc.Sandboxes}
+			require.Equal(t, tc.Expected, m.runtimeName(context.Background(), "id"))
+		})
+	}
+}
+
+func TestResolveRuntimeWithFallback(t *testing.T) {
+	const runtimeName = "io.containerd.runc.v2"
+	// Built with filepath.Join and BinaryName so the paths are absolute and
+	// carry the .exe suffix on Windows.
+	var (
+		dir       = t.TempDir()
+		binName   = shimbinary.BinaryName(runtimeName)
+		goneDir   = filepath.Join(dir, "gone")
+		stalePath = filepath.Join(goneDir, binName)
+		validPath = filepath.Join(dir, binName)
+	)
+
+	testCases := []struct {
+		Name        string
+		Runtime     string
+		RealFile    bool // create Runtime as a real file so os.Stat succeeds
+		Override    bool // Runtime was an explicit runtime_path override
+		Containers  containers.Store
+		Sandboxes   sandbox.Store
+		Cache       map[string]string
+		Expected    string
+		ExpectError bool
+	}{
+		{
+			// Pinned path still resolves: no metadata lookup, returned as-is.
+			Name:     "pinned path still valid",
+			RealFile: true,
+		},
+		{
+			// Pinned path is stale but the runtime name in metadata re-resolves.
+			Name:       "stale path re-resolved from runtime name",
+			Runtime:    stalePath,
+			Containers: fakeContainerStore{container: container(runtimeName)},
+			Sandboxes:  fakeSandboxStore{err: errdefs.ErrNotFound},
+			Cache:      map[string]string{binName: validPath},
+			Expected:   validPath,
+		},
+		{
+			// Stale path with a sandbox record instead of a container.
+			Name:       "stale path re-resolved from sandbox runtime name",
+			Runtime:    stalePath,
+			Containers: fakeContainerStore{err: errdefs.ErrNotFound},
+			Sandboxes:  fakeSandboxStore{sandbox: sbox(runtimeName)},
+			Cache:      map[string]string{binName: validPath},
+			Expected:   validPath,
+		},
+		{
+			// Stale path and no metadata: original resolution error propagates.
+			Name:        "stale path with no metadata errors",
+			Runtime:     stalePath,
+			Containers:  fakeContainerStore{err: errdefs.ErrNotFound},
+			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
+			ExpectError: true,
+		},
+		{
+			// An explicit runtime_path override to a differently named binary
+			// must not silently fall back to the default shim.
+			Name:        "stale override of a different shim errors",
+			Runtime:     filepath.Join(goneDir, "custom-shim"),
+			Containers:  fakeContainerStore{container: container(runtimeName)},
+			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
+			Cache:       map[string]string{binName: validPath},
+			ExpectError: true,
+		},
+		{
+			// A marked override must not fall back even when its binary
+			// has the same name as the default shim.
+			Name:        "stale same-name override errors",
+			Runtime:     stalePath,
+			Override:    true,
+			Containers:  fakeContainerStore{container: container(runtimeName)},
+			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
+			Cache:       map[string]string{binName: validPath},
+			ExpectError: true,
+		},
+		{
+			// Metadata name equals the (stale) runtime: the guard skips a
+			// pointless retry and the original error propagates.
+			Name:        "stale path equal to metadata name errors",
+			Runtime:     stalePath,
+			Containers:  fakeContainerStore{container: container(stalePath)},
+			Sandboxes:   fakeSandboxStore{err: errdefs.ErrNotFound},
+			ExpectError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			m := &ShimManager{containers: tc.Containers, sandboxStore: tc.Sandboxes}
+			for name, path := range tc.Cache {
+				m.runtimePaths.Store(name, path)
+			}
+			runtime, expected := tc.Runtime, tc.Expected
+			if tc.RealFile {
+				runtime = filepath.Join(t.TempDir(), binName)
+				require.NoError(t, os.WriteFile(runtime, nil, 0o755))
+				expected = runtime
+			}
+			got, err := m.resolveRuntimeWithFallback(context.Background(), runtime, "id", tc.Override)
+			if tc.ExpectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, expected, got)
+		})
+	}
+}
+
+func TestSaveShimBinaryPath(t *testing.T) {
+	for _, override := range []bool{false, true} {
+		dir := t.TempDir()
+		require.NoError(t, saveShimBinaryPath(dir, "/some/shim", override))
+
+		data, err := os.ReadFile(filepath.Join(dir, shimBinaryPathFile))
+		require.NoError(t, err)
+		require.Equal(t, "/some/shim", string(data))
+
+		_, err = os.Stat(filepath.Join(dir, shimBinaryOverrideFile))
+		require.Equal(t, override, err == nil)
 	}
 }
