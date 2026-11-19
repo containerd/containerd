@@ -258,7 +258,7 @@ func (m *ShimManager) runtimeName(ctx context.Context, id string) string {
 	if c, err := m.containers.Get(ctx, id); err == nil {
 		return c.Runtime.Name
 	} else if !errdefs.IsNotFound(err) {
-		log.G(ctx).WithError(err).Errorf("failed to look up container %s runtime name while recovering stale shim path", id)
+		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to look up container runtime name while recovering stale shim path")
 	}
 	if sb, err := m.sandboxStore.Get(ctx, id); err == nil {
 		return sb.Runtime.Name
