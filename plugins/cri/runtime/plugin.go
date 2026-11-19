@@ -205,6 +205,11 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
+	// `bin_dir` was removed in favor of `bin_dirs` in config version 4.
+	// Rename it in place for configs already using the CRIServicePlugin
+	// layout; the legacy GRPCPlugin layout is handled by migrateConfig below.
+	migrateCNIBinDir(pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"])
+
 	src, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"].(map[string]any)
 	if !ok {
 		return nil
@@ -216,6 +221,46 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	migrateConfig(dst, src)
 	pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = dst
 	return nil
+}
+
+// migrateCNIBinDir renames the deprecated `cni.bin_dir` field of a plugin
+// config to `bin_dirs` in place, dropping the old field. It is a no-op for
+// plugin configs without the field.
+func migrateCNIBinDir(pluginConfig any) {
+	dst, ok := pluginConfig.(map[string]any)
+	if !ok {
+		return
+	}
+	cni, ok := dst["cni"].(map[string]any)
+	if !ok {
+		return
+	}
+	if binDir, ok := cni["bin_dir"].(string); ok {
+		setCNIBinDirsIfUnset(cni, binDir)
+		delete(cni, "bin_dir")
+	}
+}
+
+// setCNIBinDirsIfUnset sets `bin_dirs` from a legacy `bin_dir` value, unless
+// `bin_dirs` is already set or `bin_dir` is empty.
+//
+// Plugin configs loaded from TOML decode arrays as []any, while configs built
+// in code may use []string, so both representations are handled.
+func setCNIBinDirsIfUnset(cniConf map[string]any, binDir string) {
+	if binDir == "" {
+		return
+	}
+	switch binDirs := cniConf["bin_dirs"].(type) {
+	case []string:
+		if len(binDirs) > 0 {
+			return
+		}
+	case []any:
+		if len(binDirs) > 0 {
+			return
+		}
+	}
+	cniConf["bin_dirs"] = []string{binDir}
 }
 
 func migrateConfig(dst, src map[string]any) {
@@ -266,8 +311,8 @@ func migrateConfig(dst, src map[string]any) {
 			case "bin_dir":
 				// migrate `bin_dir` to `bin_dirs` only if `bin_dirs`
 				// is not already set
-				if binDirs, ok := newCniConf["bin_dirs"].([]string); !ok || len(binDirs) == 0 {
-					newCniConf["bin_dirs"] = []string{v.(string)}
+				if binDir, ok := v.(string); ok {
+					setCNIBinDirsIfUnset(newCniConf, binDir)
 				}
 			default:
 				if _, ok := newCniConf[k]; !ok {
