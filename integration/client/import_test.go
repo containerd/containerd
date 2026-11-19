@@ -65,6 +65,10 @@ func TestExportAndImport(t *testing.T) {
 // images remain sane, and that the Garbage Collector won't delete part of its
 // content.
 func TestExportAndImportMultiLayer(t *testing.T) {
+	// ghcr.io/containerd/volume-copy-up:2.1 is not available on s390x
+	if runtime.GOARCH == "s390x" {
+		t.Skip("test image not available on s390x")
+	}
 	testExportImport(t, testMultiLayeredImage)
 }
 
@@ -610,7 +614,8 @@ func TestTransferImport(t *testing.T) {
 		// Images is the names of the images to create
 		// [0]: Index name or ""
 		// [1:]: Additional images and manifest to import
-		//  Images ending with @ will have digest appended and use the digest of the previously imported image
+		//  Images ending with @<manifest> will have the digest of the previously imported manifest appended
+		//  Images ending with @<index> will have the index digest appended
 		//  A space can be used to separate a repo name and tag, only the tag will be set in the imported image
 		Images []string
 		Opts   []image.StoreOpt
@@ -631,22 +636,22 @@ func TestTransferImport(t *testing.T) {
 		},
 		{
 			Name:   "DigestRefs",
-			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "registry.test/all-refs@"},
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "registry.test/all-refs@<manifest>", "registry.test/all-refs@<index>"},
 			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/all-refs", false, false)},
 		},
 		{
 			Name:   "DigestRefsSkipNamed",
-			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1"},
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "registry.test/all-refs@<index>"},
 			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/all-refs", false, true)},
 		},
 		{
 			Name:   "DigestOnly",
-			Images: []string{"", "", "imported-image@"},
+			Images: []string{"", "", "imported-image@<manifest>", "imported-image@<index>"},
 			Opts:   []image.StoreOpt{image.WithDigestRef("imported-image", false, true)},
 		},
 		{
 			Name:   "OverwriteDigestRefs",
-			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "someimportname@"},
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "someimportname@<manifest>", "someimportname@<index>"},
 			Opts:   []image.StoreOpt{image.WithDigestRef("someimportname", true, false)},
 		},
 		{
@@ -656,7 +661,7 @@ func TestTransferImport(t *testing.T) {
 		},
 		{
 			Name:   "TagOnlyOverwriteDigestRefs",
-			Images: []string{"registry.test/all-refs:index", "registry.test/basename latest", "registry.test/basename@"},
+			Images: []string{"registry.test/all-refs:index", "registry.test/basename latest", "registry.test/basename@<manifest>", "registry.test/basename@<index>"},
 			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/basename", true, false)},
 		},
 	} {
@@ -751,13 +756,20 @@ func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string
 		},
 	}
 
+	// indexDigestRefs collects @<index> entries to be resolved with the
+	// index digest after the index is built.
+	var indexDigestRefs []string
+
 	if len(imageNames) > 1 {
 		var lastManifest ocispec.Descriptor
 
 		for _, image := range imageNames[1:] {
-			if image != "" && image[len(image)-1] == '@' {
-				image = image[:len(image)-1]
-				descs[fmt.Sprintf("%s@%s", image, lastManifest.Digest)] = lastManifest
+			if name, ok := strings.CutSuffix(image, "@<index>"); ok {
+				indexDigestRefs = append(indexDigestRefs, name)
+				continue
+			}
+			if name, ok := strings.CutSuffix(image, "@<manifest>"); ok {
+				descs[fmt.Sprintf("%s@%s", name, lastManifest.Digest)] = lastManifest
 				continue
 			}
 			seed := hash64(image)
@@ -812,6 +824,10 @@ func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string
 	}
 	if idxName != "" {
 		descs[idxName] = id
+	}
+
+	for _, ref := range indexDigestRefs {
+		descs[fmt.Sprintf("%s@%s", ref, id.Digest)] = id
 	}
 
 	return

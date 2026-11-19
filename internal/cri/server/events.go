@@ -319,7 +319,7 @@ type criEventHandler struct {
 }
 
 // HandleEvent handles a containerd event.
-func (ce *criEventHandler) HandleEvent(any interface{}) error {
+func (ce *criEventHandler) HandleEvent(any any) error {
 	ctx := ctrdutil.NamespacedContext()
 	ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
 	defer cancel()

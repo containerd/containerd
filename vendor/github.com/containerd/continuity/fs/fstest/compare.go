@@ -19,34 +19,22 @@ package fstest
 import (
 	"fmt"
 	"os"
-
-	"github.com/containerd/continuity"
 )
 
 // CheckDirectoryEqual compares two directory paths to make sure that
 // the content of the directories is the same.
 func CheckDirectoryEqual(d1, d2 string) error {
-	c1, err := continuity.NewContext(d1)
+	r1, err := buildResources(d1)
 	if err != nil {
-		return fmt.Errorf("failed to build context: %w", err)
+		return fmt.Errorf("failed to walk %s: %w", d1, err)
 	}
 
-	c2, err := continuity.NewContext(d2)
+	r2, err := buildResources(d2)
 	if err != nil {
-		return fmt.Errorf("failed to build context: %w", err)
+		return fmt.Errorf("failed to walk %s: %w", d2, err)
 	}
 
-	m1, err := continuity.BuildManifest(c1)
-	if err != nil {
-		return fmt.Errorf("failed to build manifest: %w", err)
-	}
-
-	m2, err := continuity.BuildManifest(c2)
-	if err != nil {
-		return fmt.Errorf("failed to build manifest: %w", err)
-	}
-
-	diff := diffResourceList(m1.Resources, m2.Resources)
+	diff := diffResourceList(r1, r2)
 	if diff.HasDiff() {
 		return fmt.Errorf("directory diff between %s and %s\n%s", d1, d2, diff.String())
 	}

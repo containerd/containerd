@@ -2,12 +2,12 @@ package log
 
 import (
 	"bytes"
+	"go.opentelemetry.io/otel/trace"
 	"reflect"
 	"time"
 
 	"github.com/Microsoft/hcsshim/internal/logfields"
 	"github.com/sirupsen/logrus"
-	"go.opencensus.io/trace"
 )
 
 const nullString = "null"
@@ -107,8 +107,8 @@ func (h *Hook) encode(e *logrus.Entry) {
 
 		switch vv := v.(type) {
 		// built in types
-		// "json" marshals errors as "{}", so leave alone here
-		case bool, string, error, uintptr,
+		case bool, string, uintptr,
+			error, // "json" marshals errors as "{}", so leave alone here
 			int8, int16, int32, int64, int,
 			uint8, uint32, uint64, uint,
 			float32, float64:
@@ -163,11 +163,11 @@ func (h *Hook) addSpanContext(e *logrus.Entry) {
 	if !h.AddSpanContext || ctx == nil {
 		return
 	}
-	span := trace.FromContext(ctx)
+	span := trace.SpanFromContext(ctx)
 	if span == nil {
 		return
 	}
 	sctx := span.SpanContext()
-	e.Data[logfields.TraceID] = sctx.TraceID.String()
-	e.Data[logfields.SpanID] = sctx.SpanID.String()
+	e.Data[logfields.TraceID] = sctx.TraceID().String()
+	e.Data[logfields.SpanID] = sctx.SpanID().String()
 }

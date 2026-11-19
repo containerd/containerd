@@ -1,7 +1,12 @@
 name: E2E
 on:
   workflow_call:
-
+    inputs:
+      k8s_version:
+        description: 'Kubernetes branch or tag to test against'
+        required: false
+        default: 'master'
+        type: string
 permissions:
   contents: read
 
@@ -31,17 +36,20 @@ jobs:
           df -h
 
       - name: Checkout containerd
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Checkout Kubernetes
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: kubernetes/kubernetes
           path: src/k8s.io/kubernetes
+          ref: ${{ inputs.k8s_version }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install Go
         uses: ./src/github.com/containerd/containerd/.github/actions/install-go
@@ -55,6 +63,12 @@ jobs:
           sudo apt-get install -y gperf build-essential pkg-config
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Install criu
+        run: |
+          sudo add-apt-repository -y ppa:criu/ppa
+          sudo apt-get update
+          sudo apt-get install -y criu
 
       - name: Build and Install containerd
         working-directory: ./src/github.com/containerd/containerd
@@ -129,7 +143,7 @@ jobs:
 
       - name: Upload Log Artifacts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-logs
           path: ./_artifacts/

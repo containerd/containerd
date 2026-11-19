@@ -53,7 +53,7 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
 		},
-		"specify both cni.bin_dir and cni_bin_dirs": {
+		"cni.bin_dirs": {
 			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
@@ -62,23 +62,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 				CniConfig: CniConfig{
-					NetworkPluginBinDir:  "/opt/mycni/bin",
 					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
-				},
-			},
-			runtimeExpectedErr: "`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time",
-			warnings:           []deprecation.Warning{deprecation.CRICNIBinDir},
-		},
-		"cni.bin_dir, if used, is moved to cni.bin_dirs": {
-			runtimeConfig: &RuntimeConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {},
-					},
-				},
-				CniConfig: CniConfig{
-					NetworkPluginBinDir: "/opt/mycni/bin",
 				},
 			},
 			runtimeExpected: &RuntimeConfig{
@@ -94,9 +78,7 @@ func TestValidateConfig(t *testing.T) {
 					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
 				},
 			},
-			warnings: []deprecation.Warning{deprecation.CRICNIBinDir},
 		},
-
 		"deprecated auths": {
 			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
@@ -297,29 +279,6 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
-		"deprecated enable_cdi false": {
-			runtimeConfig: &RuntimeConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {},
-					},
-				},
-				EnableCDI: func() *bool { v := false; return &v }(),
-			},
-			runtimeExpected: &RuntimeConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Sandboxer: string(ModePodSandbox),
-						},
-					},
-				},
-				EnableCDI: func() *bool { v := false; return &v }(),
-			},
-			warnings: []deprecation.Warning{deprecation.CRIEnableCDI},
-		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			var warnings []deprecation.Warning
@@ -502,6 +461,13 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 			expectLocalPull: false,
 		},
 		{
+			name: "IgnoreDescriptorURLs triggers local pull",
+			imageConfigFn: func(ic *ImageConfig) {
+				ic.IgnoreDescriptorURLs = true
+			},
+			expectLocalPull: true,
+		},
+		{
 			name: "ImagePullWithSyncFs triggers local pull",
 			imageConfigFn: func(ic *ImageConfig) {
 				ic.ImagePullWithSyncFs = true
@@ -530,4 +496,13 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 			assert.Equal(t, tc.expectLocalPull, imageConfig.UseLocalImagePull)
 		})
 	}
+}
+
+func TestDefaultConfigEnableCRIU(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("only supported on Linux")
+	}
+	cfg := DefaultRuntimeConfig()
+	assert.NotNil(t, cfg.EnableCRIU)
+	assert.True(t, *cfg.EnableCRIU)
 }

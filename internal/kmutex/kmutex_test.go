@@ -45,7 +45,7 @@ func TestBasic(t *testing.T) {
 		retries := 100
 		waitLock := false
 
-		for i := 0; i < retries; i++ {
+		for range retries {
 			// prevent from data-race
 			km.mu.Lock()
 			ref := km.locks[key].ref
@@ -116,13 +116,13 @@ func TestMultileAcquireOnKeys(t *testing.T) {
 	ctx := context.Background()
 
 	var wg sync.WaitGroup
-	for i := 0; i < nproc; i++ {
+	for i := range nproc {
 		wg.Add(1)
 
 		go func(key string) {
 			defer wg.Done()
 
-			for i := 0; i < nloops; i++ {
+			for range nloops {
 				km.Lock(ctx, key)
 
 				time.Sleep(time.Duration(randutil.Int63n(100)) * time.Nanosecond)
@@ -147,20 +147,18 @@ func TestMultiAcquireOnSameKey(t *testing.T) {
 	nloops := 10000
 
 	var wg sync.WaitGroup
-	for i := 0; i < nproc; i++ {
-		wg.Add(1)
+	for range nproc {
 
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
-			for i := 0; i < nloops; i++ {
+			for range nloops {
 				km.Lock(ctx, key)
 
 				time.Sleep(time.Duration(randutil.Int63n(100)) * time.Nanosecond)
 
 				km.Unlock(key)
 			}
-		}()
+		})
 	}
 	km.Unlock(key)
 	wg.Wait()

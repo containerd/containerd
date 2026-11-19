@@ -33,6 +33,9 @@ import (
 
 // Test NRI networking capabilities.
 func TestNriPluginNetworkingSynchronization(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc uses its own netstack; NRI cannot read pod IPs from the host network namespace")
+	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that NRI plugins get pod networking attributes on synchronization.")
@@ -48,9 +51,9 @@ func TestNriPluginNetworkingSynchronization(t *testing.T) {
 
 	tc.setup()
 
-	for i := 0; i < podCount; i++ {
+	for i := range podCount {
 		podID := tc.runPod(fmt.Sprintf("%s%d", podPrefix, i))
-		for j := 0; j < ctrPerPod; j++ {
+		for j := range ctrPerPod {
 			tc.startContainer(podID, fmt.Sprintf("ctr%d", j))
 		}
 	}
@@ -107,6 +110,9 @@ func TestNriPluginNetworkingSynchronization(t *testing.T) {
 }
 
 func TestNriPluginNetworkingLifecycle(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc uses its own netstack; NRI cannot read pod IPs from the host network namespace")
+	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that NRI plugins get pod networking attributes during the pod lifecycle.")

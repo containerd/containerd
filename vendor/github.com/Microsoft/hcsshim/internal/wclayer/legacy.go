@@ -194,16 +194,30 @@ func (r *legacyLayerReader) reset() {
 
 func findBackupStreamSize(r io.Reader) (int64, error) {
 	br := winio.NewBackupStreamReader(r)
+	var size int64
 	for {
 		hdr, err := br.Next()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				err = nil
+				// With no inline data, sparse blocks provide the logical size.
+				return size, nil
 			}
 			return 0, err
 		}
-		if hdr.Id == winio.BackupData {
-			return hdr.Size, nil
+		switch hdr.Id {
+		case winio.BackupData:
+			// Non-sparse files and sparse files with inline data carry their
+			// logical size in BackupData.
+			if hdr.Size > 0 || hdr.Attributes&winio.StreamSparseAttributes == 0 {
+				return hdr.Size, nil
+			}
+			// A sparse BackupData stream without inline data is followed by
+			// sparse blocks that describe its logical size.
+		case winio.BackupSparseBlock:
+			// The terminal zero-length block has an offset at logical EOF.
+			if end := hdr.Offset + hdr.Size; end > size {
+				size = end
+			}
 		}
 	}
 }
@@ -436,13 +450,32 @@ func (w *legacyLayerWriter) initUtilityVM() error {
 	return nil
 }
 
-func (w *legacyLayerWriter) reset() error {
-	err := w.bufWriter.Flush()
-	if err != nil {
+func (w *legacyLayerWriter) reset() (err error) {
+	// Always close the current backup writer and file handle, even if an error
+	// occurs below (e.g. bufWriter.Flush fails with ENOSPC when the disk is
+	// full). Leaving these handles open on Windows prevents the temporary
+	// import directory (defaults to SystemTemp, i.e. C:\Windows\SystemTemp\hcs*)
+	// from being removed by the deferred os.RemoveAll in legacyLayerWriterWrapper.Close,
+	// which leaks the directory and compounds disk-space exhaustion.
+	defer func() {
+		if w.backupWriter != nil {
+			w.backupWriter.Close()
+			w.backupWriter = nil
+		}
+		if w.currentFile != nil {
+			w.currentFile.Close()
+			w.currentFile = nil
+			w.currentFileName = ""
+			w.currentFileRoot = nil
+		}
+		w.currentIsDir = false
+	}()
+
+	if err = w.bufWriter.Flush(); err != nil {
 		return err
 	}
 	w.bufWriter.Reset(io.Discard)
-	if w.currentIsDir {
+	if w.currentIsDir && w.currentFile != nil {
 		r := w.currentFile
 		br := winio.NewBackupStreamReader(r)
 		// Seek to the beginning of the backup stream, skipping the fileattrs
@@ -474,16 +507,6 @@ func (w *legacyLayerWriter) reset() error {
 			}
 		}
 		w.currentIsDir = false
-	}
-	if w.backupWriter != nil {
-		w.backupWriter.Close()
-		w.backupWriter = nil
-	}
-	if w.currentFile != nil {
-		w.currentFile.Close()
-		w.currentFile = nil
-		w.currentFileName = ""
-		w.currentFileRoot = nil
 	}
 	return nil
 }

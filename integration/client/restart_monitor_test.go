@@ -63,7 +63,10 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		t.Fatal(err)
 	}
 
-	address := configTOMLDecoded.GRPC.Address
+	var address string
+	if grpcPlugin, ok := configTOMLDecoded.Plugins["io.containerd.server.v1.grpc"].(map[string]any); ok {
+		address, _ = grpcPlugin["address"].(string)
+	}
 	if address == "" {
 		if runtime.GOOS == "windows" {
 			address = fmt.Sprintf(`\\.\pipe\containerd-containerd-test-%s`, filepath.Base(tempDir))

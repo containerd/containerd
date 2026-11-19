@@ -46,25 +46,21 @@ func Test_PodSandbox(t *testing.T) {
 
 	exitAt := time.Now().Add(time.Second)
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*500)
 		defer cancel()
 		_, err := p.Wait(ctx)
 		assert.Equal(t, err, ctx.Err())
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		exitStatus, err := p.Wait(context.Background())
 		assert.Equal(t, err, nil)
 		code, exitTime, err := exitStatus.Result()
 		assert.Equal(t, err, nil)
 		assert.Equal(t, code, uint32(128))
 		assert.Equal(t, exitTime, exitAt)
-	}()
+	})
 	time.Sleep(time.Second)
 	if err := p.Exit(uint32(128), exitAt); err != nil {
 		t.Fatalf("failed to set exit of pod sandbox %v", err)

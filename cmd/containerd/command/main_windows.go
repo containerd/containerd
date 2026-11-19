@@ -18,9 +18,8 @@ package command
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"strings"
+	"strconv"
 	"unsafe"
 
 	"github.com/Microsoft/go-winio/pkg/etw"
@@ -39,11 +38,11 @@ var (
 func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *server.Server, cancel func()) chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		var server *server.Server
+		var srv *server.Server
 		for {
 			select {
 			case s := <-serverC:
-				server = s
+				srv = s
 			case s := <-signals:
 				log.G(ctx).WithField("signal", s).Debug("received signal")
 
@@ -52,8 +51,8 @@ func handleSignals(ctx context.Context, signals chan os.Signal, serverC chan *se
 				}
 
 				cancel()
-				if server != nil {
-					server.Stop()
+				if srv != nil {
+					srv.Stop()
 				}
 				close(done)
 				return
@@ -68,7 +67,7 @@ func setupDumpStacks() {
 	// Windows does not support signals like *nix systems. So instead of
 	// trapping on SIGUSR1 to dump stacks, we wait on a Win32 event to be
 	// signaled. ACL'd to builtin administrators and local system
-	event := "Global\\stackdump-" + fmt.Sprint(os.Getpid())
+	event := "Global\\stackdump-" + strconv.Itoa(os.Getpid())
 	ev, _ := windows.UTF16PtrFromString(event)
 	sd, err := windows.SecurityDescriptorFromString("D:P(A;;GA;;;BA)(A;;GA;;;SY)")
 	if err != nil {
@@ -114,8 +113,4 @@ func init() {
 			log.L.Error(err)
 		}
 	}
-}
-
-func isLocalAddress(path string) bool {
-	return strings.HasPrefix(path, `\\.\pipe\`)
 }

@@ -136,7 +136,7 @@ func WithVolumes(volumeMounts map[string]string, platform imagespec.Platform) co
 		mounts = mount.RemoveIDMapOption(mounts)
 
 		mm := client.MountManager()
-		activationKey := fmt.Sprintf("cri-volume-%s", c.SnapshotKey)
+		activationKey := "cri-volume-" + c.SnapshotKey
 		var needsDeactivation bool
 
 		info, err := mm.Activate(ctx, activationKey, mounts)

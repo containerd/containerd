@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+package otelhttp
 
 import (
 	"context"
@@ -66,7 +66,7 @@ func newConfig(opts ...Option) *config {
 
 	c.Meter = c.MeterProvider.Meter(
 		ScopeName,
-		metric.WithInstrumentationVersion(Version()),
+		metric.WithInstrumentationVersion(Version),
 	)
 
 	return c
@@ -90,18 +90,6 @@ func WithMeterProvider(provider metric.MeterProvider) Option {
 			cfg.MeterProvider = provider
 		}
 	})
-}
-
-// WithPublicEndpoint configures the Handler to link the span with an incoming
-// span context. If this option is not provided, then the association is a child
-// association instead of a link.
-//
-// Deprecated: Use [WithPublicEndpointFn] instead.
-// To migrate, replace WithPublicEndpoint() with:
-//
-//	WithPublicEndpointFn(func(*http.Request) bool { return true })
-func WithPublicEndpoint() Option {
-	return WithPublicEndpointFn(func(*http.Request) bool { return true })
 }
 
 // WithPublicEndpointFn runs with every request, and allows conditionally
@@ -155,14 +143,15 @@ const (
 )
 
 // WithMessageEvents configures the Handler to record the specified events
-// (span.AddEvent) on spans. By default only summary attributes are added at the
-// end of the request.
+// (span.AddEvent) on spans. By default, no read or write events are recorded.
 //
 // Valid events are:
-//   - ReadEvents: Record the number of bytes read after every http.Request.Body.Read
-//     using the ReadBytesKey
-//   - WriteEvents: Record the number of bytes written after every http.ResponeWriter.Write
-//     using the WriteBytesKey
+//   - ReadEvents: Record a "read" span event after every http.Request.Body.Read.
+//   - WriteEvents: Record a "write" span event after every http.ResponseWriter.Write.
+//
+// The events do not include per-call byte-count attributes. Total request and
+// response body sizes are recorded on the span according to HTTP semantic
+// conventions.
 func WithMessageEvents(events ...Event) Option {
 	return optionFunc(func(c *config) {
 		for _, e := range events {
@@ -206,6 +195,9 @@ func WithServerName(server string) Option {
 
 // WithMetricAttributesFn returns an Option to set a function that maps an HTTP request to a slice of attribute.KeyValue.
 // These attributes will be included in metrics for every request.
+//
+// Deprecated: WithMetricAttributesFn is deprecated and will be removed in a
+// future release. Use [Labeler] instead.
 func WithMetricAttributesFn(metricAttributesFn func(r *http.Request) []attribute.KeyValue) Option {
 	return optionFunc(func(c *config) {
 		c.MetricAttributesFn = metricAttributesFn

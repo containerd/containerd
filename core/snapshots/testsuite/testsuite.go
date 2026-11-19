@@ -910,7 +910,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		appliers := []fstest.Applier{lowestApply}
 		for i := 1; i <= 127; i++ {
 			appliers = append(appliers, fstest.Apply(
-				fstest.CreateFile("/overwriteme", []byte(fmt.Sprintf("%d WAS HERE!\n", i)), 0777),
+				fstest.CreateFile("/overwriteme", fmt.Appendf(nil, "%d WAS HERE!\n", i), 0777),
 				fstest.CreateFile(fmt.Sprintf("/addhere/file-%d", i), []byte("same\n"), 0755),
 				fstest.RemoveAll("/onlyme"),
 				fstest.CreateDir("/onlyme", 0755),

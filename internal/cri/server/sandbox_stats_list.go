@@ -39,9 +39,7 @@ func (c *criService) ListPodSandboxStats(
 
 	var wg sync.WaitGroup
 	for i, sandbox := range sandboxes {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			// issue 12279: this is tautologically true where interface is stubbed out.
 			sandboxStats, err := c.podSandboxStats(ctx, sandbox) //nolint: staticcheck
 			switch {
@@ -54,7 +52,7 @@ func (c *criService) ListPodSandboxStats(
 			default:
 				stats[i] = sandboxStats
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

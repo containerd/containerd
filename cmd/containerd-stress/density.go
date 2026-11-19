@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var densityCommand = &cli.Command{
@@ -47,41 +47,41 @@ var densityCommand = &cli.Command{
 			Value: 10,
 		},
 	},
-	Action: func(cliContext *cli.Context) error {
+	Action: func(ctx context.Context, cmd *cli.Command) error {
 		var (
 			pids  []uint32
-			count = cliContext.Int("count")
+			count = cmd.Int("count")
 		)
 
 		if count < 1 {
 			return errors.New("count cannot be less than one")
 		}
 
-		config := config{
-			Address:     cliContext.String("address"),
-			Duration:    cliContext.Duration("duration"),
-			Concurrency: cliContext.Int("concurrent"),
-			Exec:        cliContext.Bool("exec"),
-			Image:       cliContext.String("image"),
-			JSON:        cliContext.Bool("json"),
-			Metrics:     cliContext.String("metrics"),
-			Snapshotter: cliContext.String("snapshotter"),
+		cfg := config{
+			Address:     cmd.String("address"),
+			Duration:    cmd.Duration("duration"),
+			Concurrency: cmd.Int("concurrent"),
+			Exec:        cmd.Bool("exec"),
+			Image:       cmd.String("image"),
+			JSON:        cmd.Bool("json"),
+			Metrics:     cmd.String("metrics"),
+			Snapshotter: cmd.String("snapshotter"),
 		}
-		client, err := config.newClient()
+		client, err := cfg.newClient()
 		if err != nil {
 			return err
 		}
 		defer client.Close()
-		ctx := namespaces.WithNamespace(context.Background(), "density")
+		ctx = namespaces.WithNamespace(ctx, "density")
 		if err := cleanup(ctx, client); err != nil {
 			return err
 		}
-		log.L.Infof("pulling %s", config.Image)
-		image, err := client.Pull(ctx, config.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(config.Snapshotter))
+		log.G(ctx).Infof("pulling %s", cfg.Image)
+		image, err := client.Pull(ctx, cfg.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(cfg.Snapshotter))
 		if err != nil {
 			return err
 		}
-		log.L.Info("generating spec from image")
+		log.G(ctx).Info("generating spec from image")
 
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
@@ -95,7 +95,7 @@ var densityCommand = &cli.Command{
 				id := fmt.Sprintf("density-%d", i)
 
 				c, err := client.NewContainer(ctx, id,
-					containerd.WithSnapshotter(config.Snapshotter),
+					containerd.WithSnapshotter(cfg.Snapshotter),
 					containerd.WithNewSnapshot(id, image),
 					containerd.WithNewSpec(
 						oci.WithImageConfig(image),

@@ -33,7 +33,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		ID:   pluginName,
 		Type: plugins.HTTPHandler,
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return newHandler(), nil
 		},
 	})

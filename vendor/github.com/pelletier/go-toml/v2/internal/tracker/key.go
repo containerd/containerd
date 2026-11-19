@@ -14,7 +14,8 @@ func (t *KeyTracker) UpdateTable(node *unstable.Node) {
 	t.Push(node)
 }
 
-// UpdateArrayTable sets the state of the tracker with the AST array table node.
+// UpdateArrayTable sets the state of the tracker with the AST array table
+// node.
 func (t *KeyTracker) UpdateArrayTable(node *unstable.Node) {
 	t.reset()
 	t.Push(node)
@@ -36,7 +37,7 @@ func (t *KeyTracker) Pop(node *unstable.Node) {
 	}
 }
 
-// Key returns the current key
+// Key returns the current key.
 func (t *KeyTracker) Key() []string {
 	k := make([]string, len(t.k))
 	copy(k, t.k)

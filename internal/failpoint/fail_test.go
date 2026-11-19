@@ -52,12 +52,18 @@ func TestParseTerms(t *testing.T) {
 		{"1000000*delay(-1)", true},
 		{"1000000*delay(1)", false},
 
+		// pause_on_fifo
+		{"1*pause_on_fifo()", true},
+		{"1*pause_on_fifo(/tmp/gate.fifo", true},
+		{"1*pause_on_fifo(/tmp/gate.fifo)", false},
+
 		// cascading terms
 		{"1*delay(1)-", true},
 		{"10*delay(2)->", true},
 		{"11*delay(3)->10*off(", true},
 		{"12*delay(4)->10*of", true},
 		{"13*delay(5)->10*off->1000*panic(oops)", false},
+		{"1*pause_on_fifo(/tmp/gate.fifo)->1*error(released)", false},
 	}
 
 	for i, c := range cases {

@@ -53,13 +53,17 @@ This library includes the following packages:
 * [rlimit](https://pkg.go.dev/github.com/cilium/ebpf/rlimit) provides a convenient API to lift
   the `RLIMIT_MEMLOCK` constraint on kernels before 5.11.
 * [btf](https://pkg.go.dev/github.com/cilium/ebpf/btf) allows reading the BPF Type Format.
+* [pin](https://pkg.go.dev/github.com/cilium/ebpf/pin) provides APIs for working with pinned objects on bpffs.
 
 ## Requirements
 
 * A version of Go that is [supported by
   upstream](https://golang.org/doc/devel/release.html#policy)
-* CI is run against kernel.org LTS releases. >= 4.4 should work but EOL'ed versions
-  are not supported.
+* Linux (amd64, arm64): CI is run against kernel.org LTS releases. >= 4.4 should work but EOL'ed
+  versions are not supported.
+* Windows (amd64): CI is run against Windows Server 2022. Only the latest eBPF for Windows
+  release is supported.
+* Other architectures are best effort. 32bit arches are not supported.
 
 ## License
 

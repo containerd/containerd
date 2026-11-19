@@ -42,7 +42,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.MountManagerPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetSingle(plugins.MountManagerPlugin)
 			if err != nil {
 				return nil, err

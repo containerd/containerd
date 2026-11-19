@@ -16,7 +16,17 @@
 
 package fs
 
-import "context"
+import (
+	"context"
+	"os"
+)
+
+func handleWalkError(root, path string, err error) error {
+	if err != nil && path != root && os.IsNotExist(err) {
+		return nil
+	}
+	return err
+}
 
 // Usage of disk information
 type Usage struct {

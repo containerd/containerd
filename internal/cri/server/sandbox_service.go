@@ -110,6 +110,14 @@ func (c *criSandboxService) ShutdownSandbox(ctx context.Context, sandboxer strin
 	return ctrl.Shutdown(ctx, sandboxID)
 }
 
+func (c *criSandboxService) UpdateSandbox(ctx context.Context, sandboxer string, sandboxID string, sandbox sandbox.Sandbox, fields ...string) error {
+	ctrl, err := c.SandboxController(sandboxer)
+	if err != nil {
+		return err
+	}
+	return ctrl.Update(ctx, sandboxID, sandbox, fields...)
+}
+
 func (c *criSandboxService) StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {

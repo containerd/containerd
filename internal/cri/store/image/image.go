@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/usage"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -36,6 +35,7 @@ import (
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Image contains all resources associated with the image. All fields
@@ -90,13 +90,19 @@ func NewStore(img Getter, provider content.InfoReaderProvider, platform platform
 		store: &store{
 			images:     make(map[string]Image),
 			digestSet:  digestset.NewSet(),
-			pinnedRefs: make(map[string]setutils.Set[string]),
+			pinnedRefs: make(map[string]sets.Set[string]),
 		},
 	}
 }
 
 // Update updates cache for a reference.
 func (s *Store) Update(ctx context.Context, ref string) error {
+	return s.UpdateWithPlatform(ctx, ref, nil)
+}
+
+// UpdateWithPlatform updates cache for a reference using the given platform matcher.
+// A nil matcher keeps using the store default.
+func (s *Store) UpdateWithPlatform(ctx context.Context, ref string, platform platforms.MatchComparer) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -107,7 +113,7 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 
 	var img *Image
 	if err == nil {
-		img, err = s.getImage(ctx, i)
+		img, err = s.getImage(ctx, i, platform)
 		if err != nil {
 			return fmt.Errorf("get image info from containerd: %w", err)
 		}
@@ -146,20 +152,24 @@ func (s *Store) update(ref string, img *Image) error {
 	return s.store.add(*img)
 }
 
-// getImage gets image information from containerd for current platform.
-func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
-	diffIDs, err := i.RootFS(ctx, s.provider, s.platform)
+// getImage gets image information from containerd for the given platform matcher.
+// A nil matcher keeps using the store default.
+func (s *Store) getImage(ctx context.Context, i images.Image, platform platforms.MatchComparer) (*Image, error) {
+	if platform == nil {
+		platform = s.platform
+	}
+	diffIDs, err := i.RootFS(ctx, s.provider, platform)
 	if err != nil {
 		return nil, fmt.Errorf("get image diffIDs: %w", err)
 	}
 	chainID := imageidentity.ChainID(diffIDs)
 
-	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(s.platform, 1), usage.WithManifestUsage())
+	size, err := usage.CalculateImageUsage(ctx, i, s.provider, usage.WithManifestLimit(platform, 1), usage.WithManifestUsage())
 	if err != nil {
 		return nil, fmt.Errorf("get image compressed resource size: %w", err)
 	}
 
-	desc, err := i.Config(ctx, s.provider, s.platform)
+	desc, err := i.Config(ctx, s.provider, platform)
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
@@ -215,7 +225,7 @@ type store struct {
 	lock       sync.RWMutex
 	images     map[string]Image
 	digestSet  *digestset.Set
-	pinnedRefs map[string]setutils.Set[string]
+	pinnedRefs map[string]sets.Set[string]
 }
 
 func (s *store) list() []Image {
@@ -242,7 +252,7 @@ func (s *store) add(img Image) error {
 
 	if img.Pinned {
 		if refs := s.pinnedRefs[img.ID]; refs == nil {
-			s.pinnedRefs[img.ID] = setutils.New(img.References...)
+			s.pinnedRefs[img.ID] = sets.New(img.References...)
 		} else {
 			refs.Insert(img.References...)
 		}
@@ -288,7 +298,7 @@ func (s *store) pin(id, ref string) error {
 	}
 
 	if refs := s.pinnedRefs[digest.String()]; refs == nil {
-		s.pinnedRefs[digest.String()] = setutils.New(ref)
+		s.pinnedRefs[digest.String()] = sets.New(ref)
 	} else {
 		refs.Insert(ref)
 	}

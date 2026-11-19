@@ -34,7 +34,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "healthcheck",
-		InitFn: func(*plugin.InitContext) (interface{}, error) {
+		InitFn: func(*plugin.InitContext) (any, error) {
 			return newService()
 		},
 	})

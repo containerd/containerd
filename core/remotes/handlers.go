@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -55,9 +56,27 @@ func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) conte
 	return context.WithValue(ctx, refKeyPrefix{}, values)
 }
 
-// MakeRefKey returns a unique reference for the descriptor. This reference can be
-// used to lookup ongoing processes related to the descriptor. This function
-// may look to the context to namespace the reference appropriately.
+// MakeRefKey returns a stable ingest reference for desc.
+//
+// The returned key is used as a content-store reference to correlate ongoing
+// fetch and push operations for the same descriptor. The key is derived from
+// the descriptor digest and, when present, the
+// [ocispec.AnnotationRefName] annotation.
+//
+// By default, the key is prefixed according to the descriptor media type:
+//
+//   - "manifest-" for manifest media types recognized by [images.IsManifestType]
+//   - "index-" for index media types recognized by [images.IsIndexType]
+//   - "layer-" for layer media types recognized by [images.IsLayerType]
+//   - "config-" for config media types recognized by [images.IsKnownConfig]
+//   - "attestation-" for attestation media types recognized by [images.IsAttestationType]
+//
+// Additional exact media type mappings may be provided through
+// [WithMediaTypeKeyPrefix]. A context-provided mapping takes precedence over the
+// built-in classification.
+//
+// If the media type is not recognized and no context override exists,
+// MakeRefKey falls back to the "unknown-" prefix.
 func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	key := desc.Digest.String()
 	if desc.Annotations != nil {
@@ -85,7 +104,11 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 	case images.IsAttestationType(desc.MediaType):
 		return "attestation-" + key
 	default:
-		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
+		log.G(ctx).WithFields(log.Fields{
+			"digest":       desc.Digest,
+			"mediatype":    desc.MediaType,
+			"artifactType": desc.ArtifactType,
+		}).Debug("using generic reference key prefix for unclassified descriptor")
 		return "unknown-" + key
 	}
 }
@@ -133,6 +156,9 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 		// into the content store. Error out here otherwise the error sent back is confusing
 		return fmt.Errorf("unable to fetch descriptor (%s) which reports content size of zero: %w", desc.Digest, errdefs.ErrInvalidArgument)
 	}
+	if desc.Size < 0 {
+		return fmt.Errorf("unable to fetch descriptor (%s) which reports negative content size (%d): %w", desc.Digest, desc.Size, errdefs.ErrInvalidArgument)
+	}
 	if ws.Offset == desc.Size {
 		// If writer is already complete, commit and return
 		err := cw.Commit(ctx, desc.Size, desc.Digest)
@@ -150,6 +176,9 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 	if err != nil {
 		return err
 	}
+
+	// Keep the reader usable until Copy finishes: a writer may request a
+	// reset after EOF, including while committing the content.
 	defer rc.Close()
 
 	return content.Copy(ctx, cw, rc, desc.Size, desc.Digest)
@@ -171,6 +200,9 @@ func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 }
 
 func push(ctx context.Context, provider content.Provider, pusher Pusher, desc ocispec.Descriptor) error {
+	if desc.Size < 0 {
+		return fmt.Errorf("invalid descriptor size %d: %w", desc.Size, errdefs.ErrInvalidArgument)
+	}
 	log.G(ctx).Debug("push")
 
 	var (
@@ -255,8 +287,8 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	}
 
 	// Iterate in reverse order as seen, parent always uploaded after child
-	for i := len(indexStack) - 1; i >= 0; i-- {
-		err := images.Dispatch(ctx, pushHandler, limiter, indexStack[i])
+	for _, index := range slices.Backward(indexStack) {
+		err := images.Dispatch(ctx, pushHandler, limiter, index)
 		if err != nil {
 			// TODO(estesp): until we have a more complete method for index push, we need to report
 			// missing dependencies in an index/manifest list by sensing the "400 Bad Request"

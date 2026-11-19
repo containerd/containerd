@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -205,7 +206,7 @@ func appendCPUPodStats(podRuntimeStats *runtime.WindowsContainerStats, container
 	}
 
 	// It is possible the pod sandbox might not be populated with values if it doesn't exist
-	// HostProcess pods are an example where there is no actual pod sandbox running and therefor no stats
+	// HostProcess pods are an example where there is no actual pod sandbox running and therefore no stats
 	if podRuntimeStats.Cpu == nil {
 		podRuntimeStats.Cpu = &runtime.WindowsCpuUsage{
 			Timestamp:            timestamp.UnixNano(),
@@ -227,7 +228,7 @@ func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, contai
 	}
 
 	// It is possible the pod sandbox might not be populated with values if it doesn't exist
-	// HostProcess pods are an example where there is no actual pod sandbox running and therefor no stats
+	// HostProcess pods are an example where there is no actual pod sandbox running and therefore no stats
 	if podRuntimeStats.Memory == nil {
 		podRuntimeStats.Memory = &runtime.WindowsMemoryUsage{Timestamp: timestamp.UnixNano()}
 	}
@@ -275,7 +276,7 @@ func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.Windo
 	if stats != nil && stats.Container != nil {
 		wstats := stats.GetWindows()
 		if wstats == nil {
-			return nil, fmt.Errorf("windows stats is empty")
+			return nil, errors.New("windows stats is empty")
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.WindowsCpuUsage{

@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -58,6 +60,7 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.TransferPlugin,
 			plugins.WarningPlugin,
+			plugins.ShimPlugin,
 		},
 		Config:          &defaultConfig,
 		ConfigMigration: configMigration,
@@ -65,7 +68,7 @@ func init() {
 	})
 }
 
-func initCRIService(ic *plugin.InitContext) (interface{}, error) {
+func initCRIService(ic *plugin.InitContext) (any, error) {
 	ctx := ic.Context
 	config := ic.Config.(*criconfig.ServerConfig)
 
@@ -87,24 +90,30 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	runtimeSvc := criRuntimePlugin.(server.RuntimeService)
 	imageSvc := criImagePlugin.(server.ImageService)
 	runtimeConfig := runtimeSvc.Config()
-	for runtimeName, rt := range runtimeConfig.Runtimes {
-		if rt.Snapshotter != "" {
-			imagePlatform := images.ImagePlatform{
-				Snapshotter: rt.Snapshotter,
-				Platform:    platforms.DefaultSpec(),
-			}
-			imageSvc.UpdateRuntimeSnapshotter(runtimeName, imagePlatform)
-		}
+	imageConfig := imageSvc.Config()
+	if err := validateRuntimePlatforms(runtimeConfig.Runtimes, imageConfig.RuntimePlatforms); err != nil {
+		return nil, err
 	}
+	imageSvc.UpdateDefaultRuntimeName(runtimeConfig.DefaultRuntimeName)
+	for runtimeName, rt := range runtimeConfig.Runtimes {
+		var imagePlatform *images.ImagePlatform
+		if rt.Snapshotter != "" {
+			imagePlatform = &images.ImagePlatform{
+				Snapshotter: rt.Snapshotter,
+			}
+		}
+		imageSvc.UpdateRuntime(runtimeName, imagePlatform)
+	}
+
+	ws, err := ic.GetSingle(plugins.WarningPlugin)
+	if err != nil {
+		return nil, err
+	}
+	warn := ws.(warning.Service)
 
 	if warnings, err := criconfig.ValidateServerConfig(ic.Context, config); err != nil {
 		return nil, fmt.Errorf("invalid cri image config: %w", err)
 	} else if len(warnings) > 0 {
-		ws, err := ic.GetSingle(plugins.WarningPlugin)
-		if err != nil {
-			return nil, err
-		}
-		warn := ws.(warning.Service)
 		for _, w := range warnings {
 			warn.Emit(ic.Context, w)
 		}
@@ -131,6 +140,22 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to get streaming config: %w", err)
 	}
 
+	var shimPath string
+	shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get shim plugin: %w", err)
+	}
+	if hasEnv, ok := shimPlugin.(interface{ Env() []string }); ok {
+		env := hasEnv.Env()
+		for _, value := range slices.Backward(env) {
+			// iterate backwards to grab the last PATH=
+			if path, ok := strings.CutPrefix(value, "PATH="); ok {
+				shimPath = path
+				break
+			}
+		}
+	}
+
 	options := &server.CRIServiceOptions{
 		RuntimeService:     runtimeSvc,
 		ImageService:       imageSvc,
@@ -138,6 +163,8 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		NRI:                getNRIAPI(ic),
 		Client:             client,
 		SandboxControllers: sbControllers,
+		ShimPath:           shimPath,
+		WarningService:     warn,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 
@@ -158,7 +185,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	service := &criGRPCServer{
 		RuntimeServiceServer: rs,
 		ImageServiceServer:   is,
-		Closer:               s, // TODO: Where is close run?
+		Closer:               s, // closed by Server.Stop in cmd/containerd/server
 		initializer:          s,
 	}
 
@@ -253,17 +280,17 @@ func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controlle
 	return sc, nil
 }
 
-func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
 	const pluginName = string(plugins.GRPCPlugin) + ".cri"
-	src, ok := pluginConfigs[pluginName].(map[string]interface{})
+	src, ok := pluginConfigs[pluginName].(map[string]any)
 	if !ok {
 		return nil
 	}
 
-	dst := map[string]interface{}{}
+	dst := map[string]any{}
 	for _, k := range []string{
 		"disable_tcp_service",
 		"stream_server_address",
@@ -278,5 +305,15 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	}
 
 	pluginConfigs[pluginName] = dst
+	return nil
+}
+
+// validateRuntimePlatforms checks that runtime_platforms only refers to configured runtime handlers.
+func validateRuntimePlatforms(runtimes map[string]criconfig.Runtime, runtimePlatforms map[string]criconfig.ImagePlatform) error {
+	for runtimeName := range runtimePlatforms {
+		if _, ok := runtimes[runtimeName]; !ok {
+			return fmt.Errorf("invalid CRI config: runtime_platforms %q is not a configured runtime handler", runtimeName)
+		}
+	}
 	return nil
 }

@@ -19,11 +19,13 @@ package client
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -35,21 +37,29 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	coreimages "github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/runtime/restart"
 	"github.com/containerd/containerd/v2/integration/failpoint"
 	"github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins"
 
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/sys/unix"
 )
 
@@ -165,6 +175,120 @@ func TestTaskUpdate(t *testing.T) {
 	}
 
 	<-statusC
+}
+
+func TestContainerRestartPolicyAlways(t *testing.T) {
+	t.Parallel()
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cOpts []NewContainerOpts
+
+	policy, err := restart.NewPolicy("always")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cOpts = append(cOpts, restart.WithPolicy(policy))
+	cOpts = append(cOpts, WithNewSnapshot(id, image))
+	cOpts = append(cOpts, WithNewSpec(oci.WithImageConfig(image), withProcessArgs("sleep", "1d")))
+	container, err := client.NewContainer(ctx, id, cOpts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		task, err := container.Task(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		task.Delete(ctx)
+	}()
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateStatusLabel(ctx, container, Running); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Kill(ctx, unix.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+
+	<-statusC
+	// should be longer than interval (10 seconds) time
+	time.Sleep(time.Second * 12)
+	newTask, err := container.Task(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newStatus, err := newTask.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newStatus.Status != Running {
+		t.Errorf("expected status %s but get %s", Running, newStatus.Status)
+	}
+
+	// update  restart label and kill task
+	if err := updateExplicitlyStoppedLabel(ctx, container, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := newTask.Kill(ctx, unix.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	// should be longer than interval (10 seconds) time
+	time.Sleep(time.Second * 12)
+	newTask, err = container.Task(ctx, nil)
+
+	newStatus, err = newTask.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newStatus.Status != Stopped {
+		t.Errorf("expected status %s but get %s", Stopped, newStatus.Status)
+	}
+}
+
+func updateExplicitlyStoppedLabel(ctx context.Context, container Container, explicitlyStopped bool) error {
+	opt := WithAdditionalContainerLabels(map[string]string{
+		restart.ExplicitlyStoppedLabel: strconv.FormatBool(explicitlyStopped),
+	})
+	return container.Update(ctx, UpdateContainerOpts(opt))
+}
+
+// UpdateStatusLabel updates the "containerd.io/restart.status"
+// label of the container according to the value of restart desired status.
+func updateStatusLabel(ctx context.Context, container Container, status ProcessStatus) error {
+	opt := WithAdditionalContainerLabels(map[string]string{
+		restart.StatusLabel: string(status),
+	})
+	return container.Update(ctx, UpdateContainerOpts(opt))
 }
 
 func TestShimInCgroup(t *testing.T) {
@@ -528,11 +652,9 @@ func TestContainerAttach(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	task, err := container.NewTask(ctx, direct.IOCreate)
 	if err != nil {
@@ -623,11 +745,9 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	container, err := client.NewContainer(ctx, id,
 		WithNewSnapshot(id, image),
@@ -701,11 +821,9 @@ func TestContainerAttachProcess(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	task, err := container.NewTask(ctx, empty())
 	if err != nil {
@@ -872,11 +990,9 @@ func TestContainerUserID(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	// sys user in the busybox image has a uid and gid of 3.
 	container, err := client.NewContainer(ctx, id,
@@ -1482,10 +1598,7 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedScore := containerdScore + 1
-	if expectedScore > sys.OOMScoreAdjMax {
-		expectedScore = sys.OOMScoreAdjMax
-	}
+	expectedScore := min(containerdScore+1, sys.OOMScoreAdjMax)
 
 	// find the shim's pid
 	if cgroups.Mode() == cgroups.Unified {
@@ -1822,4 +1935,152 @@ func TestIssue10589(t *testing.T) {
 	t.Logf("task status: %s", status.Status)
 	require.NoError(t, err, "container status")
 	assert.Equal(t, Stopped, status.Status)
+}
+
+// buildWhiteoutImage builds an image on top of the base image, appending
+// layers generated with archive.WriteDiff that create files and then delete
+// them again with whiteouts:
+//
+//	touch /file-to-delete
+//	rm /file-to-delete
+//	mkdir /dir-to-delete && touch /dir-to-delete/foo
+//	rm -rf /dir-to-delete
+//
+// The image is returned as the blobs of the new layers, config, and manifest
+// keyed by digest, together with the manifest descriptor, to be served with
+// testutil.ServeImage. The blobs of the base image are not included; they
+// are expected to be present in the content store already.
+func buildWhiteoutImage(ctx context.Context, t *testing.T, client *Client, base Image) (map[digest.Digest][]byte, ocispec.Descriptor) {
+	blobs := map[digest.Digest][]byte{}
+
+	empty := t.TempDir()
+	withFile := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(withFile, "file-to-delete"), nil, 0644))
+	withDir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(withDir, "dir-to-delete"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(withDir, "dir-to-delete", "foo"), nil, 0644))
+
+	config, err := base.Spec(ctx)
+	require.NoError(t, err)
+	manifest, err := coreimages.Manifest(ctx, client.ContentStore(), base.Target(), platforms.Default())
+	require.NoError(t, err)
+
+	for _, l := range []struct {
+		createdBy    string
+		lower, upper string
+	}{
+		{"touch /file-to-delete", empty, withFile},
+		{"rm /file-to-delete", withFile, empty},
+		{"mkdir /dir-to-delete && touch /dir-to-delete/foo", empty, withDir},
+		{"rm -rf /dir-to-delete", withDir, empty},
+	} {
+		var buf bytes.Buffer
+		require.NoError(t, archive.WriteDiff(ctx, &buf, l.lower, l.upper))
+		desc := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Digest:    digest.FromBytes(buf.Bytes()),
+			Size:      int64(buf.Len()),
+		}
+		blobs[desc.Digest] = buf.Bytes()
+		manifest.Layers = append(manifest.Layers, desc)
+		// The layer is uncompressed, so its diff ID is its blob digest.
+		config.RootFS.DiffIDs = append(config.RootFS.DiffIDs, desc.Digest)
+		config.History = append(config.History, ocispec.History{CreatedBy: l.createdBy})
+	}
+
+	configBlob, err := json.Marshal(config)
+	require.NoError(t, err)
+	manifest.Config = ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageConfig,
+		Digest:    digest.FromBytes(configBlob),
+		Size:      int64(len(configBlob)),
+	}
+	blobs[manifest.Config.Digest] = configBlob
+
+	manifest.MediaType = ocispec.MediaTypeImageManifest
+	manifestBlob, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	target := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromBytes(manifestBlob),
+		Size:      int64(len(manifestBlob)),
+	}
+	blobs[target.Digest] = manifestBlob
+
+	return blobs, target
+}
+
+// TestIssue13030 is a regression test for parallel image unpacking.
+// The test validates that when multiple layers are unpacked in parallel,
+// that whiteout files are properly processed and do not cause files to
+// be unexpectedly present in the final rootfs.
+//
+// https://github.com/containerd/containerd/issues/13030
+func TestIssue13030(t *testing.T) {
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+
+	ctx, cancel := testContext(t)
+	t.Cleanup(cancel)
+
+	// Pull the base image without unpacking it, so that all the layers of
+	// the derived image built below are unpacked in parallel.
+	base, err := client.Pull(ctx, images.Get(images.BusyBox), WithPlatformMatcher(platforms.Default()))
+	require.NoError(t, err)
+
+	blobs, target := buildWhiteoutImage(ctx, t, client, base)
+	ref := testutil.ServeImage(t, "whiteout-test", "latest", target, blobs)
+
+	image, err := client.Pull(ctx,
+		ref,
+		WithPlatformMatcher(platforms.Default()),
+		WithPullUnpack,
+		WithUnpackOpts([]UnpackOpt{WithUnpackLimiter(semaphore.NewWeighted(3))}),
+	)
+	t.Cleanup(func() {
+		client.ImageService().Delete(ctx, ref)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, t.Name(),
+		WithNewSnapshot(t.Name(), image),
+		WithNewSpec(oci.WithImageConfig(image),
+			withProcessArgs("/bin/sh", "-e", "-c", "test ! -e /file-to-delete && test ! -e /dir-to-delete")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		container.Delete(ctx, WithSnapshotCleanup)
+	})
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		task.Delete(ctx)
+	})
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = task.Start(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 {
+		t.Errorf("expected status 0 from wait but received %d", code)
+	}
 }

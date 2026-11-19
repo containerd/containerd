@@ -136,14 +136,16 @@ to all committers.
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life    | September 26, 2019             | March 4, 2021                  |                        |
 | [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life    | August 17, 2020                | March 3, 2022                  |                        |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life    | May 3, 2021                    | February 28, 2023              |                        |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                | @containerd/committers |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS            | March 10, 2023                 | September 2026*                | @containerd/committers |
-| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.7)  | End of Life    | November 5, 2024               | November 7, 2025               | @containerd/committers |
-| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.0)  | Active         | May 7, 2025                    | May 5, 2026                    | @containerd/committers |
-| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.0)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
-| [2.3](https://github.com/containerd/containerd/milestone/50)         | LTS (_future_) | April 27, 2026 (_tentative_)   | April 27, 2028 (_tentative_)   | @containerd/committers |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.39) | End of Life    | February 15, 2022              | August 23, 2025                |                        |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.36) | End of Life    | March 10, 2023                 | September 30, 2026             |                        |
+| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.13) | LTS            | November 5, 2024               | March 2027*                    | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
+| [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
+| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.9)  | End of Life    | November 5, 2025               | November 6, 2026               |                        |
+| [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.6)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
+| [2.4](https://github.com/containerd/containerd/releases/tag/v2.4.1)  | Active         | September 16, 2026             | May 16, 2027                   | @containerd/committers |
+| _[2.5](https://github.com/containerd/containerd/milestone/52)_       | _Planned_      | _January 6, 2027_              | _September 6, 2027_            | @containerd/committers |
 
-\* Support for the 1.7 release branch is provided by @containerd/committers until March 10, 2026. Extended support through September 2026 is provided by @chrishenzie and @samuelkarp.
+\* Support for the 2.0 release branch was provided by @containerd/committers until November 7, 2025. Extended support through March 2027 is provided by [@samuelkarp](https://github.com/samuelkarp) and [@chrishenzie](https://github.com/chrishenzie).  This extended support is focused on usage with Kubernetes 1.33 via [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine).  Changes may not be accepted if they are not needed for this usage.
 
 ### Kubernetes Support
 
@@ -161,7 +163,9 @@ of containerd for every supported version of Kubernetes.
 | 1.32               | 2.1.0+, 2.0.1+, 1.7.24+, 1.6.36+ | v1              |
 | 1.33               | 2.1.0+, 2.0.4+, 1.7.24+, 1.6.36+ | v1              |
 | 1.34               | 2.1.3+, 2.0.6+, 1.7.28+, 1.6.39+ | v1              |
-| 1.35               | 2.2.0+, 2.1.5+, 1.7.28+  | v1              |
+| 1.35               | 2.2.0+, 2.1.5+, 1.7.28+          | v1              |
+| 1.36               | 2.3.0+, 2.2.0+                   | v1              |
+| 1.37               | 2.4.0+, 2.3.0+                   | v1              |
 
 Deprecated containerd and kubernetes versions
 
@@ -176,6 +180,119 @@ Deprecated containerd and kubernetes versions
 | v1.6.15+, v1.7.0+        | 1.26+              | v1                                   |
 
 ** Note: containerd v1.6.*, and v1.7.* support CRI v1 and v1alpha2 through EOL as those releases continue to support older versions of k8s, cloud providers, and other clients using CRI v1alpha2. CRI v1alpha2 is deprecated in v1.7 and is not present in containerd v2.0.
+
+### Platform Support
+
+containerd runs on a range of operating systems and CPU architectures, but the
+level of support we can provide varies by platform. Support is limited by what
+we are able to build, test, and maintain. A platform that we can fully test in
+CI can be supported more strongly than one we can only compile.
+
+To make these differences explicit, platforms are organized into tiers. A tier
+describes what the project commits to for a platform. Tiers are forward-looking
+and apply to in-development and future releases. Platforms may be
+[demoted or removed](#demotion-and-removal) if the project is no longer able to
+commit to support at a given tier.
+
+A platform is identified by its `GOOS/GOARCH` pair, optionally with a variant
+(for example `linux/amd64`, `windows/amd64`, or `linux/arm/v7`). For operating
+systems like Linux, we do not designate specific distributions as supported,
+however automated testing primarily covers Ubuntu, Fedora, and AlmaLinux.
+
+#### Tiers
+
+__*Tier 1: Supported.*__ The platform is built, released, and exercised by
+automated tests (integration and/or CRI tests) in CI on every change. Test
+failures on a Tier 1 platform generally block merges and releases. These are the
+platforms we recommend for production use. Release artifacts are published with
+each release and nightly builds are produced.
+
+__*Tier 2: Released, best-effort.*__ The platform is built and release artifacts
+are published, but we run no automated testing for it. While binaries are
+produced with the expectation that they work, the project cannot independently
+validate runtime behavior. Bugs that are specific to a Tier 2 platform are
+addressed on a best-effort basis and may depend on the reporter or interested
+parties to diagnose, fix, and verify. Nightly builds are produced.
+
+__*Tier 3: Build-verified.*__ The platform is compiled in CI so that we do not
+knowingly break it, but no release artifacts are published and no testing is
+performed. This tier exists primarily to support the adoption of containerd on
+platforms that we do not have the resources to support at a stronger level.
+
+__*Unsupported.*__ Any platform not listed below. containerd may still build and
+run on these platforms, but the project makes no commitments and performs no
+verification. Users are free to build from source for their own use.
+
+#### Current platforms
+
+| Platform        | Tier | Release artifacts | Nightly builds | Functional CI testing | Build / compile check |
+|-----------------|:----:|:-----------------:|:--------------:|:---------------------:|:---------------------:|
+| linux/amd64     |  1   | ✅                | ✅             | ✅                    | ✅                    |
+| linux/arm64     |  1   | ✅                | ✅             | ✅                    | ✅                    |
+| windows/amd64   |  1   | ✅                | ✅             | ✅                    | ✅                    |
+| linux/ppc64le   |  2   | ✅                | ✅             | ❌                    | ✅                    |
+| linux/riscv64   |  2   | ✅                | ✅             | ❌                    | ✅                    |
+| linux/s390x     |  2   | ✅                | ✅             | ❌                    | ✅                    |
+| linux/arm/v7    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| linux/arm/v5    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| linux/loong64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| darwin/arm64    |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| freebsd/amd64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| freebsd/arm64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+| windows/arm64   |  3   | ❌                | ❌             | ❌                    | ✅                    |
+
+containerd's build, testing, and release infrastructure is primarily defined
+in [GitHub Actions](./.github/workflows). Release artifacts and their platforms
+are defined in `release.yml`, nightly builds in `nightly.yml`, functional
+testing in `ci.yml`, and Tier 3 compile coverage in the `binaries` and
+`crossbuild` jobs of `ci.yml`. This table should be updated if the
+workflows are changed.
+
+#### Requesting a new platform or a tier change
+
+New platforms enter at the lowest tier that the maintainers can sustainably
+commit to, and most begin at Tier 3. To propose a new platform or a change in
+tier, [open an issue](https://github.com/containerd/containerd/issues)
+describing the platform, its `GOOS/GOARCH`, the level of support being
+requested, and what you are able to contribute toward it.
+
+What it takes to reach each tier:
+
+- __Tier 3 (Build-verified):__ Go must support the platform as a port, and the
+  platform must build (at minimum, `make build` and `make binaries`). Because
+  the cost and risk are low, the maintainers will generally accept a new
+  build-verified platform as long as it does not meaningfully complicate the
+  build or slow CI. This is the recommended entry point for a new architecture.
+- __Tier 2 (Released, best-effort):__ In addition to Tier 3, the platform must
+  produce working release artifacts through the existing release tooling. The
+  maintainers decide whether to publish release artifacts for a platform at
+  their discretion, weighing demonstrated demand, the risk of shipping binaries
+  we cannot test, and the ongoing maintenance burden. A vendor or community
+  sponsor who commits to triaging platform-specific issues is not required, but
+  is strongly encouraged and makes promotion more likely.
+- __Tier 1 (Supported):__ In addition to Tier 2, the platform must be covered by
+  automated functional tests in CI that are reliable enough to gate merges. This
+  generally requires either hosted runners for the platform or a sponsor who
+  provides and _maintains_ suitable CI infrastructure (for example, self-hosted
+  runners or hardware). Testing or infrastructure that is too slow or too flaky
+  to reliably gate changes is not sufficient.
+
+#### Demotion and removal
+
+Tiers reflect what the project can sustain, so a platform may move down as well as
+up. The maintainers may demote or remove a platform when, for example:
+
+- automated testing for the platform becomes too unreliable or too slow to gate
+  changes;
+- the infrastructure or sponsorship that a tier depended on is no longer
+  available;
+- supporting the platform meaningfully impedes development of containerd; or
+- the platform is no longer in meaningful use.
+
+When practical, the maintainers will give notice before lowering a platform's
+tier or removing it, and will prefer to make such changes at a minor-release
+boundary. Removing a platform does not retroactively affect artifacts already
+published for prior releases.
 
 ### Backporting
 
@@ -354,7 +471,8 @@ releases for prior API versions should be avoided if possible.
 | v2.0               | 1.8                    |
 | v2.1               | 1.9                    |
 | v2.2               | 1.10                   |
-| _v2.3_             | _1.11_                 |
+| v2.3               | 1.11                   |
+| v2.4               | 1.12                   |
 
 
 ### Metrics API
@@ -400,7 +518,7 @@ As of containerd 2.0, the Go client API documented in
 [godoc](https://godoc.org/github.com/containerd/containerd/v2/client) is stable.
 Note that because the Go client interfaces with the GRPC API, clients building on top
 of the Go client should remain compatible with future server releases implementing the
-same major GRPC API series. For backwards compatability and as a general rule of thumb,
+same major GRPC API series. For backwards compatibility and as a general rule of thumb,
 it is the client's responsibility to handle not implemented errors returned by the containerd daemon.
 
 Any changes to the Go client API should be detectable at compile time, so upgrading will
@@ -438,12 +556,11 @@ The daemon's configuration file, commonly located in `/etc/containerd/config.tom
 is versioned and backwards compatible.  The `version` field in the config
 file specifies the config's version.  If no version number is specified inside
 the config file then it is assumed to be a version `1` config and parsed as such.
-The latest version is `version = 2`. The `main` branch is being prepared to support
-the next config version `3`. The configuration is automatically migrated to the
-latest version on each startup, leaving the configuration file unchanged. To avoid
-the migration and optimize the daemon startup time, use `containerd config migrate`
-to output the configuration as the latest version. Version `1` is no longer deprecated
-and is supported by migration, however, it is recommended to use at least version `2`.
+The latest version is `version = 4`. The configuration is automatically migrated to
+the latest version on each startup, leaving the configuration file unchanged. To
+avoid the migration and optimize the daemon startup time, use `containerd config
+migrate` to output the configuration as the latest version. All prior versions are
+supported by migration.
 
 Migrating a configuration to the latest version will limit the prior versions
 of containerd in which the configuration can be used. It is suggested not to
@@ -457,6 +574,7 @@ each configuration version.
 | 1                     | v1.0.0                     |
 | 2                     | v1.3.0                     |
 | 3                     | v2.0.0                     |
+| 4                     | v2.3.0                     |
 
 ### Not Covered
 
@@ -483,42 +601,43 @@ against total impact.
 The deprecated features are shown in the following table:
 
 | Component                                                                        | Deprecation release | Target release for removal            | Recommendation                           |
-|----------------------------------------------------------------------------------|---------------------|---------------------------------------|------------------------------------------|
-| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`)             | containerd v1.4     | containerd v2.0 ✅                    | Use `io.containerd.runc.v2`              |
-| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)                   | containerd v1.4     | containerd v2.0 ✅                    | Use `io.containerd.runc.v2`              |
-| Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0 ✅                    | Use `overlayfs` snapshotter              |
-| Container label `containerd.io/restart.logpath`                                  | containerd v1.5     | containerd v2.0 ✅                    | Use `containerd.io/restart.loguri` label |
-| `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0 ✅                    | Use `containerd-*.tar.gz` bundles        |
-| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+prettyjws`) | containerd v1.7     | containerd v2.1 (Disabled in v2.0) ✅ | Use Schema 2 or OCI images               |
-| CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅                    | Use CRI `v1`                             |
-| Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅                    |                                          |
-| Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1 ✅                    | Use external plugins (proxy or binary)   |
-| CNI `bin_dir` in CRI runtime config (`plugins.'io.containerd.cri.v1.runtime'.cni.bin_dir`) | containerd v2.1     | containerd v2.3                       | Change `bin_dir` to `bin_dirs` in the same section which supports a list of directories  |
-| NRI v0.1.0 plugin support                                                        | containerd v2.2     | containerd v2.3                       | Use the v010-adapter NRI plugin, or update v0.1.0 plugins to use the current NRI API |
-| cgroup v1 support                                                                | containerd v2.2     | (May 2029)                            | Use cgroup v2                           |
+|----------------------------------------------------------------------------------|---------------------|---------------------------------------|------------------------------------------------------------------------------------------------|
+| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`)             | containerd v1.4     | containerd v2.0 ✅                    | Use `io.containerd.runc.v2`                                                                    |
+| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)                   | containerd v1.4     | containerd v2.0 ✅                    | Use `io.containerd.runc.v2`                                                                    |
+| Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0 ✅                    | Use `overlayfs` snapshotter                                                                    |
+| Container label `containerd.io/restart.logpath`                                  | containerd v1.5     | containerd v2.0 ✅                    | Use `containerd.io/restart.loguri` label                                                       |
+| `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0 ✅                    | Use `containerd-*.tar.gz` bundles                                                              |
+| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+prettyjws`) | containerd v1.7     | containerd v2.1 (Disabled in v2.0) ✅ | Use Schema 2 or OCI images                                                                |
+| CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅                    | Use CRI `v1`                                                                                   |
+| Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅                    |                                                                                                |
+| Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1 ✅                    | Use external plugins (proxy or binary)                                                         |
+| NRI v0.1.0 plugin support                                                        | containerd v2.2     | containerd v2.3                       | Use the v010-adapter NRI plugin, or update v0.1.0 plugins to use the current NRI API           |
+| cgroup v1 support                                                                | containerd v2.2     | (May 2029)                            | Use cgroup v2                                                                                  |
+| Restoring checkpoint data during CRI `CreateContainer`                           | containerd v2.3     | containerd v2.4 ✅                    | Follow [KEP-5823](https://github.com/kubernetes/enhancements/issues/5823) for a replacement `RestorePod` API |
 
 - Pulling Schema 1 images has been disabled in containerd v2.0, but it still can be enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1`
   until containerd v2.1. `ctr` users have to specify `--local` too (e.g., `ctr images pull --local`). Users of CRI clients (such as Kubernetes and `crictl`) have to specify this environment variable on the containerd daemon (usually in the systemd unit).
-- The latest release in May 2029 may not necessarily support cgroup v1, but there will be at least one maintained branch with the support for cgroup v1.
+- The latest release in May 2029 may not necessarily support cgroup v1, but there will be at least one maintained branch with the support for cgroup v1 until that month. No branch will support cgroup v1 after that.
 
 ### Deprecated config properties
 The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in the following table:
 
 | Property Group                                                       | Property                     | Deprecation release | Target release for removal | Recommendation                                  |
-|----------------------------------------------------------------------|------------------------------|---------------------|----------------------------|-------------------------------------------------|
-|`[plugins."io.containerd.grpc.v1.cri"]`                               | `systemd_cgroup`             | containerd v1.3     | containerd v2.0 ✅         | Use `SystemdCgroup` in runc options (see below) |
-|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `untrusted_workload_runtime` | containerd v1.2     | containerd v2.0 ✅         | Create `untrusted` runtime in `runtimes`        |
-|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `default_runtime`            | containerd v1.3     | containerd v2.0 ✅         | Use `default_runtime_name`                      |
-|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_engine`             | containerd v1.3     | containerd v2.0 ✅         | Use runtime v2                                  |
-|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_root`               | containerd v1.3     | containerd v2.0 ✅         | Use `options.Root`                              |
+|----------------------------------------------------------------------|------------------------------|---------------------|----------------------------|------------------------------------------------------|
+|`[plugins."io.containerd.grpc.v1.cri"]`                               | `systemd_cgroup`             | containerd v1.3     | containerd v2.0 ✅         | Use `SystemdCgroup` in runc options (see below)      |
+|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `untrusted_workload_runtime` | containerd v1.2     | containerd v2.0 ✅         | Create `untrusted` runtime in `runtimes`             |
+|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `default_runtime`            | containerd v1.3     | containerd v2.0 ✅         | Use `default_runtime_name`                           |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_engine`             | containerd v1.3     | containerd v2.0 ✅         | Use runtime v2                                       |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_root`               | containerd v1.3     | containerd v2.0 ✅         | Use `options.Root`                                   |
 |`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `disable_cgroup`             | -                   | containerd v2.0 ✅         | Use [cgroup v2 delegation](https://rootlesscontaine.rs/getting-started/common/cgroup2/) |
-|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*.options]` | `CriuPath`                   | containerd v1.7     | containerd v2.0 ✅         | Set `$PATH` to the `criu` binary                |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.3            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.3            | Use [`config_path`](./docs/hosts.md)            |
-|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.3            | Use [`config_path`](./docs/hosts.md)            |
-|`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.3       | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
-|`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.3       | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
-|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4            | CDI support will always be enabled              |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*.options]` | `CriuPath`                   | containerd v1.7     | containerd v2.0 ✅         | Set `$PATH` to the `criu` binary                     |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.7            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.7            | Use [`config_path`](./docs/hosts.md)                 |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.7            | Use [`config_path`](./docs/hosts.md)                 |
+|`[plugins."io.containerd.tracing.processor.v1.otlp"]`                 | `endpoint`, `protocol`, `insecure` | containerd v1.6.29 | containerd v2.4 ✅    | Use [OTLP environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/), e.g. OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, OTEL_EXPORTER_OTLP_PROTOCOL, OTEL_SDK_DISABLED    |
+|`[plugins."io.containerd.cri.v1.runtime".cni]`                        | `bin_dir`                    | containerd v2.1     | containerd v2.4 ✅         | Use `bin_dirs`, which supports a list of directories |
+|`[plugins."io.containerd.internal.v1.tracing"]`                       | `service_name`, `sampling_ratio`   | containerd v1.6.29 | containerd v2.4 ✅    | Instead use [OTel environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/), e.g. OTEL_SERVICE_NAME, OTEL_TRACES_SAMPLER*  |
+|`[plugins."io.containerd.cri.v1.runtime"]`                            | `enable_cdi`                 | containerd v2.2     | containerd v2.4 ✅         | CDI support will always be enabled                   |
 
 
 > **Note**

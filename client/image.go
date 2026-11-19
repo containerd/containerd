@@ -261,6 +261,8 @@ type UnpackConfig struct {
 	DuplicationSuppressor kmutex.KeyedLocker
 	// Limiter is used to limit concurrent unpacks
 	Limiter *semaphore.Weighted
+	// FetchAllContent fetches layers during Pull even if their snapshots exist.
+	FetchAllContent bool
 }
 
 // UnpackOpt provides configuration for unpack
@@ -294,6 +296,17 @@ func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
 func WithUnpackLimiter(limiter *semaphore.Weighted) UnpackOpt {
 	return func(ctx context.Context, uc *UnpackConfig) error {
 		uc.Limiter = limiter
+		return nil
+	}
+}
+
+// WithUnpackFetchAllContent fetches layers during Pull even if their snapshots
+// already exist, without changing the selected platforms.
+// Use it with WithPullUnpack and WithUnpackOpts.
+// It has no effect on Image.Unpack, which does not fetch content.
+func WithUnpackFetchAllContent() UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.FetchAllContent = true
 		return nil
 	}
 }
@@ -337,10 +350,10 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	if err != nil {
 		return err
 	}
-	if config.CheckPlatformSupported {
-		if err := i.checkSnapshotterSupport(ctx, snapshotterName, manifest); err != nil {
-			return err
-		}
+
+	if err := i.checkSnapshotterSupport(ctx, snapshotterName, manifest,
+		config.CheckPlatformSupported); err != nil {
+		return err
 	}
 
 	for _, layer := range layers {
@@ -376,11 +389,11 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	cinfo := content.Info{
 		Digest: desc.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootFS,
+			"containerd.io/gc.ref.snapshot." + snapshotterName: rootFS,
 		},
 	}
 
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName))
+	_, err = cs.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+snapshotterName)
 	return err
 }
 
@@ -421,13 +434,18 @@ func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]roo
 	return layers, nil
 }
 
-func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest ocispec.Manifest) error {
-	snapshotterPlatformMatcher, err := i.client.GetSnapshotterSupportedPlatforms(ctx, snapshotterName)
+func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string,
+	manifest ocispec.Manifest, checkSnapshotterSupport bool) error {
+	manifestPlatform, err := images.ConfigPlatform(ctx, i.ContentStore(), manifest.Config)
 	if err != nil {
 		return err
 	}
 
-	manifestPlatform, err := images.ConfigPlatform(ctx, i.ContentStore(), manifest.Config)
+	if len(manifestPlatform.OSFeatures) == 0 && !checkSnapshotterSupport {
+		return nil
+	}
+
+	snapshotterPlatformMatcher, err := i.client.GetSnapshotterSupportedPlatforms(ctx, snapshotterName)
 	if err != nil {
 		return err
 	}

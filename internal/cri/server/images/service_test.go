@@ -40,7 +40,7 @@ const (
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
 		config:           testImageConfig,
-		runtimePlatforms: map[string]ImagePlatform{},
+		runtimePlatforms: map[string]*ImagePlatform{},
 		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
 		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
 		snapshotStore:    snapshotstore.NewStore(),
@@ -53,6 +53,17 @@ var testImageConfig = criconfig.ImageConfig{
 	PinnedImages: map[string]string{
 		"sandbox": testSandboxImage,
 	},
+}
+
+func TestUpdateRuntimeMergesSnapshotter(t *testing.T) {
+	c, _ := newTestCRIService()
+	c.runtimePlatforms["runtime"] = &ImagePlatform{}
+	c.UpdateRuntime("runtime", &ImagePlatform{Snapshotter: "native"})
+	assert.Equal(t, "native", c.runtimePlatforms["runtime"].Snapshotter)
+
+	c.runtimePlatforms["runtime"] = &ImagePlatform{Snapshotter: "overlayfs"}
+	c.UpdateRuntime("runtime", &ImagePlatform{Snapshotter: "native"})
+	assert.Equal(t, "overlayfs", c.runtimePlatforms["runtime"].Snapshotter)
 }
 
 func TestLocalResolve(t *testing.T) {

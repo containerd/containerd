@@ -46,6 +46,6 @@ func updateOCIResource(ctx context.Context, spec *runtimespec.Spec, r *runtime.U
 	return &cloned, nil
 }
 
-func getResources(spec *runtimespec.Spec) interface{} {
+func getResources(spec *runtimespec.Spec) any {
 	return spec.Linux.Resources
 }

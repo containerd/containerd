@@ -40,6 +40,7 @@ type Config struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
+	//
 	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
 	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
@@ -56,6 +57,7 @@ type Config struct {
 }
 
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
+//
 // Deprecated: this structure is deprecated in v1.34. It is not used by any of the Kubernetes components.
 type Preferences struct {
 	// +optional
@@ -100,6 +102,13 @@ type Cluster struct {
 	// compression (server-side) and decompression (client-side): https://github.com/kubernetes/kubernetes/issues/112296.
 	// +optional
 	DisableCompression bool `json:"disable-compression,omitempty"`
+	// MinConnectionPoolSize, if greater than 1, spreads requests to the server across at least this many independent
+	// transports, each with its own connections, preferring the one with fewer requests in flight. More connections may be
+	// opened, for example when a connection reaches the server's limit of concurrent HTTP/2 streams. 0 and 1 keep the
+	// default of a single shared transport. Values below 0 or above 100 are invalid. Ignored if the
+	// ClientsAllowConnectionPool feature gate is disabled.
+	// +optional
+	MinConnectionPoolSize int32 `json:"min-connection-pool-size,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
@@ -283,7 +292,56 @@ type ExecConfig struct {
 	// read user instructions might set this to "used by my-program to read user instructions".
 	// +k8s:conversion-gen=false
 	StdinUnavailableMessage string `json:"-"`
+
+	// PluginPolicy is the policy governing whether or not the configured
+	// `Command` may run.
+	// +k8s:conversion-gen=false
+	PluginPolicy PluginPolicy `json:"-"`
 }
+
+// AllowlistEntry is an entry in the allowlist. For each allowlist item, at
+// least one field must be nonempty. A struct with all empty fields is
+// considered a misconfiguration error. Each field is a criterion for
+// execution. If multiple fields are specified, then the criteria of all
+// specified fields must be met. That is, the result of an individual entry is
+// the logical AND of all checks corresponding to the specified fields within
+// the entry.
+type AllowlistEntry struct {
+	// Command matching is performed by first resolving the absolute path of both
+	// the plugin and the name in the allowlist entry using `exec.LookPath`. It
+	// will be called on both, and the resulting strings must be equal. If
+	// either call to `exec.LookPath` results in an error, the `Command` check
+	// will be considered a failure.
+	Command string `json:"-"`
+}
+
+// PluginPolicy describes the policy type and allowlist (if any) for client-go
+// credential plugins.
+type PluginPolicy struct {
+	// PolicyType specifies the policy governing which, if any, client-go
+	// credential plugins may be executed. It MUST be one of { "", "AllowAll", "DenyAll", "Allowlist" }.
+	// If the policy is "", then it falls back to "AllowAll" (this is required
+	// to maintain backward compatibility). If the policy is DenyAll, no
+	// credential plugins may run. If the policy is Allowlist, only those
+	// plugins meeting the criteria specified in the `credentialPluginAllowlist`
+	// field may run. If the policy is not `Allowlist` but one is provided, it
+	// is considered a configuration error.
+	PolicyType PolicyType `json:"-"`
+
+	// Allowlist is a slice of allowlist entries. If any of them is a match,
+	// then the executable in question may execute. That is, the result is the
+	// logical OR of all entries in the allowlist. This list MUST be nil
+	// whenever the policy is not "Allowlist".
+	Allowlist []AllowlistEntry `json:"-"`
+}
+
+type PolicyType string
+
+const (
+	PluginPolicyAllowAll  PolicyType = "AllowAll"
+	PluginPolicyDenyAll   PolicyType = "DenyAll"
+	PluginPolicyAllowlist PolicyType = "Allowlist"
+)
 
 var _ fmt.Stringer = new(ExecConfig)
 var _ fmt.GoStringer = new(ExecConfig)
@@ -372,6 +430,7 @@ func NewAuthInfo() *AuthInfo {
 
 // NewPreferences is a convenience function that returns a new
 // Preferences object with non-nil maps
+//
 // Deprecated: this method is deprecated in v1.34. It is not used by any of the Kubernetes components.
 func NewPreferences() *Preferences {
 	return &Preferences{Extensions: make(map[string]runtime.Object)}

@@ -24,21 +24,25 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -53,7 +57,7 @@ import (
 
 // NewShimManager returns an implementation of the shim manager
 // using runc
-func NewShimManager(name string) shim.Manager {
+func NewShimManager(name string) shim.Shim {
 	return &manager{
 		name: name,
 	}
@@ -103,7 +107,21 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 	cmd := exec.Command(self, args...)
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "GOMAXPROCS=4")
-	cmd.Env = append(cmd.Env, "OTEL_SERVICE_NAME=containerd-shim-"+id)
+	// Preserve inherited resource attributes, but override the daemon's identity.
+	// The OpenTelemetry SDK uses the last value for duplicate resource keys.
+	var attrs []string
+	if inherited := strings.TrimSpace(os.Getenv("OTEL_RESOURCE_ATTRIBUTES")); inherited != "" {
+		attrs = append(attrs, inherited)
+	}
+	attrs = append(attrs,
+		"service.instance.id="+url.PathEscape(id),
+		"service.version="+url.PathEscape(version.Version),
+	)
+	cmd.Env = append(cmd.Env,
+		"OTEL_SERVICE_NAME=containerd-shim-runc-v2",
+		"OTEL_RESOURCE_ATTRIBUTES="+strings.Join(attrs, ","),
+	)
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
@@ -144,8 +162,8 @@ func (s *shimSocket) Close() {
 	_ = shim.RemoveSocket(s.addr)
 }
 
-func newShimSocket(ctx context.Context, path, id string, debug bool) (*shimSocket, error) {
-	address, err := shim.SocketAddress(ctx, path, id, debug)
+func newShimSocket(ctx context.Context, root, path, id string, debug bool) (*shimSocket, error) {
+	address, err := shim.CreateSocketAddress(ctx, root, path, id, debug)
 	if err != nil {
 		return nil, err
 	}
@@ -181,20 +199,25 @@ func newShimSocket(ctx context.Context, path, id string, debug bool) (*shimSocke
 	return s, nil
 }
 
-func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shim.BootstrapParams, retErr error) {
-	var params shim.BootstrapParams
+func (manager) Start(ctx context.Context, opts *bootapi.BootstrapParams) (_ *bootapi.BootstrapResult, retErr error) {
+	var params bootapi.BootstrapResult
 	params.Version = 3
 	params.Protocol = "ttrpc"
 
-	cmd, err := newCommand(ctx, id, opts.Address, opts.TTRPCAddress, opts.Debug)
+	id := opts.GetInstanceID()
+
+	debugLog := opts.GetLogLevel() <= bootapi.LogLevel_LOG_LEVEL_DEBUG
+
+	cmd, err := newCommand(ctx, id, opts.GetContainerdGrpcAddress(), opts.GetContainerdTtrpcAddress(), debugLog)
 	if err != nil {
-		return params, err
+		return nil, err
 	}
 	grouping := id
 	spec, err := readSpec()
 	if err != nil {
-		return params, err
+		return nil, err
 	}
+
 	for _, group := range groupLabels {
 		if groupID, ok := spec.Annotations[group]; ok {
 			grouping = groupID
@@ -211,21 +234,25 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 		}
 	}()
 
-	s, err := newShimSocket(ctx, opts.Address, grouping, false)
+	socketDir := opts.GetSocketDir()
+	if socketDir == "" {
+		socketDir = filepath.Join(defaults.DefaultStateDir, "s")
+	}
+	s, err := newShimSocket(ctx, socketDir, opts.GetContainerdGrpcAddress(), grouping, false)
 	if err != nil {
 		if errdefs.IsAlreadyExists(err) {
 			params.Address = s.addr
-			return params, nil
+			return &params, nil
 		}
-		return params, err
+		return nil, err
 	}
 	sockets = append(sockets, s)
 	cmd.ExtraFiles = append(cmd.ExtraFiles, s.f)
 
-	if opts.Debug {
-		s, err = newShimSocket(ctx, opts.Address, grouping, true)
+	if debugLog {
+		s, err = newShimSocket(ctx, socketDir, opts.GetContainerdGrpcAddress(), grouping, true)
 		if err != nil {
-			return params, err
+			return nil, err
 		}
 		sockets = append(sockets, s)
 		cmd.ExtraFiles = append(cmd.ExtraFiles, s.f)
@@ -234,12 +261,12 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	goruntime.LockOSThread()
 	if os.Getenv("SCHED_CORE") != "" {
 		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
-			return params, fmt.Errorf("enable sched core support: %w", err)
+			return nil, fmt.Errorf("enable sched core support: %w", err)
 		}
 	}
 
 	if err := cmd.Start(); err != nil {
-		return params, err
+		return nil, err
 	}
 
 	goruntime.UnlockOSThread()
@@ -252,34 +279,37 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	// make sure to wait after start
 	go cmd.Wait()
 
-	if opts, err := shim.ReadRuntimeOptions[*options.Options](os.Stdin); err == nil {
-		if opts.ShimCgroup != "" {
+	var runcOpts options.Options
+	if found, err := opts.FindExtension(&runcOpts); err != nil {
+		return nil, fmt.Errorf("failed to fetch runc options: %w", err)
+	} else if found {
+		if shimCgroup := runcOpts.GetShimCgroup(); shimCgroup != "" {
 			if cgroups.Mode() == cgroups.Unified {
-				cg, err := cgroupsv2.Load(opts.ShimCgroup)
+				cg, err := cgroupsv2.Load(shimCgroup)
 				if err != nil {
-					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
+					return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
 				}
 				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
+					return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
 				}
 			} else {
-				cg, err := cgroup1.Load(cgroup1.StaticPath(opts.ShimCgroup))
+				cg, err := cgroup1.Load(cgroup1.StaticPath(shimCgroup))
 				if err != nil {
-					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
+					return nil, fmt.Errorf("failed to load cgroup %s: %w", shimCgroup, err)
 				}
 				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
+					return nil, fmt.Errorf("failed to join cgroup %s: %w", shimCgroup, err)
 				}
 			}
 		}
 	}
 
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return params, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
+		return nil, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
 	}
 
 	params.Address = sockets[0].addr
-	return params, nil
+	return &params, nil
 }
 
 func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
@@ -312,15 +342,38 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	}); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to remove runc container")
 	}
+
+	// Use the time immediately after the forced runc deletion attempt as the
+	// fallback when no recorded exit time is available.
+	fallbackExitedAt := time.Now()
+
 	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
 		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 	}
-	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
-	if err != nil {
-		log.G(ctx).WithError(err).Warn("failed to read init pid file")
+
+	// Prefer the exit status recorded by the shim. The record may be unavailable
+	// for bundles created by older shims or if the shim terminated before writing it.
+	exitEvent, exitErr := runc.ReadExitStatus(path)
+	if exitErr == nil {
+		return shim.StopStatus{
+			ExitedAt:   exitEvent.Timestamp,
+			ExitStatus: exitEvent.Status,
+			Pid:        exitEvent.Pid,
+		}, nil
 	}
+
+	if !errors.Is(exitErr, os.ErrNotExist) {
+		log.G(ctx).WithError(exitErr).Warn("failed to read recorded exit status")
+	}
+
+	pid, pidErr := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
+	if pidErr != nil {
+		log.G(ctx).WithError(pidErr).Warn("failed to read init pid file")
+		pid = 0
+	}
+
 	return shim.StopStatus{
-		ExitedAt:   time.Now(),
+		ExitedAt:   fallbackExitedAt,
 		ExitStatus: 128 + int(unix.SIGKILL),
 		Pid:        pid,
 	}, nil

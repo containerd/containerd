@@ -35,7 +35,7 @@ func TestImagesList(t *testing.T) {
 	store := NewImageStore(NewDB(db, nil, nil))
 
 	testset := map[string]*images.Image{}
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		id := "image-" + fmt.Sprint(i)
 		testset[id] = &images.Image{
 			Name: id,
@@ -563,6 +563,17 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 
 			checkImagesEqual(t, &created, &testcase.original, "unexpected image on creation")
 
+			// Wait for the wall clock to advance past the creation timestamp
+			// before updating. Create and Update both stamp time.Now().UTC()
+			// (which strips the monotonic reading), and on platforms with a
+			// coarse timer resolution (e.g. Windows) two back-to-back stamps
+			// can be identical, making updatedat == createdat. Spinning here
+			// keeps the strict "updatedat after createdat" assertion below
+			// meaningful without depending on clock resolution.
+			for !time.Now().After(created.UpdatedAt) {
+				time.Sleep(time.Millisecond)
+			}
+
 			// Update
 			now = time.Now()
 			updated, err := store.Update(ctx, testcase.input, testcase.fieldpaths...)
@@ -647,9 +658,9 @@ func checkImageTimestamps(t *testing.T, im *images.Image, now time.Time, oncreat
 	}
 }
 
-func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...interface{}) {
+func checkImagesEqual(t *testing.T, a, b *images.Image, format string, args ...any) {
 	t.Helper()
 	if !reflect.DeepEqual(a, b) {
-		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]interface{}{a, b}, args...)...)
+		t.Fatalf("images not equal \n\t%v != \n\t%v: "+format, append([]any{a, b}, args...)...)
 	}
 }

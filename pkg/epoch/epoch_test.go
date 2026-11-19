@@ -81,4 +81,20 @@ func TestSourceDateEpoch(t *testing.T) {
 		require.ErrorContains(t, err, "invalid value:")
 		require.Nil(t, vp)
 	})
+
+	t.Run("WithNegativeSourceDateEpoch", func(t *testing.T) {
+		// SOURCE_DATE_EPOCH is defined as a non-negative number of seconds
+		// since the Unix epoch, so a negative value is not well-formatted.
+		// See https://reproducible-builds.org/docs/source-date-epoch/
+		const negativeValue = "-1"
+		t.Setenv(SourceDateEpochEnv, negativeValue)
+
+		vp, err := SourceDateEpoch()
+		require.ErrorContains(t, err, "invalid SOURCE_DATE_EPOCH value")
+		require.Nil(t, vp)
+
+		vp, err = ParseSourceDateEpoch(negativeValue)
+		require.ErrorContains(t, err, "invalid value:")
+		require.Nil(t, vp)
+	})
 }

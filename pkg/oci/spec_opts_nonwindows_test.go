@@ -20,6 +20,7 @@ package oci
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -37,7 +38,7 @@ func TestWithDefaultPathEnv(t *testing.T) {
 		ctx            = namespaces.WithNamespace(context.Background(), "test")
 	)
 	WithDefaultPathEnv(ctx, nil, nil, &s)
-	if !Contains(s.Process.Env, defaultUnixEnv) {
+	if !slices.Contains(s.Process.Env, defaultUnixEnv) {
 		t.Fatal("default Unix Env not found")
 	}
 }

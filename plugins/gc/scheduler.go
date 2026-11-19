@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -97,7 +98,7 @@ func init() {
 			ScheduleDelay:     tomlext.FromStdTime(0),
 			StartupDelay:      tomlext.FromStdTime(100 * time.Millisecond),
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
@@ -112,8 +113,8 @@ func init() {
 
 			ic.Meta.Exports = map[string]string{
 				"PauseThreshold":    fmt.Sprint(m.pauseThreshold),
-				"DeletionThreshold": fmt.Sprint(m.deletionThreshold),
-				"MutationThreshold": fmt.Sprint(m.mutationThreshold),
+				"DeletionThreshold": strconv.Itoa(m.deletionThreshold),
+				"MutationThreshold": strconv.Itoa(m.mutationThreshold),
 				"ScheduleDelay":     fmt.Sprint(m.scheduleDelay),
 			}
 

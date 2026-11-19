@@ -52,14 +52,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		}
 	}
 
-	if resolver, ok := pullCtx.Resolver.(remotes.ResolverWithOptions); ok {
-		resolver.SetOptions(
-			transfer.WithConcurrentLayerFetchBuffer(pullCtx.ConcurrentLayerFetchBuffer),
-			transfer.WithMaxConcurrentDownloads(pullCtx.MaxConcurrentDownloads),
-			transfer.WithDownloadLimiter(pullCtx.DownloadLimiter),
-		)
-	}
-
 	if pullCtx.PlatformMatcher == nil {
 		if len(pullCtx.Platforms) > 1 {
 			return nil, errors.New("cannot pull multiplatform image locally, try Fetch")
@@ -125,6 +117,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			SnapshotterCapabilities: snCapabilities,
 		}
 		uopts := []unpack.UnpackerOpt{unpack.WithUnpackPlatform(platform)}
+		if uconfig.FetchAllContent {
+			uopts = append(uopts, unpack.WithFetchAllContent())
+		}
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
@@ -167,6 +162,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			unpackSpan.End()
 			return nil, err
 		}
+		unpackSpan.SetAttributes(tracing.Attribute("unpack.count", ur.Unpacks))
 		unpackSpan.End()
 	}
 
@@ -192,11 +188,25 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, limit int) (images.Image, error) {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "fetch"))
 	defer span.End()
+	if resolver, ok := rCtx.Resolver.(remotes.ResolverWithOptions); ok {
+		resolver.SetOptions(
+			transfer.WithConcurrentLayerFetchBuffer(rCtx.ConcurrentLayerFetchBuffer),
+			transfer.WithMaxConcurrentDownloads(rCtx.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(rCtx.DownloadLimiter),
+			transfer.WithIgnoreDescriptorURLs(rCtx.IgnoreDescriptorURLs),
+		)
+	}
 	store := c.ContentStore()
 	name, desc, err := rCtx.Resolver.Resolve(ctx, ref)
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute("container.image.ref", ref),
+		tracing.Attribute("image.name", name),
+		tracing.Attribute("target.mediaType", desc.MediaType),
+		tracing.Attribute("image.digest", desc.Digest.String()),
+	)
 
 	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
@@ -268,12 +278,20 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		handler = rCtx.HandlerWrapper(handler)
 	}
 
-	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
+	dispatchCtx, dispatchSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "dispatch"))
+	err = images.Dispatch(dispatchCtx, handler, limiter, desc)
+	dispatchSpan.SetStatus(err)
+	dispatchSpan.End()
+	if err != nil {
 		return images.Image{}, err
 	}
 
 	if isConvertible {
-		if desc, err = converterFunc(ctx, desc); err != nil {
+		convertCtx, convertSpan := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "convert_manifest"))
+		desc, err = converterFunc(convertCtx, desc)
+		convertSpan.SetStatus(err)
+		convertSpan.End()
+		if err != nil {
 			return images.Image{}, err
 		}
 	}

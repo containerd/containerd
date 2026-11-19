@@ -52,7 +52,7 @@ func init() {
 		Type:     plugins.ServicePlugin,
 		ID:       services.IntrospectionService,
 		Requires: []plugin.Type{plugins.WarningPlugin},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetByID(plugins.WarningPlugin, plugins.DeprecationsPlugin)
 			if err != nil {
 				return nil, err
@@ -188,7 +188,7 @@ func (l *Local) getWarnings(ctx context.Context) []*api.DeprecationWarning {
 	return warningsPB(ctx, l.warningClient.Warnings())
 }
 
-func adaptPlugin(o interface{}) filters.Adaptor {
+func adaptPlugin(o any) filters.Adaptor {
 	obj := o.(*api.Plugin)
 	return filters.AdapterFunc(func(fieldpath []string) (string, bool) {
 		if len(fieldpath) == 0 {
@@ -279,7 +279,7 @@ func warningsPB(ctx context.Context, warnings []warning.Warning) []*api.Deprecat
 }
 
 type pluginInfoProvider interface {
-	PluginInfo(context.Context, interface{}) (interface{}, error)
+	PluginInfo(context.Context, any) (any, error)
 }
 
 func (l *Local) PluginInfo(ctx context.Context, pluginType, id string, options any) (*api.PluginInfoResponse, error) {

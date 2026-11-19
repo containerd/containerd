@@ -23,9 +23,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
@@ -40,11 +42,9 @@ type deferredPipeConnection struct {
 }
 
 func (dpc *deferredPipeConnection) Read(p []byte) (n int, err error) {
+	dpc.wg.Wait()
 	if dpc.c == nil {
-		dpc.wg.Wait()
-		if dpc.c == nil {
-			return 0, dpc.conerr
-		}
+		return 0, dpc.conerr
 	}
 	return dpc.c.Read(p)
 }
@@ -71,8 +71,7 @@ func openShimLog(ctx context.Context, bundle *Bundle, dialer func(string, time.D
 	dpc := &deferredPipeConnection{
 		ctx: ctx,
 	}
-	dpc.wg.Add(1)
-	go func() {
+	dpc.wg.Go(func() {
 		c, conerr := dialer(
 			fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, bundle.ID),
 			time.Second*10,
@@ -81,8 +80,7 @@ func openShimLog(ctx context.Context, bundle *Bundle, dialer func(string, time.D
 			dpc.conerr = fmt.Errorf("failed to connect to shim log: %w", conerr)
 		}
 		dpc.c = c
-		dpc.wg.Done()
-	}()
+	})
 	return dpc, nil
 }
 
@@ -94,4 +92,8 @@ func checkCopyShimLogError(ctx context.Context, err error) error {
 		return nil
 	}
 	return err
+}
+
+func defaultSocketDir() string {
+	return filepath.Join(defaults.DefaultStateDir, "s")
 }

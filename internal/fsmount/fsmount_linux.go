@@ -19,6 +19,8 @@ package fsmount
 import (
 	"fmt"
 	"os"
+	"slices"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/unix"
@@ -91,14 +93,7 @@ func Fsmount(m mount.Mount, target string) error {
 	defer fsctx.Close()
 
 	// Check if "ro" option is present - must be set before source for read-only loop devices
-	roFlag := false
-	for _, o := range m.Options {
-		if o == "ro" {
-			roFlag = true
-			break
-		}
-	}
-	if roFlag {
+	if slices.Contains(m.Options, "ro") {
 		if err := unix.FsconfigSetFlag(int(fsctx.Fd()), "ro"); err != nil {
 			return fmt.Errorf("failed to set ro flag: %w", err)
 		}
@@ -121,6 +116,13 @@ func Fsmount(m mount.Mount, target string) error {
 
 		// Handle key=value options
 		if key, val, ok := strings.Cut(o, "="); ok {
+			switch key {
+			// Remove quoting from selinux parameters.
+			case "context", "fscontext", "defcontext", "rootcontext":
+				if nval, err := strconv.Unquote(val); err == nil {
+					val = nval
+				}
+			}
 			if err := unix.FsconfigSetString(int(fsctx.Fd()), key, val); err != nil {
 				return fmt.Errorf("failed to set string option %s=%s: %w", key, val, err)
 			}

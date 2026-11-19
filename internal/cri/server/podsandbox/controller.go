@@ -55,7 +55,7 @@ func init() {
 			plugins.ServicePlugin,
 			plugins.WarningPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			client, err := containerd.New(
 				"",
 				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),

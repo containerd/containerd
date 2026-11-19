@@ -4,25 +4,26 @@ package wclayer
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/attribute"
 	"os"
 	"path/filepath"
 	"syscall"
 	"unsafe"
 
+	"github.com/Microsoft/go-winio/vhd"
 	"github.com/Microsoft/hcsshim/internal/hcserror"
-	"github.com/Microsoft/hcsshim/internal/oc"
-	"go.opencensus.io/trace"
+	"github.com/Microsoft/hcsshim/internal/ot"
 )
 
 // ExpandScratchSize expands the size of a layer to at least size bytes.
 func ExpandScratchSize(ctx context.Context, path string, size uint64) (err error) {
 	title := "hcsshim::ExpandScratchSize"
-	ctx, span := oc.StartSpan(ctx, title)
+	ctx, span := ot.StartSpan(ctx, title)
 	defer span.End()
-	defer func() { oc.SetSpanStatus(span, err) }()
-	span.AddAttributes(
-		trace.StringAttribute("path", path),
-		trace.Int64Attribute("size", int64(size)))
+	defer func() { ot.SetSpanStatus(span, err) }()
+	span.SetAttributes(
+		attribute.String("path", path),
+		attribute.Int64("size", int64(size)))
 
 	err = expandSandboxSize(&stdDriverInfo, path, size)
 	if err != nil {
@@ -75,7 +76,7 @@ func attachVhd(path string) (syscall.Handle, error) {
 	if err != nil {
 		return 0, &os.PathError{Op: "OpenVirtualDisk", Path: path, Err: err}
 	}
-	err = attachVirtualDisk(handle, 0, 0, 0, 0, 0)
+	err = vhd.AttachVirtualDisk(handle, vhd.AttachVirtualDiskFlagBypassDefaultEncryptionPolicy, nil)
 	if err != nil {
 		syscall.Close(handle)
 		return 0, &os.PathError{Op: "AttachVirtualDisk", Path: path, Err: err}

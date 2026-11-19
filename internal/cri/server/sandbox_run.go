@@ -68,6 +68,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	name := makeSandboxName(metadata)
 
+	// CgroupnsOptions can be set only for containers (KEP-5714).
+	if cgroupnsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetCgroupnsOptions(); cgroupnsOpts != nil {
+		return nil, fmt.Errorf("cgroup namespace options must not be set for sandbox, got %v", cgroupnsOpts)
+	}
+
 	span.SetAttributes(
 		tracing.Attribute("sandbox.id", id),
 		tracing.Attribute("sandbox.name", name),
@@ -139,6 +144,31 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Save sandbox name
 	sandboxInfo.AddLabel("name", name)
 
+	// Allocate the pod SELinux labels before the sandbox record is created, so that the
+	// process label is part of the very first metadata write and is restored on recovery
+	// without an extra store update. The sandbox implementation derives the labels it
+	// needs from Metadata.ProcessLabel instead of minting its own.
+	selinuxOpts := config.GetLinux().GetSecurityContext().GetSelinuxOptions()
+	processLabel, _, err := initLabelsFromOpt(selinuxOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init selinux options %+v: %w", selinuxOpts, err)
+	}
+	// Hold a reservation on the MCS level of processLabel for the duration of this
+	// call, so that a concurrent RunPodSandbox cannot be handed the same level while
+	// this sandbox is still being set up.
+	//
+	// The reservation is refcounted per level by the shared label store, so it is
+	// dropped unconditionally on return: by then sandboxStore.Add has either taken the
+	// store's own reservation (which lives until the sandbox is deleted) or the sandbox
+	// never made it into the store and the level is free again. Releasing through the
+	// store rather than calling selinux.ReleaseLabel directly matters when the pod
+	// pinned an explicit SELinux level that another live pod already uses: the level is
+	// only really freed once the last holder lets go of it.
+	if err := c.labels.Reserve(processLabel); err != nil {
+		return nil, fmt.Errorf("failed to reserve selinux label %q: %w", processLabel, err)
+	}
+	defer c.labels.Release(processLabel)
+
 	// Create initial internal sandbox object.
 	sandbox := sandboxstore.NewSandbox(
 		sandboxstore.Metadata{
@@ -146,6 +176,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			Name:           name,
 			Config:         config,
 			RuntimeHandler: r.GetRuntimeHandler(),
+			ProcessLabel:   processLabel,
 		},
 		sandboxstore.Status{
 			State:     sandboxstore.StateUnknown,
@@ -278,7 +309,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}
 
-	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
+	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath), sb.WithRuntimePath(ociRuntime.Path)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
@@ -292,14 +323,21 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// containers anyway, the CRI layer will pre-pull the pause container to guarantee
 	// it exists (even though it's counter to the purpose of the sandbox API). This may
 	// be removed/deprecated in the distant future, if we decide to remove pause containers.
-	if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
-		return nil, err
+	//
+	// Runtimes set disable_pause_image_pull = true to tell the CRI layer that they manage
+	// pause image availability on their own (e.g. shim sandboxers).
+	if !ociRuntime.DisablePauseImagePull {
+		if err := c.ensurePauseImageExists(ctx, r.GetConfig(), r.GetRuntimeHandler()); err != nil {
+			return nil, err
+		}
+	} else {
+		log.G(ctx).Debugf("Skipping pause image pull for runtime handler %q (type=%q, sandboxer=%q, disable_pause_image_pull=true)",
+			r.GetRuntimeHandler(), ociRuntime.Type, ociRuntime.Sandboxer)
 	}
 
 	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
 	if err != nil {
-		var cerr podsandbox.CleanupErr
-		if errors.As(err, &cerr) {
+		if cerr, ok := errors.AsType[podsandbox.CleanupErr](err); ok {
 			cleanupErr = fmt.Errorf("failed to cleanup sandbox: %w", cerr)
 
 			// Strip last error as cleanup error to handle separately
@@ -312,11 +350,30 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
 
+	// Shutdown the sandbox if we fail before adding it to store.
+	rollbackSandbox := true
+	defer func() {
+		if retErr != nil && rollbackSandbox {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			cleanupErr = c.sandboxService.ShutdownSandbox(deferCtx, sandbox.Sandboxer, id)
+		}
+	}()
+
 	if ctrl.Address != "" {
 		sandbox.Endpoint = sandboxstore.Endpoint{
 			Version: ctrl.Version,
 			Address: ctrl.Address,
 		}
+	}
+
+	// CRI owns the pod SELinux label; a label from the controller is ignored.
+	if l := ctrl.Labels["selinux_label"]; l != "" && l != sandbox.ProcessLabel {
+		log.G(ctx).WithFields(log.Fields{
+			"sandbox":          id,
+			"controller_label": l,
+			"selinux_label":    sandbox.ProcessLabel,
+		}).Warn("ignoring the SELinux label returned by the sandbox controller, using the label allocated by CRI")
 	}
 
 	sandboxInfo.Labels = ctrl.Labels
@@ -325,13 +382,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions", "spec", "labels"); err != nil {
 		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 	}
-
-	labels := ctrl.Labels
-	if labels == nil {
-		labels = map[string]string{}
-	}
-
-	sandbox.ProcessLabel = labels["selinux_label"]
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.Pid = ctrl.Pid // NRI reads the pid from status during RunPodSandbox hook
@@ -368,6 +418,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
+	// We no longer need to stop sandbox with a cleanup defer since it is in the store.
+	rollbackSandbox = false
 
 	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
 	// Note that this has to be done after sandboxStore.Add() because we need to get
@@ -389,7 +441,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
-	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
+	sandboxRuntimeCreateTimer.WithValues(ociRuntime.Type).UpdateSince(runtimeStart)
 
 	return &runtime.RunPodSandboxResponse{PodSandboxId: id}, nil
 }

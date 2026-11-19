@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -40,7 +41,7 @@ import (
 	"github.com/containerd/log"
 )
 
-// TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functinal.
+// TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functional.
 
 const (
 	// errorStartReason is the exit reason when fails to start container.
@@ -234,7 +235,7 @@ func filterLabel(k, v string) string {
 }
 
 // getRuntimeOptions get runtime options from container metadata.
-func getRuntimeOptions(c containers.Container) (interface{}, error) {
+func getRuntimeOptions(c containers.Container) (any, error) {
 	from := c.Runtime.Options
 	if from == nil || from.GetValue() == nil {
 		return nil, nil
@@ -265,7 +266,7 @@ func unknownContainerStatus() containerstore.Status {
 	}
 }
 
-// copyResourcesToStatus copys container resource contraints from spec to
+// copyResourcesToStatus copies container resource constraints from spec to
 // container status.
 // This will need updates when new fields are added to ContainerResources.
 func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status) containerstore.Status {
@@ -335,6 +336,12 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 			}
 			if spec.Windows.Resources.CPU.Maximum != nil {
 				status.Resources.Windows.CpuMaximum = int64(*spec.Windows.Resources.CPU.Maximum)
+			}
+			for _, a := range spec.Windows.Resources.CPU.Affinity {
+				status.Resources.Windows.AffinityCpus = append(
+					status.Resources.Windows.AffinityCpus,
+					&runtime.WindowsCpuGroupAffinity{CpuMask: a.Mask, CpuGroup: a.Group},
+				)
 			}
 		}
 
@@ -471,6 +478,18 @@ func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
 	}
 
 	return labels, nil
+}
+
+// initLabelsFromOpt allocates the SELinux process and mount labels described by
+// the given CRI SELinux options. On success the MCS level of the returned process
+// label is reserved and the caller owns it until it is either released with
+// selinux.ReleaseLabel or handed over to the label store.
+func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
+	labels, err := toLabel(selinuxOpts)
+	if err != nil {
+		return "", "", err
+	}
+	return label.InitLabels(labels)
 }
 
 func checkSelinuxLevel(level string) error {

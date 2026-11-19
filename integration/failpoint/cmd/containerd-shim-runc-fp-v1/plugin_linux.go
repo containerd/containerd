@@ -47,7 +47,7 @@ func init() {
 			plugins.EventPlugin,
 			plugins.InternalPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			pp, err := ic.GetByID(plugins.EventPlugin, "publisher")
 			if err != nil {
 				return nil, err
@@ -88,7 +88,7 @@ func (s *taskServiceWithFp) RegisterTTRPC(server *ttrpc.Server) error {
 }
 
 func (s *taskServiceWithFp) UnaryServerInterceptor() ttrpc.UnaryServerInterceptor {
-	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (any, error) {
 		methodName := filepath.Base(info.FullMethod)
 		if fp, ok := s.fps[methodName]; ok {
 			if err := fp.Evaluate(); err != nil {
@@ -102,12 +102,19 @@ func (s *taskServiceWithFp) UnaryServerInterceptor() ttrpc.UnaryServerIntercepto
 // newFailpointFromOCIAnnotation reloads and parses the annotation from
 // bundle-path/config.json.
 //
-// The annotation controlling task API's failpoint should be like:
+// An annotation controlling a task API failpoint looks like:
 //
 //	io.containerd.runtime.v2.shim.failpoint.Create = 1*off->1*error(please retry)
 //
-// The `Create` is the shim unary API and the value of annotation is the
-// failpoint control. The function will return a set of failpoint controllers.
+// Create names a shim unary API and the annotation value is its failpoint
+// control. The bootstrap command also supports BeforeStartShim, evaluated
+// before the shim server is started, and AfterStartShim, evaluated after the
+// shim server is started and before containerd registers it:
+//
+//	io.containerd.runtime.v2.shim.failpoint.AfterStartShim = 1*pause_on_fifo(/path/to/gate.fifo)
+//
+// Create the FIFO first. Write a byte to unblock bootstrap.
+// Remove the failpoint annotation before the next Create.
 func newFailpointFromOCIAnnotation() (map[string]*failpoint.Failpoint, error) {
 	// NOTE: shim's current working dir is in bundle dir.
 	cwd, err := os.Getwd()

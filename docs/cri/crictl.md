@@ -12,7 +12,7 @@ or `crictl` please make sure the issue has not already been submitted.
 If you have not already installed crictl please install the version compatible
 with the `cri` plugin you are using. If you are a user, your deployment
 should have installed crictl for you. If not, get it from your release tarball.
-If you are a developer the current version of crictl is specified [here](/script/setup/critools-version).
+If you are a developer the current version of crictl is specified [here](../../script/setup/critools-version).
 A helper command has been included to install the dependencies at the right version:
 ```console
 $ make install-deps
@@ -59,29 +59,29 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull registry.k8s.io/pause:3.10.1
-  3.10.1: Pulling from pause
-  19e4906e80f6: Pull complete
-  Digest: sha256:278fb9dbcca9518083ad1e11276933a2e96f23de604a3a08cc3c80002767d24c
-  Status: Downloaded newer image for registry.k8s.io/pause:3.10.1
-  registry.k8s.io/pause:3.10.1
-$ docker save registry.k8s.io/pause:3.10.1 -o pause.tar
+$ docker pull registry.k8s.io/pause:3.10.2
+  3.10.2: Pulling from pause
+  81ede36234b0: Pull complete
+  Digest: sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4
+  Status: Downloaded newer image for registry.k8s.io/pause:3.10.2
+  registry.k8s.io/pause:3.10.2
+$ docker save registry.k8s.io/pause:3.10.2 -o pause.tar
 ```
 Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: registry.k8s.io/pause:3.10.1
+  Loaded image: registry.k8s.io/pause:3.10.2
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-registry.k8s.io/pause       3.10.1              cd073f4c5f6a8       320kB
-$ sudo crictl inspecti cd073f4c5f6a8
+registry.k8s.io/pause       3.10.2              4a83b15d3ecfe       736kB
+$ sudo crictl inspecti 4a83b15d3ecfe
   ... displays information about the pause image.
-$ sudo crictl inspecti registry.k8s.io/pause:3.10.1
+$ sudo crictl inspecti registry.k8s.io/pause:3.10.2
   ... displays information about the pause image.
 ```
 
@@ -290,7 +290,7 @@ $ crictl info
     "streamIdleTimeout": "4h0m0s",
     "enableSelinux": false,
     "selinuxCategoryRange": 1024,
-    "sandboxImage": "registry.k8s.io/pause:3.10.1",
+    "sandboxImage": "registry.k8s.io/pause:3.10.2",
     "statsCollectPeriod": 10,
     "systemdCgroup": false,
     "enableTLSStreaming": false,
@@ -312,7 +312,6 @@ $ crictl info
     "netnsMountsUnderStateDir": false,
     "enableUnprivilegedPorts": false,
     "enableUnprivilegedICMP": false,
-    "enableCDI": false,
     "cdiSpecDirs": [
       "/etc/cdi",
       "/var/run/cdi"

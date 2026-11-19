@@ -52,18 +52,32 @@ func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snap
 // the syncer doesn't update any persistent states, it's fine to let it
 // exit with the process.
 func (s *snapshotsSyncer) start() {
-	tick := time.NewTicker(s.syncPeriod)
+	// Set minimum sleep to half of syncPeriod to ensure adequate CPU release
+	minSleep := s.syncPeriod / 2
+	// Use EMA to smooth sleep adjustments and avoid abrupt changes between iterations.
+	emaAlpha := 0.2
+	targetSleep := float64(s.syncPeriod)
 	go func() {
-		defer tick.Stop()
 		// TODO(random-liu): This is expensive. We should do benchmark to
 		// check the resource usage and optimize this.
 		for {
+			begin := time.Now()
 			if err := s.sync(); err != nil {
 				log.L.WithError(err).Error("Failed to sync snapshot stats")
 			}
-			<-tick.C
+			cost := time.Since(begin)
+			desiredSleep := float64(s.syncPeriod - cost)
+			targetSleep = calculateEMA(targetSleep, desiredSleep, emaAlpha)
+			// Ensure minimum CPU release even if EMA converges too low.
+			sleepDuration := max(time.Duration(targetSleep), minSleep)
+
+			time.Sleep(sleepDuration)
 		}
 	}()
+}
+
+func calculateEMA(previous, sample, alpha float64) float64 {
+	return previous + alpha*(sample-previous)
 }
 
 // sync updates all snapshots stats.

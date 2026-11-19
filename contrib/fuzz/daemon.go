@@ -24,9 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/log"
 )
 
 const (
@@ -56,10 +54,12 @@ func startDaemon() {
 			Debug: config.Debug{
 				Level: "debug",
 			},
-			GRPC: config.GRPCConfig{
-				Address:        defaultAddress,
-				MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-				MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
+			Plugins: map[string]any{
+				"io.containerd.server.v1.grpc": map[string]any{
+					"address":               defaultAddress,
+					"max_recv_message_size": defaults.DefaultMaxRecvMsgSize,
+					"max_send_message_size": defaults.DefaultMaxSendMsgSize,
+				},
 			},
 			DisabledPlugins: []string{},
 			RequiredPlugins: []string{},
@@ -71,18 +71,11 @@ func startDaemon() {
 			return
 		}
 
-		l, err := sys.GetLocalListener(srvconfig.GRPC.Address, srvconfig.GRPC.UID, srvconfig.GRPC.GID)
-		if err != nil {
+		defer server.Stop()
+		if err := server.Start(ctx); err != nil {
 			errC <- err
 			return
 		}
-
-		go func() {
-			defer l.Close()
-			if err := server.ServeGRPC(l); err != nil {
-				log.G(ctx).WithError(err).WithField("address", srvconfig.GRPC.Address).Fatal("serve failure")
-			}
-		}()
 
 		server.Wait()
 	}()

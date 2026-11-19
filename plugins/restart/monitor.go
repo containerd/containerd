@@ -51,7 +51,7 @@ func init() {
 		Config: &Config{
 			Interval: tomlext.FromStdTime(10 * time.Second),
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
 			client, err := containerd.New("", containerd.WithInMemoryServices(ic))
 			if err != nil {
@@ -60,10 +60,12 @@ func init() {
 			m := &monitor{
 				client: client,
 			}
+			// This function is executed exactly once.
+			m.resetAlwaysContainerExplicitlyStoppedLabel()
 			go m.run(tomlext.ToStdTime(ic.Config.(*Config).Interval))
 			return m, nil
 		},
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]any) error {
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}
@@ -87,6 +89,44 @@ type monitor struct {
 	client *containerd.Client
 }
 
+// Reset restart.ExplicitlyStoppedLabel to false for containers whose restart policy is "always".
+// This ensures "always" containers are eligible to restart even if they were previously explicitly stopped.
+func (m *monitor) resetAlwaysContainerExplicitlyStoppedLabel() {
+	ns, err := m.client.NamespaceService().List(context.Background())
+	if err != nil {
+		log.G(context.Background()).WithError(err).Errorf("failed to get container namespace")
+		return
+	}
+	for _, name := range ns {
+		ctx := namespaces.WithNamespace(context.Background(), name)
+		containers, err := m.client.Containers(ctx, fmt.Sprintf("labels.%q", restart.StatusLabel))
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to get containers")
+			continue
+		}
+		for _, c := range containers {
+			labels, err := c.Labels(ctx)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to get container %s label", c.ID())
+				continue
+			}
+			rp, err := restart.NewPolicy(labels[restart.PolicyLabel])
+			if err != nil {
+				log.G(ctx).WithError(err).Error("failed to parse restart policy")
+				continue
+			}
+			if rp.Name() == "always" {
+				explicitlyStopped, _ := strconv.ParseBool(labels[restart.ExplicitlyStoppedLabel])
+				if explicitlyStopped {
+					if err := resetContainerExplicitlyStoppedLabel(ctx, c); err != nil {
+						log.G(ctx).WithError(err).Error("failed to reset explicitly-stopped label")
+					}
+				}
+			}
+		}
+	}
+}
+
 func (m *monitor) run(interval time.Duration) {
 	if interval == 0 {
 		interval = 10 * time.Second
@@ -106,9 +146,7 @@ func (m *monitor) reconcile(ctx context.Context) error {
 	}
 	var wgNSLoop sync.WaitGroup
 	for _, name := range ns {
-		wgNSLoop.Add(1)
-		go func() {
-			defer wgNSLoop.Done()
+		wgNSLoop.Go(func() {
 			ctx := namespaces.WithNamespace(ctx, name)
 			changes, err := m.monitor(ctx)
 			if err != nil {
@@ -117,19 +155,24 @@ func (m *monitor) reconcile(ctx context.Context) error {
 			}
 			var wgChangesLoop sync.WaitGroup
 			for _, c := range changes {
-				wgChangesLoop.Add(1)
-				go func() {
-					defer wgChangesLoop.Done()
+				wgChangesLoop.Go(func() {
 					if err := c.apply(ctx, m.client); err != nil {
 						log.G(ctx).WithError(err).Error("apply change")
 					}
-				}()
+				})
 			}
 			wgChangesLoop.Wait()
-		}()
+		})
 	}
 	wgNSLoop.Wait()
 	return nil
+}
+
+func resetContainerExplicitlyStoppedLabel(ctx context.Context, container containerd.Container) error {
+	opt := containerd.WithAdditionalContainerLabels(map[string]string{
+		restart.ExplicitlyStoppedLabel: strconv.FormatBool(false),
+	})
+	return container.Update(ctx, containerd.UpdateContainerOpts(opt))
 }
 
 func (m *monitor) monitor(ctx context.Context) ([]change, error) {

@@ -36,6 +36,8 @@ message RegisterPluginRequest {
     string plugin_name = 1;
     // Plugin invocation index. Plugins are called in ascending index order.
     string plugin_idx = 2;
+    // NRI (module) version used by plugin, if known.
+    string NRI_version = 3;
 }
 
 message UpdateContainersRequest {
@@ -84,6 +86,21 @@ service Plugin {
   // Shutdown a plugin (let it know the runtime is going down).
   rpc Shutdown(Empty) returns (Empty);
 
+  // RunPodSandbox relays the corresponding request to the plugin.
+  rpc RunPodSandbox(RunPodSandboxRequest) returns (RunPodSandboxResponse);
+
+  // UpdatePodSandbox relays the corresponding request to the plugin.
+  rpc UpdatePodSandbox(UpdatePodSandboxRequest) returns (UpdatePodSandboxResponse);
+
+  // PostUpdatePodSandbox relays the corresponding request to the plugin.
+  rpc PostUpdatePodSandbox(PostUpdatePodSandboxRequest) returns (PostUpdatePodSandboxResponse);
+
+  // StopPodSandbox relays the corresponding request to the plugin.
+  rpc StopPodSandbox(StopPodSandboxRequest) returns (StopPodSandboxResponse);
+
+  // RemovePodSandbox relays the corresponding request to the plugin.
+  rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse);
+
   // CreateContainer relays the corresponding request to the plugin. In
   // response, the plugin can adjust the container being created, and
   // update other containers in the runtime. Container adjustment can
@@ -92,17 +109,30 @@ service Plugin {
   // assigned container resources.
   rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse);
 
+  // PostCreateContainer relays the corresponding container request to the plugin.
+  rpc PostCreateContainer(PostCreateContainerRequest) returns (PostCreateContainerResponse);
+
+  // StartContainer relays the corresponding container request to the plugin.
+  rpc StartContainer(StartContainerRequest) returns (StartContainerResponse);
+
+  // PostStartContainer relays the corresponding container request to the plugin.
+  rpc PostStartContainer(PostStartContainerRequest) returns (PostStartContainerResponse);
+
   // UpdateContainer relays the corresponding request to the plugin.
   // The plugin can alter how the container is updated and request updates
   // to additional containers in the runtime.
   rpc UpdateContainer(UpdateContainerRequest) returns (UpdateContainerResponse);
 
+  // PostUpdateContainer relays the corresponding container request to the plugin.
+  rpc PostUpdateContainer(PostUpdateContainerRequest) returns (PostUpdateContainerResponse);
+
   // StopContainer relays the corresponding request to the plugin. The plugin
   // can update any of the remaining containers in the runtime in response.
   rpc StopContainer(StopContainerRequest) returns (StopContainerResponse);
 
-  // UpdatePodSandbox relays the corresponding request to the plugin.
-  rpc UpdatePodSandbox(UpdatePodSandboxRequest) returns (UpdatePodSandboxResponse);
+  // RemoveContainer relays the corresponding container request to the plugin.
+  rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse);
+
 
   // StateChange relays any remaining pod or container lifecycle/state change
   // events the plugin has subscribed for. These can be used to trigger any
@@ -145,12 +175,48 @@ message ConfigureRequest {
   int64 registration_timeout = 4;
   // Configured request processing timeout in milliseconds.
   int64 request_timeout = 5;
+  // Version of NRI used by the runtime.
+  string NRI_version = 6;
 }
 
 message ConfigureResponse {
   // Events to subscribe the plugin for. Each bit set corresponds to an
   // enumerated Event.
   int32 events = 2;
+  // How the runtime handles a failure of the plugin to receive and respond
+  // to a request within a timeout period. If unset, all fields have their
+  // default value. The defaults match the behavior of NRI before this field
+  // existed.
+  FailurePolicy failure_policy = 3;
+}
+
+// FailurePolicy tells the runtime what to do when a plugin fails to receive
+// and respond to a request within a timeout period.
+// Failure types covered by the FailurePolicy include request timeout, lost
+// connection, and protocol error. Non-transport/timeout errors, such as a
+// plugin returning a rejection to the request, are not covered by the
+// FailurePolicy.
+//
+// The runtime takes two independent decisions for each failure: one about
+// the request and one about the plugin. Each field controls one decision.
+// The default of each field is the behavior of NRI before this field
+// existed. A plugin that does not set a policy is treated as before: the
+// runtime disconnects it and the request proceeds without it.
+message FailurePolicy {
+  // When fail_request is set to true, fail the request is the policy. The
+  // error names the plugin and the request, like an error returned by the
+  // plugin. The remaining plugins do not receive the request. The
+  // fail_request policy defaults to false when unset. False results in the
+  // request proceeding on to the remaining plugins, as if the plugin were
+  // not subscribed to it.
+  bool fail_request = 1;
+  // Keep the plugin registered when it exceeds the request timeout. The
+  // plugin continues receiving requests. A plugin that stays unresponsive
+  // delays each request it receives by the full timeout. Default: the
+  // runtime disconnects and unregisters the plugin. This field only applies
+  // to timeouts. A plugin that loses its connection or causes a protocol
+  // error is always disconnected.
+  bool keep_connected = 2;
 }
 
 message SynchronizeRequest {
@@ -169,6 +235,45 @@ message SynchronizeResponse {
   bool more = 2;
 }
 
+message RunPodSandboxRequest {
+  // Pod being created.
+  PodSandbox pod = 1;
+}
+
+message RunPodSandboxResponse{}
+
+message UpdatePodSandboxRequest {
+  // Pod being updated.
+  PodSandbox pod = 1;
+  // Overhead associated with this pod.
+  LinuxResources overhead_linux_resources = 2;
+  // Sum of container resources for this pod.
+  LinuxResources linux_resources = 3;
+}
+
+message UpdatePodSandboxResponse {}
+
+message PostUpdatePodSandboxRequest {
+  // Updated pod.
+  PodSandbox pod = 1;
+}
+
+message PostUpdatePodSandboxResponse {}
+
+message StopPodSandboxRequest {
+  // Pod being stopped.
+  PodSandbox pod = 1;
+}
+
+message StopPodSandboxResponse{}
+
+message RemovePodSandboxRequest {
+  // Pod being removed.
+  PodSandbox pod = 1;
+}
+
+message RemovePodSandboxResponse{}
+
 message CreateContainerRequest {
   // Pod of container being created.
   PodSandbox pod = 1;
@@ -184,6 +289,33 @@ message CreateContainerResponse {
   // Requested eviction of existing containers.
   repeated ContainerEviction evict = 3;
 }
+
+message PostCreateContainerRequest {
+  // Pod of created container.
+  PodSandbox pod = 1;
+  // Created container.
+  Container container = 2;
+}
+
+message PostCreateContainerResponse{}
+
+message StartContainerRequest {
+  // Pod of container being started.
+  PodSandbox pod = 1;
+  // Container being started.
+  Container container = 2;
+}
+
+message StartContainerResponse {}
+
+message PostStartContainerRequest {
+  // Pod of started container.
+  PodSandbox pod = 1;
+  // Started container.
+  Container container = 2;
+}
+
+message PostStartContainerResponse {}
 
 message UpdateContainerRequest {
   // Pod of container being updated.
@@ -201,6 +333,15 @@ message UpdateContainerResponse {
   repeated ContainerEviction evict = 2;
 }
 
+message PostUpdateContainerRequest {
+  // Pod of updated container.
+  PodSandbox pod = 1;
+  // Updated container.
+  Container container = 2;
+}
+
+message PostUpdateContainerResponse {}
+
 message StopContainerRequest {
   // Pod of container being stopped.
   PodSandbox pod = 1;
@@ -213,16 +354,14 @@ message StopContainerResponse {
   repeated ContainerUpdate update = 1;
 }
 
-message UpdatePodSandboxRequest {
-  // Pod being updated.
+message RemoveContainerRequest {
+  // Pod of removed container.
   PodSandbox pod = 1;
-  // Overhead associated with this pod.
-  LinuxResources overhead_linux_resources = 2;
-  // Sum of container resources for this pod.
-  LinuxResources linux_resources = 3;
+  // Removed container.
+  Container container = 2;
 }
 
-message UpdatePodSandboxResponse {}
+message RemoveContainerResponse {}
 
 message StateChangeEvent {
   // Event type of notification.
@@ -330,6 +469,20 @@ message Container {
   string status_message = 19;
   repeated CDIDevice CDI_devices = 20;
   User user = 21;
+  Image image = 22;
+}
+
+// Image identifies the container's image.
+message Image {
+  // image reference, e.g. "registry.k8s.io/pause:3.10"
+  string name = 1;
+  // image index digest or manifest digest, e.g. "sha256:..."
+  // index media types: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json
+  // manifest media types: application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json
+  string digest = 2;
+  // image config digest (platform-specific), e.g. "sha256:..."
+  // config media types: application/vnd.oci.image.config.v1+json, application/vnd.docker.container.image.v1+json
+  string config_digest = 3;
 }
 
 // Possible container states.
@@ -562,6 +715,7 @@ message LinuxContainerAdjustment {
   map<string,LinuxNetDevice> net_devices = 9;
   LinuxScheduler scheduler = 10;
   LinuxRdt rdt = 11;
+  LinuxMemoryPolicy memory_policy = 12;
 }
 
 message LinuxSeccomp {
@@ -586,6 +740,29 @@ message LinuxSeccompArg {
   uint64 value = 2;
   uint64 value_two = 3;
   string op = 4;
+}
+
+// Memory policy of a container being created.
+message LinuxMemoryPolicy {
+  MpolMode mode = 1;
+  string nodes = 2;
+  repeated MpolFlag flags = 3;
+}
+
+enum MpolMode {
+    MPOL_DEFAULT = 0;
+    MPOL_PREFERRED = 1;
+    MPOL_BIND = 2;
+    MPOL_INTERLEAVE = 3;
+    MPOL_LOCAL = 4;
+    MPOL_PREFERRED_MANY = 5;
+    MPOL_WEIGHTED_INTERLEAVE = 6;
+}
+
+enum MpolFlag {
+    MPOL_F_STATIC_NODES = 0;
+    MPOL_F_RELATIVE_NODES = 1;
+    MPOL_F_NUMA_BALANCING = 2;
 }
 
 // Requested update to an already created container.
@@ -739,4 +916,5 @@ enum Field {
     RdtClosID = 37;
     RdtSchemata = 38;
     RdtEnableMonitoring = 39;
+    MemoryPolicy = 40;
 }

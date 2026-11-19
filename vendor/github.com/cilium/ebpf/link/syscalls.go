@@ -1,3 +1,5 @@
+//go:build !windows
+
 package link
 
 import (
@@ -10,27 +12,7 @@ import (
 	"github.com/cilium/ebpf/internal/unix"
 )
 
-// Type is the kind of link.
-type Type = sys.LinkType
-
-// Valid link types.
-const (
-	UnspecifiedType   = sys.BPF_LINK_TYPE_UNSPEC
-	RawTracepointType = sys.BPF_LINK_TYPE_RAW_TRACEPOINT
-	TracingType       = sys.BPF_LINK_TYPE_TRACING
-	CgroupType        = sys.BPF_LINK_TYPE_CGROUP
-	IterType          = sys.BPF_LINK_TYPE_ITER
-	NetNsType         = sys.BPF_LINK_TYPE_NETNS
-	XDPType           = sys.BPF_LINK_TYPE_XDP
-	PerfEventType     = sys.BPF_LINK_TYPE_PERF_EVENT
-	KprobeMultiType   = sys.BPF_LINK_TYPE_KPROBE_MULTI
-	TCXType           = sys.BPF_LINK_TYPE_TCX
-	UprobeMultiType   = sys.BPF_LINK_TYPE_UPROBE_MULTI
-	NetfilterType     = sys.BPF_LINK_TYPE_NETFILTER
-	NetkitType        = sys.BPF_LINK_TYPE_NETKIT
-)
-
-var haveProgAttach = internal.NewFeatureTest("BPF_PROG_ATTACH", "4.10", func() error {
+var haveProgAttach = internal.NewFeatureTest("BPF_PROG_ATTACH", func() error {
 	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
 		Type:    ebpf.CGroupSKB,
 		License: "MIT",
@@ -48,9 +30,9 @@ var haveProgAttach = internal.NewFeatureTest("BPF_PROG_ATTACH", "4.10", func() e
 	// have the syscall.
 	prog.Close()
 	return nil
-})
+}, "4.10")
 
-var haveProgAttachReplace = internal.NewFeatureTest("BPF_PROG_ATTACH atomic replacement of MULTI progs", "5.5", func() error {
+var haveProgAttachReplace = internal.NewFeatureTest("BPF_PROG_ATTACH atomic replacement of MULTI progs", func() error {
 	if err := haveProgAttach(); err != nil {
 		return err
 	}
@@ -90,9 +72,9 @@ var haveProgAttachReplace = internal.NewFeatureTest("BPF_PROG_ATTACH atomic repl
 		return nil
 	}
 	return err
-})
+}, "5.5")
 
-var haveBPFLink = internal.NewFeatureTest("bpf_link", "5.7", func() error {
+var haveBPFLink = internal.NewFeatureTest("bpf_link", func() error {
 	attr := sys.LinkCreateAttr{
 		// This is a hopefully invalid file descriptor, which triggers EBADF.
 		TargetFd:   ^uint32(0),
@@ -107,9 +89,9 @@ var haveBPFLink = internal.NewFeatureTest("bpf_link", "5.7", func() error {
 		return nil
 	}
 	return err
-})
+}, "5.7")
 
-var haveProgQuery = internal.NewFeatureTest("BPF_PROG_QUERY", "4.15", func() error {
+var haveProgQuery = internal.NewFeatureTest("BPF_PROG_QUERY", func() error {
 	attr := sys.ProgQueryAttr{
 		// We rely on this being checked during the syscall.
 		// With an otherwise correct payload we expect EBADF here
@@ -127,9 +109,9 @@ var haveProgQuery = internal.NewFeatureTest("BPF_PROG_QUERY", "4.15", func() err
 		return ErrNotSupported
 	}
 	return errors.New("syscall succeeded unexpectedly")
-})
+}, "4.15")
 
-var haveTCX = internal.NewFeatureTest("tcx", "6.6", func() error {
+var haveTCX = internal.NewFeatureTest("tcx", func() error {
 	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
 		Type:    ebpf.SchedCLS,
 		License: "MIT",
@@ -162,9 +144,9 @@ var haveTCX = internal.NewFeatureTest("tcx", "6.6", func() error {
 		return ErrNotSupported
 	}
 	return errors.New("syscall succeeded unexpectedly")
-})
+}, "6.6")
 
-var haveNetkit = internal.NewFeatureTest("netkit", "6.7", func() error {
+var haveNetkit = internal.NewFeatureTest("netkit", func() error {
 	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
 		Type:    ebpf.SchedCLS,
 		License: "MIT",
@@ -197,4 +179,4 @@ var haveNetkit = internal.NewFeatureTest("netkit", "6.7", func() error {
 		return ErrNotSupported
 	}
 	return errors.New("syscall succeeded unexpectedly")
-})
+}, "6.7")

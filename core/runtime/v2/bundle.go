@@ -18,16 +18,21 @@ package v2
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // LoadBundle loads an existing bundle from disk
@@ -72,6 +77,9 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		return nil, err
 	}
 	if err := os.Mkdir(b.Path, 0700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, fmt.Errorf("bundle for %s: %w", id, errdefs.ErrAlreadyExists)
+		}
 		return nil, err
 	}
 	if typeurl.Is(spec, &specs.Spec{}) {
@@ -99,16 +107,31 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 		}
 	}
 	paths = append(paths, work)
-	// symlink workdir
-	if err := os.Symlink(work, filepath.Join(b.Path, "work")); err != nil {
+	// create work link (symlink on unix, junction on windows)
+	if err := createWorkLink(work, b.Path); err != nil {
 		return nil, err
 	}
-	if spec := spec.GetValue(); spec != nil {
-		// write the spec to the bundle
-		specPath := filepath.Join(b.Path, oci.ConfigFilename)
-		err = os.WriteFile(specPath, spec, 0666)
-		if err != nil {
-			return nil, fmt.Errorf("failed to write bundle spec: %w", err)
+	// Spec may be nil for some sandboxers that do not initialize the spec, for
+	// example the shim sandboxer with a hostNetwork container.
+	if spec != nil {
+		if specVal := spec.GetValue(); specVal != nil {
+			logger := log.G(ctx)
+			if logger.Logger.IsLevelEnabled(log.TraceLevel) && typeurl.Is(spec, &specs.Spec{}) {
+				var s specs.Spec
+				if err := json.Unmarshal(specVal, &s); err == nil && s.Linux != nil {
+					logger.WithFields(log.Fields{
+						"bundle":        b.Path,
+						"maskedPaths":   s.Linux.MaskedPaths,
+						"readonlyPaths": s.Linux.ReadonlyPaths,
+					}).Trace("configured bundle paths")
+				}
+			}
+			// write the spec to the bundle
+			specPath := filepath.Join(b.Path, oci.ConfigFilename)
+			err = os.WriteFile(specPath, specVal, 0666)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write bundle spec: %w", err)
+			}
 		}
 	}
 	return b, nil
@@ -126,7 +149,7 @@ type Bundle struct {
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
-	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
+	work, werr := resolveWorkLink(b.Path)
 	rootfs := filepath.Join(b.Path, "rootfs")
 	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
 		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
@@ -155,7 +178,7 @@ func (b *Bundle) Delete() error {
 // atomicDelete renames the path to a hidden file before removal
 func atomicDelete(path string) error {
 	// create a hidden dir for an atomic removal
-	atomicPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	atomicPath := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
 	if err := os.Rename(path, atomicPath); err != nil {
 		if os.IsNotExist(err) {
 			return nil

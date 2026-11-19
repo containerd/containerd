@@ -38,7 +38,7 @@ func init() {
 	})
 }
 
-func initFunc(ic *plugin.InitContext) (interface{}, error) {
+func initFunc(ic *plugin.InitContext) (any, error) {
 	return &service{}, nil
 }
 

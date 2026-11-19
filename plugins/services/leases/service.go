@@ -40,7 +40,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.LeasePlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetByID(plugins.LeasePlugin, "manager")
 			if err != nil {
 				return nil, err

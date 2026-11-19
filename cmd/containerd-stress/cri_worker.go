@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
+	"github.com/containerd/containerd/v2/integration/remote"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -34,7 +34,7 @@ type criWorker struct {
 	wg       *sync.WaitGroup
 	count    int
 	failures int
-	client   internalapi.RuntimeService
+	client   *remote.RuntimeService
 
 	commit         string
 	runtimeHandler string
@@ -142,7 +142,7 @@ func (w *criWorker) getID() string {
 }
 
 // cleanup cleans up any containers in the "stress" namespace before the test run
-func criCleanup(ctx context.Context, client internalapi.RuntimeService) error {
+func criCleanup(ctx context.Context, client *remote.RuntimeService) error {
 	filter := &runtime.PodSandboxFilter{
 		LabelSelector: map[string]string{podNamespaceLabel: stressNs},
 	}

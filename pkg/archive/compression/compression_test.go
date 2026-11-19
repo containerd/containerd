@@ -18,7 +18,6 @@ package compression
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"io"
@@ -28,6 +27,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	kgzip "github.com/klauspost/compress/gzip"
 )
 
 func TestMain(m *testing.M) {
@@ -107,7 +108,7 @@ func TestCompressDecompressGzip(t *testing.T) {
 
 	decompressor := testCompressDecompress(t, 1024*1024, Gzip)
 	wrapper := decompressor.(*readCloserWrapper)
-	_, ok := wrapper.Reader.(*gzip.Reader)
+	_, ok := wrapper.Reader.(*kgzip.Reader)
 	if !ok {
 		t.Fatalf("unexpected compressor type: %T", wrapper.Reader)
 	}

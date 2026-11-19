@@ -20,19 +20,21 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/stretchr/testify/assert"
+
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func TestCRIGRPCServerConfigMigration(t *testing.T) {
 	pluginName := string(plugins.GRPCPlugin) + ".cri"
 
-	src := map[string]interface{}{
+	src := map[string]any{
 		// these should be removed in the new cri grpc config
-		"registry": map[string]interface{}{
+		"registry": map[string]any{
 			"config_path": "/etc/containerd/certs.d",
 		},
-		"containerd": map[string]interface{}{
+		"containerd": map[string]any{
 			"default_runtime_name": "runc",
 		},
 
@@ -42,17 +44,17 @@ func TestCRIGRPCServerConfigMigration(t *testing.T) {
 		"stream_server_port":    "10000",
 		"stream_idle_timeout":   "3h0m0s",
 		"enable_tls_streaming":  true,
-		"x509_key_pair_streaming": map[string]interface{}{
+		"x509_key_pair_streaming": map[string]any{
 			"cert_file": "/etc/containerd/certs.d/server.crt",
 			"key_file":  "/etc/containerd/certs.d/server.key",
 		},
 	}
-	pluginConfigs := map[string]interface{}{
+	pluginConfigs := map[string]any{
 		pluginName: src,
 	}
 	configMigration(context.Background(), 2, pluginConfigs)
 
-	dst, ok := pluginConfigs[pluginName].(map[string]interface{})
+	dst, ok := pluginConfigs[pluginName].(map[string]any)
 	assert.True(t, ok)
 	assert.NotNil(t, dst)
 
@@ -65,4 +67,16 @@ func TestCRIGRPCServerConfigMigration(t *testing.T) {
 	for k, v := range src {
 		assert.Equal(t, v, dst[k])
 	}
+}
+
+func TestValidateRuntimePlatforms(t *testing.T) {
+	runtimes := map[string]criconfig.Runtime{"existing-runtime": {}}
+
+	assert.NoError(t, validateRuntimePlatforms(runtimes, nil))
+	assert.NoError(t, validateRuntimePlatforms(runtimes, map[string]criconfig.ImagePlatform{
+		"existing-runtime": {},
+	}))
+	assert.ErrorContains(t, validateRuntimePlatforms(runtimes, map[string]criconfig.ImagePlatform{
+		"runtime-not-exists": {},
+	}), `runtime_platforms "runtime-not-exists" is not a configured runtime handler`)
 }

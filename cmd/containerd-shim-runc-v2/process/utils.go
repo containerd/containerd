@@ -29,8 +29,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/console"
+	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -135,7 +138,7 @@ func newPidFile(bundle string) *pidFile {
 
 func newExecPidFile(bundle, id string) *pidFile {
 	return &pidFile{
-		path: filepath.Join(bundle, fmt.Sprintf("%s.pid", id)),
+		path: filepath.Join(bundle, id+".pid"),
 	}
 }
 
@@ -149,6 +152,32 @@ func (p *pidFile) Path() string {
 
 func (p *pidFile) Read() (int, error) {
 	return runc.ReadPidFile(p.path)
+}
+
+// shutdownAndDrain shuts a terminal console down, so a copier parked on it
+// wakes, then waits for the process I/O to drain. A process deleted from the
+// created state never ran setExited, so this is its only shutdown.
+func shutdownAndDrain(ctx context.Context, platform stdio.Platform, cons console.Console, wg *sync.WaitGroup, what string) {
+	if cons != nil {
+		platform.ShutdownConsole(ctx, cons)
+	}
+	if err := waitTimeout(ctx, wg, 10*time.Second); err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to drain %s io", what)
+	}
+}
+
+// closeIO releases a process's I/O however it was wired. A terminal process
+// has no processIO, but its stdin writer and console are still ours to close.
+func closeIO(closers []io.Closer, cons console.Console, pio *processIO) {
+	for _, c := range closers {
+		c.Close()
+	}
+	if cons != nil {
+		cons.Close()
+	}
+	if pio != nil {
+		pio.Close()
+	}
 }
 
 // waitTimeout handles waiting on a waitgroup with a specified timeout.
@@ -169,7 +198,7 @@ func waitTimeout(ctx context.Context, wg *sync.WaitGroup, timeout time.Duration)
 	}
 }
 
-func stateName(v interface{}) string {
+func stateName(v any) string {
 	switch v.(type) {
 	case *runningState, *execRunningState:
 		return "running"

@@ -50,7 +50,9 @@ func (c *criService) initPlatform() (err error) {
 			log.L.Warn("Selinux is not supported")
 		}
 		if r := c.config.SelinuxCategoryRange; r > 0 {
-			selinux.CategoryRange = uint32(r)
+			if err := selinux.SetCategoryRange(uint32(r)); err != nil {
+				return fmt.Errorf("SelinuxCategoryRange: %w", err)
+			}
 		}
 	} else {
 		selinux.SetDisabled()
@@ -101,11 +103,9 @@ func (c *criService) initPlatform() (err error) {
 		}
 	}
 
-	if c.config.EnableCDI == nil || *c.config.EnableCDI {
-		err := cdi.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
-		if err != nil {
-			return fmt.Errorf("failed to configure CDI registry")
-		}
+	err = cdi.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
+	if err != nil {
+		return fmt.Errorf("failed to configure CDI registry: %w", err)
 	}
 
 	return nil

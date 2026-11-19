@@ -1,12 +1,14 @@
 version: "2"
 linters:
   enable:
-    - copyloopvar # Checks for loop variable copies in Go 1.22+
-    - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
-    - dupword # Checks for duplicate words in the source code
+    - copyloopvar  # Checks for loop variable copies in Go 1.22+
+    - depguard     # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
+    - dupword      # Checks for duplicate words in the source code
     - gosec
     - misspell
+    - modernize    # Suggests modernizations to Go code; see https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/modernize
     - nolintlint
+    - perfsprint   # Checks that fmt.Sprintf can be replaced with a faster alternative.
     - revive
     - unconvert
     - usetesting
@@ -40,6 +42,15 @@ linters:
         - G301
         - G302
         - G304
+        - G703
+        - G122
+    modernize:
+      disable:
+        # see https://github.com/containerd/containerd/pull/14268#discussion_r4147027776
+        - embedlit
+        # TODO(thaJeztah): enable testingcontext once github.com/AdamKorcz/go-118-fuzz-build is updated.
+        # see https://github.com/containerd/containerd/pull/13022#discussion_r2937038804
+        - testingcontext
     staticcheck:
       checks:
         - all
@@ -58,6 +69,31 @@ linters:
   exclusions:
     generated: lax
     rules:
+      # Staticcheck analyzes one GOOS at a time. On unsupported platforms,
+      # these shared callers resolve to stubs that always return errors, so
+      # SA4023 reports their valid cross-platform error checks as constant.
+      # Keep the exclusions scoped to those callers because CI also analyzes
+      # the supported implementations, which can return nil.
+      - path: contrib[\\/]checkpoint[\\/]checkcriu\.go
+        text: SA4023
+        linters:
+          - staticcheck
+      - path: core[\\/]mount[\\/](manager[\\/]manager|mount|mount_unix)\.go
+        text: SA4023
+        linters:
+          - staticcheck
+      - path: internal[\\/]cri[\\/]server[\\/]sandbox_stats\.go
+        text: SA4023
+        linters:
+          - staticcheck
+      - path: plugins[\\/]content[\\/]local[\\/](store|writer)\.go
+        text: SA4023
+        linters:
+          - staticcheck
+      - path: plugins[\\/](diff|snapshots)[\\/]erofs[\\/](differ|erofs)\.go
+        text: SA4023
+        linters:
+          - staticcheck
       # Metric descriptors are currently only used for linux
       - path: cri[\\/]server[\\/]list_metric_descriptors.go
         linters:

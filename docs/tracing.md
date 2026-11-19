@@ -9,14 +9,12 @@ containerd daemon can send traces to collection endpoints by configuring
 [OpenTelemetry exporter environment variables](https://opentelemetry.io/docs/specs/otel/protocol/exporter/)
 within the daemon's process space.
 
-The following options are supported.
+The following environment variables are supported.
 
-- `endpoint`: The address of a server that receives [OpenTelemetry Protocol](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.8.0/specification/protocol/otlp.md).
-- `protocol`: OpenTelemetry supports multiple protocols.
+- `OTEL_EXPORTER_OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`): The address of a server that receives [OpenTelemetry Protocol](https://github.com/open-telemetry/opentelemetry-specification/blob/v1.8.0/specification/protocol/otlp.md).
+- `OTEL_EXPORTER_OTLP_PROTOCOL` (or `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`): OpenTelemetry supports multiple protocols.
   The default value is "http/protobuf". "grpc" is also supported.
-- `insecure`: Disable transport security when the protocol is "grpc". The default is false.
-  "http/protobuf" always uses the schema provided by the endpoint and
-  the value of this setting being ignored.
+- `OTEL_EXPORTER_OTLP_INSECURE` (or `OTEL_EXPORTER_OTLP_TRACES_INSECURE`): Disable transport security when connecting to the collector. The default is false.
 
 The sampling ratio and the service name on the traces can be configured by setting
 [OpenTelemetry environment variables](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
@@ -41,6 +39,28 @@ export OTEL_SERVICE_NAME="containerd"
 export OTEL_TRACES_SAMPLER="traceidratio"
 export OTEL_TRACES_SAMPLER_ARG=1.0
 ```
+
+## Sending traces from the runc shim
+
+Build `containerd-shim-runc-v2` with the `shim_tracing` build tag to enable
+shim tracing. The shim inherits the daemon's OpenTelemetry exporter settings,
+but uses the stable service name `containerd-shim-runc-v2`.
+
+Each newly launched shim sets these resource attributes:
+
+- `service.instance.id`: the ID passed to the shim at startup.
+- `service.version`: the shim's build version.
+
+These attributes override matching keys inherited through
+`OTEL_RESOURCE_ATTRIBUTES`; other inherited attributes are preserved.
+A shared shim retains its identity while serving multiple containers, so
+`service.instance.id` does not identify the target container of every operation.
+The startup ID is not guaranteed to be unique across hosts or containerd
+namespaces; include that context when correlating shim instances.
+
+Previously, shim service names included the startup ID (`containerd-shim-<id>`).
+Update queries using those names to select `service.name=containerd-shim-runc-v2` and
+filter by `service.instance.id` as needed.
 
 ## Sending traces from containerd client
 
@@ -81,7 +101,7 @@ func clientWithTrace() error {
         grpc.WithTransportCredentials(insecure.NewCredentials()),
         grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
     }
-    client, ctx, cancel, err := commands.NewClient(context, containerd.WithDialOpts(dialOpts))
+    client, ctx, cancel, err := commands.NewClient(ctx, cmd, containerd.WithDialOpts(dialOpts))
     if err != nil {
         return err
     }

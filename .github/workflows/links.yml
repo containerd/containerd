@@ -18,13 +18,16 @@ jobs:
     name: lychee
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: lycheeverse/lychee-action@a8c4c7cb88f0c7386610c35eb25108e448569cb0 # v2.7.0
         with:
           # Fail action on broken links
           fail: true
-          args: --exclude-path vendor --exclude-path releases --timeout 30 --no-progress './**/*.md'
+          # Exclude core/runtime/v2/README.md symlink, already checked in docs/runtime-v2.md
+          args: --exclude-path vendor --exclude-path releases --exclude-path core/runtime/v2/README.md --timeout 30 --no-progress './**/*.md'
           format: markdown
           # Write GitHub job summary
           jobSummary: true

@@ -19,6 +19,7 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"sync"
 	"testing"
@@ -69,7 +70,7 @@ func TestSnapshotterWithRef(t *testing.T) {
 	key1 := "test1"
 	test1opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: key1,
+			snapshots.LabelSnapshotRef: key1,
 		},
 	)
 
@@ -112,7 +113,7 @@ func TestSnapshotterWithRef(t *testing.T) {
 	key2 := "test2"
 	test2opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: key2,
+			snapshots.LabelSnapshotRef: key2,
 		},
 	)
 
@@ -291,9 +292,7 @@ func (s *tmpSnapshotter) Update(ctx context.Context, info snapshots.Info, fieldp
 		return snapshots.Info{}, errdefs.ErrNotFound
 	}
 
-	for k, v := range info.Labels {
-		i.Labels[k] = v
-	}
+	maps.Copy(i.Labels, info.Labels)
 
 	s.snapshots[i.Name] = i
 
@@ -341,7 +340,7 @@ func (s *tmpSnapshotter) create(ctx context.Context, key, parent string, kind sn
 	base.Name = key
 	base.Kind = kind
 
-	target := base.Labels[labelSnapshotRef]
+	target := base.Labels[snapshots.LabelSnapshotRef]
 	if target != "" {
 		for _, name := range s.targets[target] {
 			if s.snapshots[name].Parent == parent {
@@ -400,7 +399,7 @@ func (s *tmpSnapshotter) Commit(ctx context.Context, name, key string, opts ...s
 	s.snapshots[name] = base
 	delete(s.snapshots, key)
 
-	if target := base.Labels[labelSnapshotRef]; target != "" {
+	if target := base.Labels[snapshots.LabelSnapshotRef]; target != "" {
 		s.targets[target] = append(s.targets[target], name)
 	}
 

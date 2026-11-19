@@ -14,6 +14,7 @@ import (
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/Microsoft/hcsshim/internal/winapi"
+	winapitypes "github.com/Microsoft/hcsshim/internal/winapi/types"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
@@ -25,11 +26,11 @@ type CimFsWriter struct {
 	// name of this cim. Usually a <name>.cim file will be created to represent this cim.
 	name string
 	// handle is the CIMFS_IMAGE_HANDLE that must be passed when calling CIMFS APIs.
-	handle winapi.FsHandle
+	handle winapitypes.FsHandle
 	// name of the active file i.e the file to which we are currently writing.
 	activeName string
 	// stream to currently active file.
-	activeStream winapi.StreamHandle
+	activeStream winapitypes.StreamHandle
 	// amount of bytes that can be written to the activeStream.
 	activeLeft uint64
 	// if true the CIM will be sealed after the writer is closed.
@@ -58,7 +59,7 @@ func Create(imagePath string, oldFSName string, newFSName string) (_ *CimFsWrite
 			return nil, err
 		}
 	}
-	var handle winapi.FsHandle
+	var handle winapitypes.FsHandle
 	if err := winapi.CimCreateImage(imagePath, oldNameBytes, newNameBytes, &handle); err != nil {
 		return nil, fmt.Errorf("failed to create cim image at path %s, oldName: %s, newName: %s: %w", imagePath, oldFSName, newFSName, err)
 	}
@@ -117,11 +118,11 @@ func CreateBlockCIMWithOptions(ctx context.Context, bCIM *BlockCIM, options ...B
 	}
 
 	// Check OS support
-	if !IsBlockCimSupported() {
+	if !IsBlockCimWriteSupported() {
 		return nil, fmt.Errorf("block CIM not supported on this OS version")
 	}
 
-	if config.dataIntegrity && !IsVerifiedCimSupported() {
+	if config.dataIntegrity && !IsVerifiedCimWriteSupported() {
 		return nil, fmt.Errorf("verified CIMs are not supported on this OS version")
 	}
 
@@ -143,13 +144,15 @@ func CreateBlockCIMWithOptions(ctx context.Context, bCIM *BlockCIM, options ...B
 		return nil, fmt.Errorf("invalid block CIM type `%d`: %w", bCIM.Type, os.ErrInvalid)
 	}
 
+	winapi.LogCimDLLSupport()
+
 	var newNameUTF16 *uint16
 	newNameUTF16, err = windows.UTF16PtrFromString(bCIM.CimName)
 	if err != nil {
 		return nil, err
 	}
 
-	var handle winapi.FsHandle
+	var handle winapitypes.FsHandle
 	if err := winapi.CimCreateImage2(bCIM.BlockPath, createFlags, nil, newNameUTF16, &handle); err != nil {
 		return nil, fmt.Errorf("failed to create block CIM at path %s,%s: %w", bCIM.BlockPath, bCIM.CimName, err)
 	}
@@ -216,7 +219,7 @@ func (c *CimFsWriter) AddFile(path string, info *winio.FileBasicInfo, fileSize i
 	if err != nil {
 		return err
 	}
-	fileMetadata := &winapi.CimFsFileMetadata{
+	fileMetadata := &winapitypes.CimFsFileMetadata{
 		Attributes:     info.FileAttributes,
 		FileSize:       fileSize,
 		CreationTime:   info.CreationTime,
@@ -346,7 +349,7 @@ func (c *CimFsWriter) Close() (err error) {
 	}
 	if c.sealOnClose {
 		if err = sealBlockCIM(filepath.Dir(c.name)); err != nil {
-			return &OpError{Cim: c.name, Op: "seal", Err: err}
+			return &OpError{Cim: filepath.Dir(c.name), Op: "seal", Err: err}
 		}
 	}
 	return nil
@@ -433,7 +436,7 @@ func GetCimUsage(ctx context.Context, cimPath string) (uint64, error) {
 // files with the same path at all other CIMs) When mounting this merged CIM the source
 // CIMs MUST be provided in the exact same order.
 func MergeBlockCIMsWithOpts(ctx context.Context, mergedCIM *BlockCIM, sourceCIMs []*BlockCIM, opts ...BlockCIMOpt) (err error) {
-	if !IsMergedCimSupported() {
+	if !IsMergedCimWriteSupported() {
 		return fmt.Errorf("merged CIMs aren't supported on this OS version")
 	} else if len(sourceCIMs) < 2 {
 		return fmt.Errorf("need at least 2 source CIMs, got %d: %w", len(sourceCIMs), os.ErrInvalid)
@@ -506,6 +509,10 @@ func MergeBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM) (err error) {
 func sealBlockCIM(blockPath string) error {
 	var hashSize, fixedHeaderSize uint64
 	hashBuf := make([]byte, cimHashSize)
+
+	// the blockPath could be a path to a block device or a file. In either case there should be no trailing backslash.
+	blockPath = strings.TrimSuffix(blockPath, "\\")
+
 	if err := winapi.CimSealImage(blockPath, &hashSize, &fixedHeaderSize, &hashBuf[0]); err != nil {
 		return fmt.Errorf("failed to seal block CIM: %w", err)
 	} else if hashSize != cimHashSize {

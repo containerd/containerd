@@ -83,6 +83,40 @@ func TestDrainExecSyncIO(t *testing.T) {
 		assert.Error(t, drainExecSyncIO(ctx, ep, 3*time.Second, attachDoneCh))
 		assert.Equal(t, []string{"Delete"}, ep.actionEvents)
 	})
+
+	t.Run("CanceledNoTimeout", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+		cancel()
+
+		ep := &fakeExecProcess{
+			id:  t.Name(),
+			pid: uint32(os.Getpid()),
+		}
+
+		attachDoneCh := make(chan struct{})
+		assert.ErrorIs(t, drainExecSyncIO(ctx, ep, 0, attachDoneCh), context.Canceled)
+		assert.Equal(t, []string{"Delete"}, ep.actionEvents)
+	})
+
+	t.Run("CancelWhileDraining", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(ctx)
+
+		ep := &fakeExecProcess{
+			id:  t.Name(),
+			pid: uint32(os.Getpid()),
+		}
+
+		attachDoneCh := make(chan struct{})
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- drainExecSyncIO(ctx, ep, 0, attachDoneCh)
+		}()
+
+		time.AfterFunc(100*time.Millisecond, cancel)
+
+		assert.ErrorIs(t, <-errCh, context.Canceled)
+		assert.Equal(t, []string{"Delete"}, ep.actionEvents)
+	})
 }
 
 type fakeExecProcess struct {

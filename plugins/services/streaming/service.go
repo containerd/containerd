@@ -36,7 +36,7 @@ import (
 var emptyResponse typeurl.Any
 
 func init() {
-	// save marshalled empty response to avoid marshaling everytime
+	// save marshalled empty response to avoid marshaling every time
 	var err error
 	emptyResponse, err = typeurl.MarshalAny(&ptypes.Empty{})
 	if err != nil {
@@ -49,7 +49,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.StreamingPlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetByID(plugins.StreamingPlugin, "manager")
 			if err != nil {
 				return nil, err

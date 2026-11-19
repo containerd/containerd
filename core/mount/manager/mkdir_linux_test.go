@@ -77,14 +77,14 @@ func TestMkdirHandler(t *testing.T) {
 		t.Fatalf("expected directory")
 	}
 	if fi.Mode().Perm() != testmode {
-		t.Fatalf("expected mode 0775 got %o", fi.Mode().Perm())
+		t.Fatalf("expected mode %04o got %04o", testmode, fi.Mode().Perm())
 	}
 	sys := fi.Sys().(*syscall.Stat_t)
 	if int(sys.Uid) != luid {
-		t.Fatalf("expected uid 1000 got %d", sys.Uid)
+		t.Fatalf("expected uid %d got %d", luid, sys.Uid)
 	}
 	if int(sys.Gid) != lgid {
-		t.Fatalf("expected gid 1000 got %d", sys.Gid)
+		t.Fatalf("expected gid %d got %d", lgid, sys.Gid)
 	}
 
 	m.Options = append(m.Options, fmt.Sprintf("X-containerd.mkdir.path=%s", filepath.Join(td, "notinroot")))

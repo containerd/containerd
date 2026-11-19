@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	createMode = os.FileMode(0600)
+	userReadWrite = os.FileMode(0600)
 )
 
 // Algorithm indicates an asymmetric algorithm used by the credential.
@@ -66,6 +66,23 @@ type GenerateOpts struct {
 	Algorithm Algorithm
 	// Size is used to specify the bit size of the RSA key or curve for EC keys.
 	Size int
+}
+
+// ValidateGenerateOpts ensures that the provided GenerateOpts are valid.
+func ValidateGenerateOpts(opts GenerateOpts) error {
+	switch opts.Algorithm {
+	case RSA:
+		if opts.Size < 2048 {
+			return fmt.Errorf("RSA key size must be at least 2048 bits, got %d", opts.Size)
+		}
+	case EC:
+		if _, ok := ecdsaCurves[opts.Size]; !ok {
+			return fmt.Errorf("invalid EC curve size: %d", opts.Size)
+		}
+	default:
+		return fmt.Errorf("unsupported algorithm: %q", opts.Algorithm)
+	}
+	return nil
 }
 
 // CertStorage exposes the different backend storage options for certificates.
@@ -191,6 +208,9 @@ var ecdsaCurves = map[int]elliptic.Curve{
 
 // Generate creates a new ECDSA or RSA private key and returns a signer that can be used to make a CSR for the key.
 func (f *FileStorage) Generate(opts GenerateOpts) (crypto.Signer, error) {
+	if err := ValidateGenerateOpts(opts); err != nil {
+		return nil, err
+	}
 	var err error
 	switch opts.Algorithm {
 	case RSA:
@@ -212,7 +232,7 @@ func (f *FileStorage) Generate(opts GenerateOpts) (crypto.Signer, error) {
 // Store finishes our cert installation by PEM encoding the cert, intermediate, and key and storing them to disk.
 func (f *FileStorage) Store(cert *x509.Certificate, intermediate *x509.Certificate) error {
 	// Make sure our directory exists
-	if err := os.MkdirAll(filepath.Dir(f.certFile), createMode|0111); err != nil {
+	if err := os.MkdirAll(filepath.Dir(f.certFile), userReadWrite|0111); err != nil {
 		return err
 	}
 
@@ -226,10 +246,10 @@ func (f *FileStorage) Store(cert *x509.Certificate, intermediate *x509.Certifica
 	}
 
 	// Write the certificates out to files
-	if err := ioutil.WriteFile(f.certFile, certBuf.Bytes(), createMode); err != nil {
+	if err := ioutil.WriteFile(f.certFile, certBuf.Bytes(), userReadWrite); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(f.caCertFile, intermediateBuf.Bytes(), createMode); err != nil {
+	if err := ioutil.WriteFile(f.caCertFile, intermediateBuf.Bytes(), userReadWrite); err != nil {
 		return err
 	}
 
@@ -246,7 +266,7 @@ func (f *FileStorage) Store(cert *x509.Certificate, intermediate *x509.Certifica
 		return fmt.Errorf("could not encode key to PEM: %v", err)
 	}
 
-	return ioutil.WriteFile(f.keyFile, keyBuf.Bytes(), createMode)
+	return ioutil.WriteFile(f.keyFile, keyBuf.Bytes(), userReadWrite)
 }
 
 // Sign returns a signature for the provided digest.

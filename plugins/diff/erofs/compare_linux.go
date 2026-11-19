@@ -148,9 +148,8 @@ func (s erofsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts
 		}
 		config.Labels[labels.LabelUncompressed] = dgstr.Digest().String()
 	} else {
-		err := writeDiff(ctx, cw, lower, upperRoot)
-		if err != nil {
-			return emptyDesc, fmt.Errorf("failed to create diff tar stream: %w", err)
+		if errOpen = writeDiff(ctx, cw, lower, upperRoot); errOpen != nil {
+			return emptyDesc, fmt.Errorf("failed to create diff tar stream: %w", errOpen)
 		}
 	}
 

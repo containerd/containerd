@@ -39,7 +39,7 @@ func init() {
 		Config: &Config{
 			Path: defaultPath,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			path := ic.Config.(*Config).Path
 			ic.Meta.Exports["path"] = path
 			bin := filepath.Join(path, "bin")

@@ -36,6 +36,8 @@ fi
 CONTAINERD_CONFIG_FILE=${CONTAINERD_CONFIG_FILE:-""}
 # The runtime to use (ignored when CONTAINERD_CONFIG_FILE is set)
 CONTAINERD_RUNTIME=${CONTAINERD_RUNTIME:-""}
+# The shim binary to run it with, instead of the one its type is looked up as
+CONTAINERD_RUNTIME_PATH=${CONTAINERD_RUNTIME_PATH:-""}
 if [ -z "${CONTAINERD_CONFIG_FILE}" ]; then
   config_file="${CONTAINERD_CONFIG_DIR}/containerd-config-cri.toml"
   truncate --size 0 "${config_file}"
@@ -77,6 +79,7 @@ EOF
     cat >>${config_file} <<EOF
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
 runtime_type = "${CONTAINERD_RUNTIME}"
+runtime_path = "${CONTAINERD_RUNTIME_PATH}"
 EOF
   fi
   if [ $IS_WINDOWS -eq 0 ]; then
@@ -163,7 +166,7 @@ fi
 # To allow the cri-integration test to run via CLI without explicitly setting CGROUP_DRIVER
 if [ $IS_WINDOWS -eq 0 ] && [ ! -v CGROUP_DRIVER ]; then
   echo "CGROUP_DRIVER is unset"
-elif [ "$CGROUP_DRIVER" = "systemd" ]; then
+elif [ "${CGROUP_DRIVER:-}" = "systemd" ]; then
   cat >> ${CONTAINERD_CONFIG_FILE} << EOF
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
    SystemdCgroup = true

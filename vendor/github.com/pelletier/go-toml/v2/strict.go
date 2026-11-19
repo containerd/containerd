@@ -1,7 +1,6 @@
 package toml
 
 import (
-	"github.com/pelletier/go-toml/v2/internal/danger"
 	"github.com/pelletier/go-toml/v2/internal/tracker"
 	"github.com/pelletier/go-toml/v2/unstable"
 )
@@ -12,66 +11,63 @@ type strict struct {
 	// Tracks the current key being processed.
 	key tracker.KeyTracker
 
-	missing []unstable.ParserError
+	missing []decodeError
 }
 
+// decodeError is the information needed to materialize a DecodeError once the
+// whole document is available.
+type decodeError struct {
+	highlight unstable.Range
+	key       Key
+	message   string
+}
+
+// Reset clears the state of the tracker so it can be reused for another
+// document.
+func (s *strict) Reset() {
+	s.key = tracker.KeyTracker{}
+	s.missing = s.missing[:0]
+}
+
+// EnterTable is called when a new table or array table expression starts
+// being processed.
 func (s *strict) EnterTable(node *unstable.Node) {
 	if !s.Enabled {
 		return
 	}
-
 	s.key.UpdateTable(node)
 }
 
-func (s *strict) EnterArrayTable(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
-	s.key.UpdateArrayTable(node)
-}
-
-func (s *strict) EnterKeyValue(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
-	s.key.Push(node)
-}
-
-func (s *strict) ExitKeyValue(node *unstable.Node) {
-	if !s.Enabled {
-		return
-	}
-
-	s.key.Pop(node)
-}
-
+// MissingTable is called when a table is present in the document but has no
+// corresponding field in the target.
 func (s *strict) MissingTable(node *unstable.Node) {
 	if !s.Enabled {
 		return
 	}
-
-	s.missing = append(s.missing, unstable.ParserError{
-		Highlight: keyLocation(node),
-		Message:   "missing table",
-		Key:       s.key.Key(),
+	s.missing = append(s.missing, decodeError{
+		highlight: keyLocation(node),
+		key:       s.key.Key(),
+		message:   "missing table",
 	})
 }
 
+// MissingField is called when a key-value is present in the document but has
+// no corresponding field in the target.
 func (s *strict) MissingField(node *unstable.Node) {
 	if !s.Enabled {
 		return
 	}
-
-	s.missing = append(s.missing, unstable.ParserError{
-		Highlight: keyLocation(node),
-		Message:   "missing field",
-		Key:       s.key.Key(),
+	s.key.Push(node)
+	s.missing = append(s.missing, decodeError{
+		highlight: keyLocation(node),
+		key:       s.key.Key(),
+		message:   "unknown field",
 	})
+	s.key.Pop(node)
 }
 
-func (s *strict) Error(doc []byte) error {
+// Error returns the cumulated StrictMissingError for the document, or nil.
+func (s *strict) Error(document []byte) error {
 	if !s.Enabled || len(s.missing) == 0 {
 		return nil
 	}
@@ -81,14 +77,16 @@ func (s *strict) Error(doc []byte) error {
 	}
 
 	for _, derr := range s.missing {
-		derr := derr
-		err.Errors = append(err.Errors, *wrapDecodeError(doc, &derr))
+		highlight := document[derr.highlight.Offset : derr.highlight.Offset+derr.highlight.Length]
+		err.Errors = append(err.Errors, *newDecodeError(document, highlight, derr.key, derr.message))
 	}
 
 	return err
 }
 
-func keyLocation(node *unstable.Node) []byte {
+// keyLocation returns the range of the document covering all the parts of
+// the key of the given node.
+func keyLocation(node *unstable.Node) unstable.Range {
 	k := node.Key()
 
 	hasOne := k.Next()
@@ -96,12 +94,15 @@ func keyLocation(node *unstable.Node) []byte {
 		panic("should not be called with empty key")
 	}
 
-	start := k.Node().Data
-	end := k.Node().Data
+	start := k.Node().Raw
+	end := start
 
 	for k.Next() {
-		end = k.Node().Data
+		end = k.Node().Raw
 	}
 
-	return danger.BytesRange(start, end)
+	return unstable.Range{
+		Offset: start.Offset,
+		Length: end.Offset + end.Length - start.Offset,
+	}
 }

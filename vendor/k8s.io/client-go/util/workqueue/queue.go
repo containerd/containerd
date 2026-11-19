@@ -37,6 +37,21 @@ type TypedInterface[T comparable] interface {
 	ShuttingDown() bool
 }
 
+// Pausable is an optional interface for workqueues that can pause and resume
+// item retrieval. A TypedInterface[T] implementation opts in by
+// implementing it. Callers discover support with a type assertion.
+//
+// Implementations are expected to block Get while paused and let it return again once
+// Resume is called, or with the shutdown flag set once the queue is shut down, in
+// which case the items still queued are not handed out. Add, Done and Forget
+// keep working while paused.
+type Pausable interface {
+	// Pause blocks Get from returning items until Resume or ShutDown is called.
+	Pause()
+	// Resume unblocks Get so queued items can be retrieved again.
+	Resume()
+}
+
 // Queue is the underlying storage for items. The functions below are always
 // called from the same goroutine.
 type Queue[T comparable] interface {
@@ -80,6 +95,7 @@ func (q *queue[T]) Pop() (item T) {
 }
 
 // QueueConfig specifies optional configurations to customize an Interface.
+//
 // Deprecated: use TypedQueueConfig instead.
 type QueueConfig = TypedQueueConfig[any]
 
@@ -129,6 +145,7 @@ func NewTypedWithConfig[T comparable](config TypedQueueConfig[T]) *Typed[T] {
 }
 
 // NewNamed creates a new named queue.
+//
 // Deprecated: Use NewWithConfig instead.
 func NewNamed(name string) *Type {
 	return NewWithConfig(QueueConfig{
@@ -169,12 +186,13 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 		cond:                       sync.NewCond(&sync.Mutex{}),
 		metrics:                    metrics,
 		unfinishedWorkUpdatePeriod: updatePeriod,
+		stopCh:                     make(chan struct{}),
 	}
 
 	// Don't start the goroutine for a type of noMetrics so we don't consume
 	// resources unnecessarily
 	if _, ok := metrics.(noMetrics[T]); !ok {
-		go t.updateUnfinishedWorkLoop()
+		t.wg.Go(t.updateUnfinishedWorkLoop)
 	}
 
 	return t
@@ -183,6 +201,7 @@ func newQueue[T comparable](c clock.WithTicker, queue Queue[T], metrics queueMet
 const defaultUnfinishedWorkUpdatePeriod = 500 * time.Millisecond
 
 // Type is a work queue (see the package comment).
+//
 // Deprecated: Use Typed instead.
 type Type = Typed[any]
 
@@ -205,11 +224,20 @@ type Typed[t comparable] struct {
 
 	shuttingDown bool
 	drain        bool
+	paused       bool
 
 	metrics queueMetrics[t]
 
 	unfinishedWorkUpdatePeriod time.Duration
 	clock                      clock.WithTicker
+
+	// wg manages goroutines started by the queue to allow graceful shutdown
+	// ShutDown() will wait for goroutines to exit before returning.
+	wg sync.WaitGroup
+
+	stopCh chan struct{}
+	// stopOnce guarantees we only signal shutdown a single time
+	stopOnce sync.Once
 }
 
 // Add marks item as needing processing. When the queue is shutdown new
@@ -256,11 +284,12 @@ func (q *Typed[T]) Len() int {
 func (q *Typed[T]) Get() (item T, shutdown bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
-	for q.queue.Len() == 0 && !q.shuttingDown {
+	for (q.queue.Len() == 0 || q.paused) && !q.shuttingDown {
 		q.cond.Wait()
 	}
-	if q.queue.Len() == 0 {
-		// We must be shutting down.
+	if q.queue.Len() == 0 || q.paused {
+		// We must be shutting down. A paused queue does not hand out the
+		// remaining items, see Pausable.
 		return *new(T), true
 	}
 
@@ -292,10 +321,38 @@ func (q *Typed[T]) Done(item T) {
 	}
 }
 
+// Pause stops Get from returning items until Resume or ShutDown is called.
+// Add and Done continue to work while the queue is paused. See Pausable.
+func (q *Typed[T]) Pause() {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	q.paused = true
+}
+
+// Resume allows Get to return items again after Pause.
+func (q *Typed[T]) Resume() {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	if !q.paused {
+		return
+	}
+	q.paused = false
+	q.cond.Broadcast()
+}
+
 // ShutDown will cause q to ignore all new items added to it. Worker
 // goroutines will continue processing items in the queue until it is
-// empty and then receive the shutdown signal.
+// empty and then receive the shutdown signal. If the queue is paused,
+// queued items are not handed out and workers receive the shutdown signal
+// immediately (see Pausable).
 func (q *Typed[T]) ShutDown() {
+	defer q.wg.Wait()
+	q.stopOnce.Do(func() {
+		defer close(q.stopCh)
+	})
+
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -305,12 +362,18 @@ func (q *Typed[T]) ShutDown() {
 }
 
 // ShutDownWithDrain is equivalent to ShutDown but waits until all items
-// in the queue have been processed.
+// in the queue have been processed. If the queue is paused it waits only
+// for items already handed to workers; queued items are not drained (see
+// Pausable).
 // ShutDown can be called after ShutDownWithDrain to force
 // ShutDownWithDrain to stop waiting.
 // Workers must call Done on an item after processing it, otherwise
 // ShutDownWithDrain will block indefinitely.
 func (q *Typed[T]) ShutDownWithDrain() {
+	defer q.wg.Wait()
+	q.stopOnce.Do(func() {
+		defer close(q.stopCh)
+	})
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
@@ -330,20 +393,22 @@ func (q *Typed[T]) ShuttingDown() bool {
 	return q.shuttingDown
 }
 
+func (q *Typed[T]) updateUnfinishedWork() {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	if !q.shuttingDown {
+		q.metrics.updateUnfinishedWork()
+	}
+}
+
 func (q *Typed[T]) updateUnfinishedWorkLoop() {
 	t := q.clock.NewTicker(q.unfinishedWorkUpdatePeriod)
 	defer t.Stop()
-	for range t.C() {
-		if !func() bool {
-			q.cond.L.Lock()
-			defer q.cond.L.Unlock()
-			if !q.shuttingDown {
-				q.metrics.updateUnfinishedWork()
-				return true
-			}
-			return false
-
-		}() {
+	for {
+		select {
+		case <-t.C():
+			q.updateUnfinishedWork()
+		case <-q.stopCh:
 			return
 		}
 	}

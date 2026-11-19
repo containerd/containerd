@@ -18,7 +18,9 @@
 
 package fstest
 
-import "testing"
+import (
+	"testing"
+)
 
 func WithMkfs(t *testing.T, f func(), mkfs ...string) {
 	t.Fatal("WithMkfs requires Linux")

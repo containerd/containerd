@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/url"
 	gruntime "runtime"
-	"slices"
 	"time"
 
 	"github.com/containerd/log"
@@ -34,9 +33,9 @@ import (
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
-	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 )
 
 const (
@@ -73,7 +72,7 @@ const (
 	ModeShim SandboxControllerMode = "shim"
 	// DefaultSandboxImage is the default image to use for sandboxes when empty or
 	// for default configurations.
-	DefaultSandboxImage = "registry.k8s.io/pause:3.10.1"
+	DefaultSandboxImage = "registry.k8s.io/pause:3.10.2"
 	// IOTypeFifo is container io implemented by creating named pipe
 	IOTypeFifo = "fifo"
 	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
@@ -97,7 +96,7 @@ type Runtime struct {
 	// Currently, only device plugins populate the annotations.
 	ContainerAnnotations []string `toml:"container_annotations" json:"ContainerAnnotations"`
 	// Options are config options for the runtime.
-	Options map[string]interface{} `toml:"options" json:"options"`
+	Options map[string]any `toml:"options" json:"options"`
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.
 	PrivilegedWithoutHostDevices bool `toml:"privileged_without_host_devices" json:"privileged_without_host_devices"`
@@ -125,6 +124,12 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
+	// DisablePauseImagePull disables the automatic pre-pull of the pause container image
+	// in ensurePauseImageExists() during RunPodSandbox. When set to true, the shim controller
+	// implementation is responsible for ensuring the pause image (or its equivalent) is available.
+	// This is useful for sandboxers that do not require the host-level pause image.
+	// Default: false (CRI pre-pulls the pause image for all runtimes).
+	DisablePauseImagePull bool `toml:"disable_pause_image_pull" json:"disablePauseImagePull"`
 	// IOType defines how containerd transfer the io streams of the container
 	// if it is not set, the named pipe will be created for the container
 	// we can also set it to "streaming" to create a stream by streaming api,
@@ -153,13 +158,7 @@ type ContainerdConfig struct {
 
 // CniConfig contains toml config related to cni
 type CniConfig struct {
-	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
-	//
-	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
-	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
-	//
-	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
 	NetworkPluginBinDirs []string `toml:"bin_dirs" json:"binDirs"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
@@ -300,7 +299,7 @@ type ImageConfig struct {
 	// by other plugins to lookup the current image name.
 	// Image names should be full names including domain and tag
 	// Examples:
-	//   "sandbox": "registry.k8s.io/pause:3.10.1"
+	//   "sandbox": "registry.k8s.io/pause:3.10.2"
 	//   "base": "docker.io/library/ubuntu:latest"
 	// Migrated from:
 	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
@@ -324,6 +323,9 @@ type ImageConfig struct {
 
 	// ConcurrentLayerFetchBuffer restricts the maximum concurrent chunks size in for each image during a download.
 	ConcurrentLayerFetchBuffer int `toml:"concurrent_layer_fetch_buffer" json:"concurrentLayerFetchBuffer"`
+
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool `toml:"ignore_descriptor_urls" json:"ignoreDescriptorURLs"`
 
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
@@ -405,12 +407,6 @@ type RuntimeConfig struct {
 	// for all containers which are not using host network, are not running in user namespace
 	// and if it is not overwritten by PodSandboxConfig
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
-	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
-	// into the OCI config
-	// For more details about CDI and the syntax of CDI Spec files please refer to
-	// https://tags.cncf.io/container-device-interface.
-	// DEPRECATED: CDI support will always be enabled in a future release.
-	EnableCDI *bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
@@ -441,6 +437,10 @@ type RuntimeConfig struct {
 	//   https://golang.org/pkg/time/#ParseDuration
 	// Default: "2m"
 	StatsRetentionPeriod string `toml:"stats_retention_period" json:"statsRetentionPeriod"`
+
+	// EnableCRIU enables CRIU (Checkpoint/Restore In Userspace) support.
+	// When set to false, checkpoint/restore operations will be disabled.
+	EnableCRIU *bool `toml:"enable_criu" json:"enableCRIU"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -596,6 +596,11 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 			Reason:    "must be configured in transfer service plugin: plugins.\"io.containerd.transfer.v1.local\"",
 		},
 		{
+			Name:      "IgnoreDescriptorURLs",
+			IsPresent: func() bool { return c.IgnoreDescriptorURLs },
+			Reason:    "must be configured in transfer service plugin: plugins.\"io.containerd.transfer.v1.local\"",
+		},
+		{
 			Name:      "ImagePullWithSyncFs",
 			IsPresent: func() bool { return c.ImagePullWithSyncFs },
 			Reason:    "not supported with transfer service",
@@ -631,28 +636,6 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
 		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
-	}
-
-	// Validation for CNI config
-	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
-		warnings = append(warnings, deprecation.CRICNIBinDir)
-		log.G(ctx).Warning("`bin_dir` is deprecated, please use `bin_dirs` instead")
-
-		if slices.Equal(c.CniConfig.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
-			// if a user set `bin_dir` explicitly, we remove the default value of `bin_dirs`
-			// to avoid the unexpected conflict between the two since we don't allow setting both.
-			c.CniConfig.NetworkPluginBinDirs = nil
-		}
-		if len(c.CniConfig.NetworkPluginBinDirs) == 0 {
-			// Before `NetworkPluginBinDir` is deprecated and removed, we manually move it
-			// into `NetworkPluginBinDirs` (if `NetworkPluginBinDirs` is empty)
-			// so that we can use it in the rest of the code.
-			c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
-			c.CniConfig.NetworkPluginBinDir = ""
-		}
-	}
-	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
-		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {
@@ -697,11 +680,6 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
-	}
-
-	// Validation for enable_cdi
-	if c.EnableCDI != nil && !*c.EnableCDI {
-		warnings = append(warnings, deprecation.CRIEnableCDI)
 	}
 
 	return warnings, nil
@@ -772,7 +750,7 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 }
 
 // GenerateRuntimeOptions generates runtime options from cri plugin config.
-func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
+func GenerateRuntimeOptions(r Runtime) (any, error) {
 	if r.Options == nil {
 		return nil, nil
 	}
@@ -797,7 +775,7 @@ func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
 }
 
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
+func getRuntimeOptionsType(t string) any {
 	switch t {
 	case plugins.RuntimeRuncV2:
 		return &runcoptions.Options{}

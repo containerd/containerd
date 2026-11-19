@@ -28,6 +28,7 @@ import (
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/platforms"
@@ -136,6 +137,17 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 	)
 	require.NoError(t, err)
 
+	// Wait for the background GC scheduled by a pull, otherwise it races
+	// with the removal of tmpDir and may panic the test binary.
+	scheduler, err := lastInitContext.GetSingle(plugins.GCPlugin)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := scheduler.(interface {
+			ScheduleAndWait(context.Context) (gc.Stats, error)
+		}).ScheduleAndWait(ctx)
+		require.NoError(t, err)
+	})
+
 	return client
 }
 
@@ -146,7 +158,7 @@ func tweakContentInitFnWithDelayer(commitDelayDuration time.Duration) tweakPlugi
 		}
 
 		oldInitFn := p.InitFn
-		p.InitFn = func(ic *plugin.InitContext) (interface{}, error) {
+		p.InitFn = func(ic *plugin.InitContext) (any, error) {
 			instance, err := oldInitFn(ic)
 			if err != nil {
 				return nil, err

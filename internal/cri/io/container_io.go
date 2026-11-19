@@ -19,7 +19,6 @@ package io
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -88,7 +87,7 @@ func WithNewFIFOs(root string, tty, stdin bool) ContainerIOOpts {
 func WithStreams(address string, tty, stdin bool) ContainerIOOpts {
 	return func(c *ContainerIO) error {
 		if address == "" {
-			return fmt.Errorf("address can not be empty for io stream")
+			return errors.New("address can not be empty for io stream")
 		}
 		fifos, err := newStreams(address, c.id, tty, stdin)
 		if err != nil {
@@ -174,8 +173,7 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 		// wrapper doesn't close the actual stdin, it only stops io.Copy.
 		// The actual stdin will be closed by stream server.
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
 				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
@@ -197,8 +195,7 @@ func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
 					c.stderrGroup.Remove(stderrKey)
 				}
 			}
-			wg.Done()
-		}()
+		})
 	}
 
 	attachStream := func(key string, close <-chan struct{}) {

@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/go-digest/digestset"
 	assertlib "github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestInternalStore(t *testing.T) {
@@ -61,7 +61,7 @@ func TestInternalStore(t *testing.T) {
 	s := &store{
 		images:     make(map[string]Image),
 		digestSet:  digestset.NewSet(),
-		pinnedRefs: make(map[string]setutils.Set[string]),
+		pinnedRefs: make(map[string]sets.Set[string]),
 	}
 
 	t.Logf("should be able to add image")
@@ -144,7 +144,7 @@ func TestInternalStorePinnedImage(t *testing.T) {
 	s := &store{
 		images:     make(map[string]Image),
 		digestSet:  digestset.NewSet(),
-		pinnedRefs: make(map[string]setutils.Set[string]),
+		pinnedRefs: make(map[string]sets.Set[string]),
 	}
 
 	ref1 := "containerd.io/ref-1"

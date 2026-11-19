@@ -4,7 +4,7 @@ This guide is useful if you intend to contribute on containerd. Thanks for your
 effort. Every contribution is very appreciated.
 
 This doc includes:
-* [Getting started with GitHub Codespaces](#getting-started-with-gitHub-codespaces)
+* [Getting started with GitHub Codespaces](#getting-started-with-github-codespaces)
 * [Build requirements](#build-requirements)
 * [Build the development environment](#build-the-development-environment)
 * [Build containerd](#build-containerd)
@@ -25,7 +25,7 @@ A codespace will open in a web-based version of Visual Studio Code. The [dev con
 
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
-* Go compiler (download from https://go.dev/dl/). The two most recent major Go versions are supported. For example, if Go 1.25 is the latest, then 1.25 and 1.24 are supported.
+* Go compiler (download from https://go.dev/dl/). At least one of the two most recent major Go versions are supported. For example, if Go 1.26 is the latest, either 1.26 or 1.25 are supported. It is not uncommon to find issues in early days of the latest go version. The support of the non-latest version is dependant on dependencies supported versions.
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
 > *Note*: On macOS, you need a third party runtime to run containers on containerd
@@ -61,7 +61,7 @@ Runc is the default container runtime used by `containerd` and is required to
 run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
 container runtime development. Make sure to follow the guidelines for versioning
-in [RUNC.md](/docs/RUNC.md) for the best results.
+in [RUNC.md](docs/RUNC.md) for the best results.
 
 > *Note*: Runc only supports Linux
 
@@ -128,7 +128,7 @@ to use `go mod` command to modify the dependencies. After modifition, you should
 and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` directory are up to date.
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
-Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+Please refer to [RUNC.md](docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
 
 > *Note*: On macOS, the containerd daemon can be built and run natively. However, as stated above, runc only supports linux.
 
@@ -260,6 +260,11 @@ During the automated CI the unit tests and integration tests are run as part of 
  - `make root-test`: run all non-integration tests which require `root`
  - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**.
  - `make cri-integration`: [CRI Integration Tests](https://github.com/containerd/containerd/blob/main/docs/cri/testing.md#cri-integration-test) run cri integration tests
+
+A test that needs `root` calls `testutil.RequiresRoot`, which skips it unless
+`-test.root` is passed. `make test` skips those tests and still succeeds, so check
+whether the tests covering your change are among them. `make root-test` selects
+the packages that call the helper and runs them with `-test.root`.
 
 To execute a specific test or set of tests you can use the `go test` capabilities
 without using the `Makefile` targets. The following examples show how to specify a test

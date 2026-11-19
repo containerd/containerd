@@ -41,7 +41,7 @@ import (
 )
 
 var bufPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		buffer := make([]byte, 1<<20)
 		return &buffer
 	},
@@ -545,8 +545,13 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 
 	path, refp, data := s.ingestPaths(ref)
 
+	// if we get passed an expected digest, we need to use the same algorithm (sha512, etc)
+	digestAlg := digest.Canonical
+	if expected != "" && expected.Algorithm().Available() {
+		digestAlg = expected.Algorithm()
+	}
 	var (
-		digester  = digest.Canonical.Digester()
+		digester  = digestAlg.Digester()
 		offset    int64
 		startedAt time.Time
 		updatedAt time.Time
@@ -594,7 +599,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 		}
 
 		if total > 0 {
-			if err := os.WriteFile(filepath.Join(path, "total"), []byte(fmt.Sprint(total)), 0666); err != nil {
+			if err := os.WriteFile(filepath.Join(path, "total"), fmt.Append(nil, total), 0666); err != nil {
 				return nil, err
 			}
 		}
@@ -627,7 +632,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 // be cancelled. Any resources associated with the ingest will be cleaned.
 func (s *store) Abort(ctx context.Context, ref string) error {
 	root := s.ingestRoot(ref)
-	if err := os.RemoveAll(root); err != nil {
+	if err := removePath(root); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("ingest ref %q: %w", ref, errdefs.ErrNotFound)
 		}
@@ -679,7 +684,7 @@ func readFileString(path string) (string, error) {
 
 // readFileTimestamp reads a file with just a timestamp present.
 func readFileTimestamp(p string) (time.Time, error) {
-	b, err := os.ReadFile(p)
+	b, err := readFileWithRetry(p)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = fmt.Errorf("%s: %w", err.Error(), errdefs.ErrNotFound)
@@ -704,7 +709,7 @@ func writeTimestampFile(p string, t time.Time) error {
 }
 
 func writeToCompletion(path string, data []byte, mode os.FileMode) error {
-	tmp := fmt.Sprintf("%s.tmp", path)
+	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC|os.O_SYNC, mode)
 	if err != nil {
 		return fmt.Errorf("create tmp file: %w", err)

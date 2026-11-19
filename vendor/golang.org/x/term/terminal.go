@@ -106,6 +106,9 @@ type Terminal struct {
 	// a read. It aliases into inBuf.
 	remainder []byte
 	inBuf     [256]byte
+	// readErr is an error returned by a read that also returned data. It is
+	// reported after all of that data has been processed.
+	readErr error
 
 	// History records and retrieves lines of input read by [ReadLine] which
 	// a user can retrieve and navigate using the up and down arrow keys.
@@ -160,7 +163,9 @@ const (
 	keyEnd
 	keyDeleteWord
 	keyDeleteLine
+	keyDelete
 	keyClearScreen
+	keyTranspose
 	keyPasteStart
 	keyPasteEnd
 )
@@ -194,6 +199,8 @@ func bytesToKey(b []byte, pasteActive bool) (rune, []byte) {
 			return keyDeleteLine, b[1:]
 		case 12: // ^L
 			return keyClearScreen, b[1:]
+		case 20: // ^T
+			return keyTranspose, b[1:]
 		case 23: // ^W
 			return keyDeleteWord, b[1:]
 		case 14: // ^N
@@ -226,6 +233,10 @@ func bytesToKey(b []byte, pasteActive bool) (rune, []byte) {
 		case 'F':
 			return keyEnd, b[3:]
 		}
+	}
+
+	if !pasteActive && len(b) >= 4 && b[0] == keyEscape && b[1] == '[' && b[2] == '3' && b[3] == '~' {
+		return keyDelete, b[4:]
 	}
 
 	if !pasteActive && len(b) >= 6 && b[0] == keyEscape && b[1] == '[' && b[2] == '1' && b[3] == ';' && b[4] == '3' {
@@ -590,7 +601,7 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 		}
 		t.line = t.line[:t.pos]
 		t.moveCursorToPos(t.pos)
-	case keyCtrlD:
+	case keyCtrlD, keyDelete:
 		// Erase the character under the current position.
 		// The EOF case when the line is empty is handled in
 		// readLine().
@@ -600,6 +611,24 @@ func (t *Terminal) handleKey(key rune) (line string, ok bool) {
 		}
 	case keyCtrlU:
 		t.eraseNPreviousChars(t.pos)
+	case keyTranspose:
+		// This transposes the two characters around the cursor and advances the cursor. Best-effort.
+		if len(t.line) < 2 || t.pos < 1 {
+			return
+		}
+		swap := t.pos
+		if swap == len(t.line) {
+			swap-- // special: at end of line, swap previous two chars
+		}
+		t.line[swap-1], t.line[swap] = t.line[swap], t.line[swap-1]
+		if t.pos < len(t.line) {
+			t.pos++
+		}
+		if t.echo {
+			t.moveCursorToPos(swap - 1)
+			t.writeLine(t.line[swap-1:])
+			t.moveCursorToPos(t.pos)
+		}
 	case keyClearScreen:
 		// Erases the screen and moves the cursor to the home position.
 		t.queue([]rune("\x1b[2J\x1b[H"))
@@ -762,7 +791,11 @@ func (t *Terminal) ReadPassword(prompt string) (line string, err error) {
 	return
 }
 
-// ReadLine returns a line of input from the terminal.
+// ReadLine returns a line of input from the terminal, excluding the
+// trailing newline. It may return partial data along with an error.
+// An [io.EOF] error indicates the end of the stream. For other errors,
+// such as [ErrPasteIndicator] in bracketed paste mode, a subsequent
+// call may return more data.
 func (t *Terminal) ReadLine() (line string, err error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -837,21 +870,24 @@ func (t *Terminal) readLine() (line string, err error) {
 			}
 			return
 		}
+		if t.readErr != nil {
+			err = t.readErr
+			t.readErr = nil
+			return
+		}
 
 		// t.remainder is a slice at the beginning of t.inBuf
 		// containing a partial key sequence
 		readBuf := t.inBuf[len(t.remainder):]
-		var n int
 
 		t.lock.Unlock()
-		n, err = t.c.Read(readBuf)
+		n, readErr := t.c.Read(readBuf)
 		t.lock.Lock()
 
-		if err != nil {
-			return
-		}
-
 		t.remainder = t.inBuf[:n+len(t.remainder)]
+		if readErr != nil {
+			t.readErr = readErr
+		}
 	}
 }
 

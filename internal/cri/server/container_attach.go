@@ -24,8 +24,8 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/log"
-	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	remotecommand "k8s.io/cri-streaming/pkg/streaming/remotecommand"
 
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 )

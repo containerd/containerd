@@ -39,6 +39,7 @@ type shimBinaryConfig struct {
 	runtime      string
 	address      string
 	ttrpcAddress string
+	socketDir    string
 	env          []string
 }
 
@@ -48,6 +49,7 @@ func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
 		runtime:                config.runtime,
 		containerdAddress:      config.address,
 		containerdTTRPCAddress: config.ttrpcAddress,
+		socketDir:              config.socketDir,
 		env:                    config.env,
 	}
 }
@@ -56,28 +58,25 @@ type binary struct {
 	runtime                string
 	containerdAddress      string
 	containerdTTRPCAddress string
+	socketDir              string
 	bundle                 *Bundle
 	env                    []string
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
-	args := []string{"-id", b.bundle.ID}
-	switch log.GetLevel() {
-	case log.DebugLevel, log.TraceLevel:
-		args = append(args, "-debug")
-	}
-	args = append(args, "start")
-
-	cmd, err := client.Command(
+	cmd, err := command(
 		ctx,
-		&client.CommandConfig{
-			Runtime:      b.runtime,
-			Address:      b.containerdAddress,
+		&commandConfig{
+			ID:           b.bundle.ID,
+			RuntimePath:  b.runtime,
+			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
-			Path:         b.bundle.Path,
+			WorkDir:      b.bundle.Path,
 			Opts:         opts,
-			Args:         args,
 			Env:          b.env,
+			LogLevel:     log.GetLevel(),
+			Action:       "start",
+			SocketDir:    b.socketDir,
 		})
 	if err != nil {
 		return nil, err
@@ -115,10 +114,8 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	}()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", out, err)
+		return nil, shimCallError(ctx.Err(), out, err)
 	}
-	response := bytes.TrimSpace(out)
-
 	onCloseWithShimLog := func() {
 		onClose()
 		cancelShimLog()
@@ -129,12 +126,12 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, err
 	}
 
-	params, err := parseStartResponse(response)
+	params, err := parseStartResponse(out)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := makeConnection(ctx, b.bundle.ID, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, b.bundle.ID, params, onCloseWithShimLog, client.AnonDialer)
 	if err != nil {
 		return nil, err
 	}
@@ -146,10 +143,11 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	// The address is in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 	return &shim{
-		bundle:  b.bundle,
-		client:  conn,
-		address: address,
-		version: params.Version,
+		bundle:    b.bundle,
+		client:    conn,
+		address:   address,
+		version:   int(params.Version),
+		bootstrap: params,
 	}, nil
 }
 
@@ -165,24 +163,18 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	if gruntime.GOOS != "windows" && gruntime.GOOS != "freebsd" {
 		bundlePath = b.bundle.Path
 	}
-	args := []string{
-		"-id", b.bundle.ID,
-		"-bundle", b.bundle.Path,
-	}
-	switch log.GetLevel() {
-	case log.DebugLevel, log.TraceLevel:
-		args = append(args, "-debug")
-	}
-	args = append(args, "delete")
 
-	cmd, err := client.Command(ctx,
-		&client.CommandConfig{
-			Runtime:      b.runtime,
-			Address:      b.containerdAddress,
+	cmd, err := command(ctx,
+		&commandConfig{
+			ID:           b.bundle.ID,
+			RuntimePath:  b.runtime,
+			BundlePath:   b.bundle.Path,
+			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
-			Path:         bundlePath,
+			WorkDir:      bundlePath,
 			Opts:         nil,
-			Args:         args,
+			LogLevel:     log.GetLevel(),
+			Action:       "delete",
 		})
 
 	if err != nil {
@@ -196,11 +188,12 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	cmd.Stderr = errb
 	if err := cmd.Run(); err != nil {
 		log.G(ctx).WithFields(log.Fields{
-			"cmd":   cmd.String(),
-			"error": err,
-			"id":    b.bundle.ID,
+			"cmd":    cmd.String(),
+			"error":  err,
+			"id":     b.bundle.ID,
+			"stderr": errb.String(),
 		}).Error("failed to delete dead shim")
-		return nil, fmt.Errorf("%s: %w", errb.String(), err)
+		return nil, shimCallError(ctx.Err(), errb.Bytes(), err)
 	}
 	if s := errb.String(); s != "" {
 		log.G(ctx).WithFields(log.Fields{
@@ -220,4 +213,24 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
 		Pid:       response.Pid,
 	}, nil
+}
+
+// shimCallError builds an error for a failed shim binary invocation.
+//
+// command is run via exec.CommandContext, which kills the process
+// once ctx is done. On Windows that kill is TerminateProcess(handle, 1),
+// which is indistinguishable from the shim genuinely calling os.Exit(1),
+// and os/exec reports the wait status in preference to the context error.
+// A killed shim also writes nothing to stderr, so without surfacing ctxErr
+// the resulting message degenerates to ": exit status 1" with no
+// indication that containerd killed the process rather than the shim
+// exiting on its own.
+func shimCallError(ctxErr error, stderr []byte, err error) error {
+	if ctxErr != nil {
+		err = fmt.Errorf("shim killed after %w: %w", ctxErr, err)
+	}
+	if s := bytes.TrimSpace(stderr); len(s) > 0 {
+		err = fmt.Errorf("%s: %w", s, err)
+	}
+	return err
 }

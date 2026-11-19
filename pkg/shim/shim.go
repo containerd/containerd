@@ -18,7 +18,6 @@ package shim
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -28,10 +27,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"time"
 
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	shimapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -51,33 +53,17 @@ type Publisher interface {
 	io.Closer
 }
 
-// StartOpts describes shim start configuration received from containerd
-type StartOpts struct {
-	Address      string
-	TTRPCAddress string
-	Debug        bool
-}
-
-// BootstrapParams is a JSON payload returned in stdout from shim.Start call.
-type BootstrapParams struct {
-	// Version is the version of shim parameters (expected 2 for shim v2)
-	Version int `json:"version"`
-	// Address is a address containerd should use to connect to shim.
-	Address string `json:"address"`
-	// Protocol is either TTRPC or GRPC.
-	Protocol string `json:"protocol"`
-}
-
 type StopStatus struct {
 	Pid        int
 	ExitStatus int
 	ExitedAt   time.Time
 }
 
-// Manager is the interface which manages the shim process
-type Manager interface {
+// Shim is the interface which manages the shim process lifecycle using the
+// new bootstrap protocol.
+type Shim interface {
 	Name() string
-	Start(ctx context.Context, id string, opts StartOpts) (BootstrapParams, error)
+	Start(ctx context.Context, params *bootapi.BootstrapParams) (*bootapi.BootstrapResult, error)
 	Stop(ctx context.Context, id string) (StopStatus, error)
 	Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeInfo, error)
 }
@@ -133,8 +119,6 @@ var (
 const (
 	ttrpcAddressEnv = "TTRPC_ADDRESS"
 	grpcAddressEnv  = "GRPC_ADDRESS"
-	namespaceEnv    = "NAMESPACE"
-	maxVersionEnv   = "MAX_SHIM_VERSION"
 )
 
 func parseFlags() {
@@ -152,7 +136,7 @@ func parseFlags() {
 	flag.StringVar(&id, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
 	flag.StringVar(&debugSocketFlag, "debug-socket", "", "debug socket path to serve")
-	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
+	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir") // Provided only during -delete action
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
 	flag.StringVar(&containerdBinaryFlag, "publish-binary", "",
@@ -181,7 +165,7 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 	l := log.G(ctx)
 	_ = log.SetFormat(log.TextFormat)
 	if debugFlag {
-		_ = log.SetLevel("debug")
+		_ = log.SetLevel(log.DebugLevel)
 	}
 	f, err := openLog(ctx, id)
 	if err != nil {
@@ -191,22 +175,22 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 	return log.WithLogger(ctx, l), nil
 }
 
-// Run initializes and runs a shim server.
-func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
+// RunShim initializes and runs a shim server using the new bootstrap protocol.
+func RunShim(ctx context.Context, shim Shim, opts ...BinaryOpts) {
 	var config Config
 	for _, o := range opts {
 		o(&config)
 	}
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", manager.Name()))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", shim.Name()))
 
-	if err := run(ctx, manager, config); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
+	if err := run(ctx, shim, config); err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %s", shim.Name(), err)
 		os.Exit(1)
 	}
 }
 
-func runInfo(ctx context.Context, manager Manager) error {
+func runInfo(ctx context.Context, manager Shim) error {
 	info, err := manager.Info(ctx, os.Stdin)
 	if err != nil {
 		return err
@@ -219,7 +203,7 @@ func runInfo(ctx context.Context, manager Manager) error {
 	return err
 }
 
-func run(ctx context.Context, manager Manager, config Config) error {
+func run(ctx context.Context, manager Shim, config Config) error {
 	parseFlags()
 	if versionFlag {
 		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))
@@ -235,7 +219,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	if namespaceFlag == "" {
-		return fmt.Errorf("shim namespace cannot be empty")
+		return errors.New("shim namespace cannot be empty")
 	}
 
 	setRuntime()
@@ -286,20 +270,43 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		}
 		return nil
 	case "start":
-		opts := StartOpts{
-			Address:      addressFlag,
-			TTRPCAddress: ttrpcAddress,
-			Debug:        debugFlag,
+		// Read stdin into memory so the bootstrap payload can be validated.
+		// Protect against unbounded memory consumption with a limit (e.g., 10MB).
+		input, err := io.ReadAll(io.LimitReader(os.Stdin, 10<<20))
+		if err != nil {
+			return fmt.Errorf("failed to read stdin: %w", err)
 		}
 
-		params, err := manager.Start(ctx, id, opts)
+		params, err := parseBootstrapParams(input, id, namespaceFlag)
 		if err != nil {
 			return err
 		}
 
-		data, err := json.Marshal(&params)
+		// Persist the socket directory so the long-running server process
+		// (which doesn't receive bootstrap params) can read it for cleanup.
+		if dir := params.GetSocketDir(); dir != "" {
+			if err := writeSocketDir(dir); err != nil {
+				return fmt.Errorf("failed to write socket-dir: %w", err)
+			}
+		}
+
+		result, err := manager.Start(ctx, params)
 		if err != nil {
-			return fmt.Errorf("failed to marshal bootstrap params to json: %w", err)
+			return err
+		}
+
+		// On Windows, the shim daemon may not have created its named pipe
+		// yet when this start helper returns. Wait for it to be connectable
+		// before writing the bootstrap result to stdout.
+		// Similar to hcsshim's readiness pattern (microsoft/hcsshim notifyReady).
+		// On Unix this is a no-op: domain sockets appear atomically.
+		if err := awaitPipeReady(result.Address); err != nil {
+			return fmt.Errorf("shim pipe not ready: %w", err)
+		}
+
+		data, err := proto.Marshal(result)
+		if err != nil {
+			return fmt.Errorf("failed to marshal bootstrap params: %w", err)
 		}
 
 		if _, err := os.Stdout.Write(data); err != nil {
@@ -319,7 +326,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.InternalPlugin,
 		ID:   "shutdown",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return sd, nil
 		},
 	})
@@ -328,7 +335,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	registry.Register(&plugin.Registration{
 		Type: plugins.EventPlugin,
 		ID:   "publisher",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return NewPublisher(ttrpcAddress, func(cfg *publisherConfig) {
 				p, _ := ic.GetByID(plugins.TTRPCPlugin, "otelttrpc")
 				if p == nil {
@@ -398,10 +405,21 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		}
 
 		if src, ok := instance.(TTRPCServerUnaryOptioner); ok {
-			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryServerInterceptor())
+			// Tracing goes first, it establishes the context the others read.
+			at := len(ttrpcUnaryInterceptors)
+			if result.Registration.ID == "otelttrpc" {
+				at = 0
+			}
+			ttrpcUnaryInterceptors = slices.Insert(ttrpcUnaryInterceptors, at, src.UnaryServerInterceptor())
 		}
 
-		if result.Registration.ID == "pprof" {
+		switch result.Registration.ID {
+		case "tracing":
+			// The tracing plugin buffers spans, closing it flushes them.
+			if c, ok := instance.(io.Closer); ok {
+				sd.RegisterCallback(func(context.Context) error { return c.Close() })
+			}
+		case "pprof":
 			if src, ok := instance.(server); ok {
 				pprofHandler = src
 			}
@@ -409,7 +427,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	if len(ttrpcServices) == 0 {
-		return fmt.Errorf("required that ttrpc service")
+		return errors.New("at least one TTRPC service is required")
 	}
 
 	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)

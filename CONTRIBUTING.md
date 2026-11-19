@@ -25,6 +25,33 @@ $ script/setup/install-dev-tools
 $ make install-deps
 ```
 
+## Pull request expectations
+
+- Before starting work on an issue, check whether an open pull request already
+  addresses it: look at the issue's linked pull requests and search open pull
+  requests for the issue number.
+- Document features and enhancements, both at the code level and in the
+  user-facing docs under `docs/`.
+- Test at the levels that fit the change: unit, integration, or end-to-end.
+  For failure injection in integration tests, use the failpoint pattern
+  (`internal/failpoint`, `integration/failpoint`).
+- Run `make check` and the tests that cover your change locally before opening
+  or updating a pull request.
+- Monitor your pull request's CI runs and make sure your changes are not
+  responsible for failures.
+
+## Automated and AI-generated contributions
+
+Pull requests must be opened by a human. Any use of automation to create
+pull requests must be approved by a maintainer. Accounts creating pull requests
+using automation without prior approval may be restricted from the containerd
+organization.
+
+All AI-generated or AI-assisted submissions — whether code, PR descriptions,
+or comments — must be reviewed by the human author before being submitted.
+The human author is responsible for the correctness and quality of all content
+in their pull request and any associated comments.
+
 ## Code style
 
 - Go files adhere to standard Go formatting and styling

@@ -26,5 +26,5 @@ import (
 type Watcher interface {
 	Close() error
 	Run(ctx context.Context)
-	Add(id string, cg interface{}) error
+	Add(id string, cg any) error
 }

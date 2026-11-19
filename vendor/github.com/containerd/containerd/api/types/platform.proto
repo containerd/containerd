@@ -27,4 +27,5 @@ message Platform {
   string architecture = 2;
   string variant = 3;
   string os_version = 4;
+  repeated string os_features = 5;
 }

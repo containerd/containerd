@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"runtime"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
@@ -118,7 +117,7 @@ func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Co
 // WithCheckpointRW includes the rw in the checkpoint
 func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	diffOpts := []diff.Opt{
-		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", c.SnapshotKey)),
+		diff.WithReference("checkpoint-rw-" + c.SnapshotKey),
 	}
 	rw, err := rootfs.CreateDiff(ctx,
 		c.SnapshotKey,

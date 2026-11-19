@@ -18,6 +18,7 @@ package oci
 
 import (
 	"context"
+	_ "crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -76,7 +77,7 @@ func newFakeImage(config ocispec.Image) (Image, error) {
 	}
 	configDescriptor := ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageConfig,
-		Digest:    digest.NewDigestFromBytes(digest.SHA256, configBlob),
+		Digest:    digest.Canonical.FromBytes(configBlob),
 	}
 
 	return fakeImage{
@@ -182,15 +183,6 @@ func TestWithDefaultSpecForPlatform(t *testing.T) {
 		}
 	}
 
-}
-
-func Contains(a []string, x string) bool {
-	for _, n := range a {
-		if x == n {
-			return true
-		}
-	}
-	return false
 }
 
 func TestWithProcessCwd(t *testing.T) {

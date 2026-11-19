@@ -124,6 +124,19 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		runtimeUser = &runtime.ContainerUser{}
 	}
 
+	var statusStopSignal runtime.Signal
+	stopsignal := container.Config.GetStopSignal()
+
+	if stopsignal == runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
+		if container.Metadata.StopSignal != "" {
+			statusStopSignal = toCRISignal(container.Metadata.StopSignal)
+		} else {
+			statusStopSignal = runtime.Signal_SIGNAL_SIGTERM
+		}
+	} else {
+		statusStopSignal = stopsignal
+	}
+
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -143,6 +156,7 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		LogPath:     meta.LogPath,
 		Resources:   status.Resources,
 		User:        runtimeUser,
+		StopSignal:  statusStopSignal,
 	}, nil
 }
 
@@ -155,7 +169,7 @@ type ContainerInfo struct {
 	SnapshotKey    string                   `json:"snapshotKey"`
 	Snapshotter    string                   `json:"snapshotter"`
 	RuntimeType    string                   `json:"runtimeType"`
-	RuntimeOptions interface{}              `json:"runtimeOptions"`
+	RuntimeOptions any                      `json:"runtimeOptions"`
 	Config         *runtime.ContainerConfig `json:"config"`
 	RuntimeSpec    *runtimespec.Spec        `json:"runtimeSpec"`
 }

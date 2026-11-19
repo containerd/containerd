@@ -22,7 +22,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"syscall"
@@ -31,14 +30,13 @@ import (
 	"github.com/containerd/log"
 	"github.com/moby/sys/mountinfo"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux/label"
+	"github.com/opencontainers/selinux/go-selinux"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cri/seutil"
 	"github.com/containerd/containerd/v2/pkg/seccomp"
 	"github.com/containerd/containerd/v2/pkg/sys"
 )
@@ -129,54 +127,6 @@ func (c *Controller) pinUserNamespace(sandboxID string, netnsPath string) error 
 
 	if err = unix.Mount(usernsFd.Name(), nsPath, "none", unix.MS_BIND, ""); err != nil {
 		return fmt.Errorf("failed to bind mount ns src: %v at %s: %w", usernsFd.Name(), nsPath, err)
-	}
-	return nil
-}
-
-func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
-	var labels []string
-
-	if selinuxOptions == nil {
-		return nil, nil
-	}
-	if err := checkSelinuxLevel(selinuxOptions.Level); err != nil {
-		return nil, err
-	}
-	if selinuxOptions.User != "" {
-		labels = append(labels, "user:"+selinuxOptions.User)
-	}
-	if selinuxOptions.Role != "" {
-		labels = append(labels, "role:"+selinuxOptions.Role)
-	}
-	if selinuxOptions.Type != "" {
-		labels = append(labels, "type:"+selinuxOptions.Type)
-	}
-	if selinuxOptions.Level != "" {
-		labels = append(labels, "level:"+selinuxOptions.Level)
-	}
-
-	return labels, nil
-}
-
-func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
-	labels, err := toLabel(selinuxOpts)
-	if err != nil {
-		return "", "", err
-	}
-	return label.InitLabels(labels)
-}
-
-func checkSelinuxLevel(level string) error {
-	if len(level) == 0 {
-		return nil
-	}
-
-	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}(\.c\d{1,4})?(,c\d{1,4}(\.c\d{1,4})?)*)?$`, level)
-	if err != nil {
-		return fmt.Errorf("the format of 'level' %q is not correct: %w", level, err)
-	}
-	if !matched {
-		return fmt.Errorf("the format of 'level' %q is not correct", level)
 	}
 	return nil
 }
@@ -296,10 +246,10 @@ func isVMBasedRuntime(runtimeType string) bool {
 }
 
 func modifyProcessLabel(runtimeType string, spec *runtimespec.Spec) error {
-	if !isVMBasedRuntime(runtimeType) {
+	if !selinux.GetEnabled() || !isVMBasedRuntime(runtimeType) {
 		return nil
 	}
-	l, err := seutil.ChangeToKVM(spec.Process.SelinuxLabel)
+	l, err := selinux.SetProcessKind(spec.Process.SelinuxLabel, selinux.ProcessKindKVM)
 	if err != nil {
 		return fmt.Errorf("failed to get selinux kvm label: %w", err)
 	}

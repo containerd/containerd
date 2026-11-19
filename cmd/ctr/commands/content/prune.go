@@ -17,6 +17,7 @@
 package content
 
 import (
+	"context"
 	"strings"
 	"time"
 	"unicode"
@@ -25,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -47,30 +48,31 @@ var pruneFlags = []cli.Flag{
 var pruneCommand = &cli.Command{
 	Name:  "prune",
 	Usage: "Prunes content from the content store",
-	Subcommands: cli.Commands{
+	Commands: []*cli.Command{
 		pruneReferencesCommand,
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 var pruneReferencesCommand = &cli.Command{
 	Name:  "references",
 	Usage: "Prunes preference labels from the content store (layers only by default)",
 	Flags: pruneFlags,
-	Action: func(cliContext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(cliContext)
+	Action: func(ctx context.Context, cmd *cli.Command) error {
+		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		dryRun := cliContext.Bool("dry")
+		dryRun := cmd.Bool("dry")
 		if dryRun {
 			log.G(ctx).Logger.SetLevel(log.DebugLevel)
 			log.G(ctx).Debug("dry run, no changes will be applied")
 		}
 
 		var deleteOpts []leases.DeleteOpt
-		if !cliContext.Bool("async") {
+		if !cmd.Bool("async") {
 			deleteOpts = append(deleteOpts, leases.SynchronousDelete)
 		}
 
@@ -109,6 +111,7 @@ var pruneReferencesCommand = &cli.Command{
 		}
 		return ls.Delete(ctx, l, deleteOpts...)
 	},
+	DisableSliceFlagSeparator: true,
 }
 
 func isLayerLabel(key string) bool {

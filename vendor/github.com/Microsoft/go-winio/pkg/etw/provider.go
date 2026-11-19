@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 package etw
 
@@ -55,7 +54,6 @@ const (
 
 type eventInfoClass uint32
 
-//nolint:deadcode,varcheck // keep unused constants for potential future use
 const (
 	eventInfoClassProviderBinaryTrackInfo eventInfoClass = iota
 	eventInfoClassProviderSetReserved1

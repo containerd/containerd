@@ -270,6 +270,8 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		})
 	}
 	request.RuntimePath = info.RuntimePath
+	request.TaskApiAddress = info.taskAPIAddress
+	request.TaskApiVersion = info.taskAPIVersion
 	if info.Options != nil {
 		o, err := typeurl.MarshalAny(info.Options)
 		if err != nil {

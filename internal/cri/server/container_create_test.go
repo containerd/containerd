@@ -70,7 +70,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil, nil)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -146,7 +146,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations: test.podAnnotations,
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -508,7 +508,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				ContainerAnnotations: test.containerAnnotations,
 			}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
-				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
+				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -759,8 +759,84 @@ func TestLinuxContainerMounts(t *testing.T) {
 			}
 			c := newTestCRIService()
 			c.os.(*ostesting.FakeOS).StatFn = test.statFn
-			mounts := c.linuxContainerMounts(testSandboxID, config)
+			mounts := c.linuxContainerMounts(testSandboxID, config, nil)
 			assert.Equal(t, test.expectedMounts, mounts, test.desc)
+		})
+	}
+}
+
+func TestResolveCgroupnsMode(t *testing.T) {
+	for _, tc := range []struct {
+		desc           string
+		privileged     bool
+		cgroupnsOpts   *runtime.CgroupNamespace
+		unifiedCgroups bool
+		want           runtime.NamespaceMode
+		wantErr        bool
+	}{
+		{
+			desc:           "default: non-privileged on cgroup v2",
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_CONTAINER,
+		},
+		{
+			desc:           "default: privileged on cgroup v2",
+			privileged:     true,
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_NODE,
+		},
+		{
+			desc: "default: non-privileged on cgroup v1",
+			want: runtime.NamespaceMode_NODE,
+		},
+		{
+			desc:       "default: privileged on cgroup v1",
+			privileged: true,
+			want:       runtime.NamespaceMode_NODE,
+		},
+		{
+			desc:           "CONTAINER: privileged on cgroup v2",
+			privileged:     true,
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_CONTAINER},
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_CONTAINER,
+		},
+		{
+			desc:         "CONTAINER: non-privileged on cgroup v1",
+			cgroupnsOpts: &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_CONTAINER},
+			want:         runtime.NamespaceMode_CONTAINER,
+		},
+		{
+			desc:           "NODE: non-privileged on cgroup v2",
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_NODE},
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_NODE,
+		},
+		{
+			desc:           "POD is unsupported",
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_POD},
+			unifiedCgroups: true,
+			wantErr:        true,
+		},
+		{
+			desc:           "TARGET is unsupported",
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_TARGET},
+			unifiedCgroups: true,
+			wantErr:        true,
+		},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			securityContext := &runtime.LinuxContainerSecurityContext{
+				Privileged:       tc.privileged,
+				NamespaceOptions: &runtime.NamespaceOption{CgroupnsOptions: tc.cgroupnsOpts},
+			}
+			got, err := resolveCgroupnsMode(securityContext, tc.unifiedCgroups)
+			if tc.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

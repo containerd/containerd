@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package propagation // import "go.opentelemetry.io/otel/propagation"
+package propagation
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"go.opentelemetry.io/otel/propagation/internal/hextable"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -46,8 +47,8 @@ func (TraceContext) Inject(ctx context.Context, carrier TextMapCarrier) {
 		carrier.Set(tracestateHeader, ts)
 	}
 
-	// Clear all flags other than the trace-context supported sampling bit.
-	flags := sc.TraceFlags() & trace.FlagsSampled
+	// Preserve only the spec-defined flags: sampled (0x01) and random (0x02).
+	flags := sc.TraceFlags() & (trace.FlagsSampled | trace.FlagsRandom)
 
 	var sb strings.Builder
 	sb.Grow(2 + 32 + 16 + 2 + 3)
@@ -104,14 +105,13 @@ func (TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	if !extractPart(opts[:], &h, 2) {
 		return trace.SpanContext{}
 	}
-	if version == 0 && (h != "" || opts[0] > 2) {
-		// version 0 not allow extra
-		// version 0 not allow other flag
+	if version == 0 && (h != "" || opts[0] > 3) {
+		// version 0 does not allow extra fields or reserved flag bits.
 		return trace.SpanContext{}
 	}
 
-	// Clear all flags other than the trace-context supported sampling bit.
-	scc.TraceFlags = trace.TraceFlags(opts[0]) & trace.FlagsSampled // nolint:gosec // slice size already checked.
+	scc.TraceFlags = trace.TraceFlags(opts[0]) & //nolint:gosec // slice size already checked.
+		(trace.FlagsSampled | trace.FlagsRandom)
 
 	// Ignore the error returned here. Failure to parse tracestate MUST NOT
 	// affect the parsing of traceparent according to the W3C tracecontext
@@ -127,27 +127,23 @@ func (TraceContext) extract(carrier TextMapCarrier) trace.SpanContext {
 	return sc
 }
 
-// upperHex detect hex is upper case Unicode characters.
-func upperHex(v string) bool {
-	for _, c := range v {
-		if c >= 'A' && c <= 'F' {
-			return true
-		}
-	}
-	return false
-}
-
 func extractPart(dst []byte, h *string, n int) bool {
 	part, left, _ := strings.Cut(*h, delimiter)
 	*h = left
-	// hex.Decode decodes unsupported upper-case characters, so exclude explicitly.
-	if len(part) != n || upperHex(part) {
+	if len(part) != n {
 		return false
 	}
-	if p, err := hex.Decode(dst, []byte(part)); err != nil || p != n/2 {
-		return false
+	// hextable.Rev maps every invalid character to 0xff, including the
+	// upper-case A-F the specification disallows. OR-ing every looked-up value
+	// together lets a single check detect any invalid character, because no
+	// valid value has the upper 4 bits set.
+	invalidMark := byte(0)
+	for i := 0; i < n; i += 2 {
+		hi, lo := hextable.Rev[part[i]], hextable.Rev[part[i+1]]
+		dst[i/2] = (hi << 4) | lo
+		invalidMark |= hi | lo
 	}
-	return true
+	return invalidMark&0xf0 == 0
 }
 
 // Fields returns the keys who's values are set with Inject.

@@ -19,17 +19,19 @@ package oci
 import (
 	"context"
 	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
+	"github.com/moby/sys/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateSpec(t *testing.T) {
@@ -52,7 +54,7 @@ func TestGenerateSpec(t *testing.T) {
 			s.Process.Capabilities.Permitted,
 			s.Process.Capabilities.Effective,
 		} {
-			for i := 0; i < len(defaults); i++ {
+			for i := range defaults {
 				if cl[i] != defaults[i] {
 					t.Errorf("cap at %d does not match set %q != %q", i, defaults[i], cl[i])
 				}
@@ -252,6 +254,12 @@ func TestPopulateDefaultUnixSpec(t *testing.T) {
 	if expected.Linux == nil {
 		t.Error("Cannot populate Unix Spec")
 	}
+
+	// CgroupsPath should never contain backslashes when the spec is generated
+	// on Windows.
+	if strings.Contains(expected.Linux.CgroupsPath, "\\") {
+		t.Errorf("CgroupsPath contains backslashes: %s", expected.Linux.CgroupsPath)
+	}
 }
 
 func TestWithPrivileged(t *testing.T) {
@@ -330,61 +338,218 @@ func TestWithPrivileged(t *testing.T) {
 	}
 }
 
-func TestOpenUserFile_AbsoluteSymlink(t *testing.T) {
+func TestOpenUserFile_Symlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("absolute symlink handling is only supported on non-Windows platforms")
+		t.Skip("symlink handling is only supported on non-Windows platforms")
 	}
 
 	expectedContent := []byte("root:x:0:0:root:/root:/bin/bash" + t.Name())
 
-	root := t.TempDir()
-	// Use 'continuity' library to create a directory structure simulating NixOS
-	if err := fstest.Apply(
-		fstest.CreateDir("/etc", 0o755),
-		fstest.CreateDir("/nix/store/abcd", 0o755),
-		fstest.CreateFile("/nix/store/abcd/passwd", expectedContent, 0o644),
-		// /etc/passwd -> /nix/store/abcd/passwd (absolute symlink)
-		fstest.Symlink("/nix/store/abcd/passwd", "/etc/passwd"),
-	).Apply(root); err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct {
+		name    string
+		initOps []fstest.Applier
+	}{
+		{
+			name: "absolute symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/etc", 0o755),
+				fstest.CreateDir("/nix/store/abcd", 0o755),
+				fstest.CreateFile("/nix/store/abcd/passwd", expectedContent, 0o644),
+				// /etc/passwd -> /nix/store/abcd/passwd (absolute symlink)
+				fstest.Symlink("/nix/store/abcd/passwd", "/etc/passwd"),
+			},
+		},
+		{
+			name: "absolute symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/passwd", expectedContent, 0o644),
+				// /etc -> /system/etc (absolute symlink)
+				fstest.Symlink("/system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/passwd", expectedContent, 0o644),
+				fstest.Symlink("../system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("/passwd", expectedContent, 0o644),
+				fstest.Symlink("..", "/etc"),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+
+			err := fstest.Apply(tc.initOps...).Apply(rootDir)
+			require.NoError(t, err)
+
+			rootFS, err := os.OpenRoot(rootDir)
+			require.NoError(t, err)
+			defer rootFS.Close()
+
+			f, err := openUserFile(rootFS.FS(), "etc/passwd")
+			require.NoError(t, err)
+
+			defer f.Close()
+
+			content, err := io.ReadAll(f)
+			require.NoError(t, err)
+
+			require.Equal(t, string(expectedContent), string(content))
+		})
 	}
 
-	rootFS := os.DirFS(root)
+}
 
-	// Ensure the FS implements the ReadLink interface.
-	// If the native os.DirFS doesn't implement it (depending on Go version),
-	// wrap it in our readLinkFS helper.
-	if _, ok := rootFS.(readLinker); !ok {
-		t.Logf("os.DirFS does not implement ReadLink; wrapping to use ReadLink")
-		rootFS = readLinkFS{root: root, fs: rootFS}
+func TestGroupLookup_Symlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink handling is only supported on non-Windows platforms")
 	}
 
-	f, err := openUserFile(rootFS, "etc/passwd")
-	if err != nil {
-		t.Fatalf("openUserFile failed on absolute symlink: %v", err)
-	}
-	defer f.Close()
+	expectedContent := []byte("dummygroup:x:1001:paulo\n")
 
-	content, err := io.ReadAll(f)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != string(expectedContent) {
-		t.Errorf("expected content %q, got %q", string(expectedContent), string(content))
+	for _, tc := range []struct {
+		name    string
+		initOps []fstest.Applier
+	}{
+		{
+			name: "absolute symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/etc", 0o755),
+				fstest.CreateDir("/nix/store/abcd", 0o755),
+				fstest.CreateFile("/nix/store/abcd/group", expectedContent, 0o644),
+				fstest.Symlink("/nix/store/abcd/group", "/etc/group"),
+			},
+		},
+		{
+			name: "absolute symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/group", expectedContent, 0o644),
+				fstest.Symlink("/system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v1",
+			initOps: []fstest.Applier{
+				fstest.CreateDir("/system/etc", 0o755),
+				fstest.CreateFile("/system/etc/group", expectedContent, 0o644),
+				fstest.Symlink("../system/etc", "/etc"),
+			},
+		},
+		{
+			name: "relative symlink - v2",
+			initOps: []fstest.Applier{
+				fstest.CreateFile("group", expectedContent, 0o644),
+				fstest.Symlink("..", "/etc"),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rootDir := t.TempDir()
+
+			err := fstest.Apply(tc.initOps...).Apply(rootDir)
+			require.NoError(t, err)
+
+			rootFS, err := os.OpenRoot(rootDir)
+			require.NoError(t, err)
+			defer rootFS.Close()
+
+			gid, err := GIDFromFS(rootFS.FS(), func(g user.Group) bool {
+				return g.Name == "dummygroup"
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, uint32(1001), gid)
+
+			gids, err := getSupplementalGroupsFromFS(rootFS.FS(), func(g user.Group) bool {
+				return g.Name == "dummygroup"
+			})
+			require.NoError(t, err)
+
+			if len(gids) != 1 || gids[0] != 1001 {
+				t.Errorf("expected supplemental GIDs [1001], got %v", gids)
+			}
+		})
 	}
 }
 
-// Helpers for testing ReadLink support
-type readLinkFS struct {
-	root string
-	fs   fs.FS
-}
+func TestParsePossibleCPUs(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    []int
+		expectError bool
+	}{
+		{
+			name:     "continuous range",
+			input:    "0-3",
+			expected: []int{0, 1, 2, 3},
+		},
+		{
+			name:     "large range",
+			input:    "0-127",
+			expected: func() []int {
+				res := make([]int, 128)
+				for i := range res {
+					res[i] = i
+				}
+				return res
+			}(),
+		},
+		{
+			name:     "non-continuous range",
+			input:    "0-2,4,6-7",
+			expected: []int{0, 1, 2, 4, 6, 7},
+		},
+		{
+			name:     "single cpu",
+			input:    "5",
+			expected: []int{5},
+		},
+		{
+			name:        "empty input",
+			input:       "",
+			expectError: true,
+		},
+		{
+			name:        "invalid range",
+			input:       "0-2,invalid",
+			expectError: true,
+		},
+		{
+			name:        "malformed range with multiple dashes",
+			input:       "0-2-3",
+			expectError: true,
+		},
+		{
+			name:        "reversed range",
+			input:       "3-0",
+			expectError: true,
+		},
+		{
+			name:        "negative start",
+			input:       "-1-3",
+			expectError: true,
+		},
+	}
 
-func (r readLinkFS) Open(name string) (fs.File, error) {
-	return r.fs.Open(name)
-}
-
-func (r readLinkFS) ReadLink(name string) (string, error) {
-	// Force link reading using the actual path on disk
-	return os.Readlink(filepath.Join(r.root, filepath.FromSlash(name)))
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result, err := parsePossibleCPUs(test.input)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, test.expected, result)
+			}
+		})
+	}
 }

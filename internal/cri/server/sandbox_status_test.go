@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/types"
 )
 
 func TestPodSandboxStatus(t *testing.T) {
@@ -204,7 +204,7 @@ func TestSetUpdatedResources(t *testing.T) {
 				return
 			}
 
-			var info types.SandboxInfo
+			var info podsandboxtypes.SandboxInfo
 			err = json.Unmarshal([]byte(test.info["info"]), &info)
 			assert.NoError(t, err)
 

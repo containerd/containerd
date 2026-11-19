@@ -118,7 +118,7 @@ type CheckpointTaskInfo struct {
 	// ParentCheckpoint is the digest of a parent checkpoint
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
-	Options interface{}
+	Options any
 
 	runtime string
 }
@@ -139,7 +139,7 @@ type TaskInfo struct {
 	// RootFS is a list of mounts to use as the task's root filesystem
 	RootFS []mount.Mount
 	// Options hold runtime specific settings for task creation
-	Options interface{}
+	Options any
 	// RuntimePath is an absolute path that can be used to overwrite path
 	// to a shim runtime binary.
 	RuntimePath string
@@ -151,6 +151,12 @@ type TaskInfo struct {
 	// they will be based on the runtimeOptions.
 	// https://github.com/containerd/containerd/issues/11568
 	runtimeOptions typeurl.Any
+
+	// taskAPIAddress is sandbox API address for this task, can be a unix domain socket, or vsock address.
+	// It is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
+	taskAPIAddress string
+	// taskAPIVersion is task api version, currently supported value is 2 and 3.
+	taskAPIVersion uint32
 }
 
 // Runtime name for the container
@@ -636,7 +642,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 // UpdateTaskInfo allows updated specific settings to be changed on a task
 type UpdateTaskInfo struct {
 	// Resources updates a tasks resource constraints
-	Resources interface{}
+	Resources any
 	// Annotations allows arbitrary and/or experimental resource constraints for task update
 	Annotations map[string]string
 }
@@ -745,7 +751,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 
 func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
 	opts := []diff.Opt{
-		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
+		diff.WithReference("checkpoint-rw-" + id),
 	}
 	rw, err := rootfs.CreateDiff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), opts...)
 	if err != nil {
@@ -761,7 +767,7 @@ func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapsh
 
 func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image string) error {
 	if image == "" {
-		return fmt.Errorf("cannot checkpoint image with empty name")
+		return errors.New("cannot checkpoint image with empty name")
 	}
 	ir, err := t.client.ImageService().Get(ctx, image)
 	if err != nil {
@@ -795,7 +801,7 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 }
 
 // isCheckpointPathExist only suitable for runc runtime now
-func isCheckpointPathExist(runtime string, v interface{}) bool {
+func isCheckpointPathExist(runtime string, v any) bool {
 	if v == nil {
 		return false
 	}

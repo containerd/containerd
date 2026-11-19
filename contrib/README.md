@@ -9,3 +9,8 @@ Packaging and other built tools can be added to `contrib` to aid in packaging co
 ## Testing
 
 Code in the `contrib` directory may or may not have been tested in the normal test pipeline for core components.
+
+### gVisor
+
+See [gvisor](gvisor/README.md) to run the gVisor CI steps locally in a privileged
+container.

@@ -56,7 +56,7 @@ func checkLayerFileUpdate(ctx context.Context, t *testing.T, sn snapshots.Snapsh
 	var sleepTime time.Duration
 
 	// run 5 times to account for sporadic failure
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		time.Sleep(sleepTime)
 
 		if err := checkSnapshots(ctx, sn, work, l1Init, l2Init); err != nil {

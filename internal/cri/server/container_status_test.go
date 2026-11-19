@@ -168,6 +168,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expected.FinishedAt = test.finishedAt
 			expected.ExitCode = test.exitCode
 			expected.Message = test.message
+			expected.StopSignal = runtime.Signal_SIGNAL_SIGTERM
 			patchExceptedWithState(expected, test.expectedState)
 			containerStatus, err := toCRIContainerStatus(context.Background(),
 				container,
@@ -273,8 +274,91 @@ func TestContainerStatus(t *testing.T) {
 			expected.StartedAt = test.startedAt
 			expected.FinishedAt = test.finishedAt
 			expected.Reason = test.reason
+			expected.StopSignal = runtime.Signal_SIGNAL_SIGTERM
 			patchExceptedWithState(expected, test.expectedState)
 			assert.Equal(t, expected, resp.GetStatus())
+		})
+	}
+}
+
+func TestToCRISignal(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected runtime.Signal
+	}{
+		{input: "SIGTERM", expected: runtime.Signal_SIGNAL_SIGTERM},
+		{input: "SIGRTMIN+1", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS1},
+		{input: "SIGRTMAX-1", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS1},
+		{input: "SIGNAL_SIGABRT", expected: runtime.Signal_SIGNAL_SIGABRT},
+		{input: "SIGNAL_SIGALRM", expected: runtime.Signal_SIGNAL_SIGALRM},
+		{input: "SIGNAL_SIGBUS", expected: runtime.Signal_SIGNAL_SIGBUS},
+		{input: "SIGNAL_SIGCHLD", expected: runtime.Signal_SIGNAL_SIGCHLD},
+		{input: "SIGNAL_SIGCLD", expected: runtime.Signal_SIGNAL_SIGCLD},
+		{input: "SIGNAL_SIGCONT", expected: runtime.Signal_SIGNAL_SIGCONT},
+		{input: "SIGNAL_SIGFPE", expected: runtime.Signal_SIGNAL_SIGFPE},
+		{input: "SIGNAL_SIGHUP", expected: runtime.Signal_SIGNAL_SIGHUP},
+		{input: "SIGNAL_SIGILL", expected: runtime.Signal_SIGNAL_SIGILL},
+		{input: "SIGNAL_SIGINT", expected: runtime.Signal_SIGNAL_SIGINT},
+		{input: "SIGNAL_SIGIO", expected: runtime.Signal_SIGNAL_SIGIO},
+		{input: "SIGNAL_SIGIOT", expected: runtime.Signal_SIGNAL_SIGIOT},
+		{input: "SIGNAL_SIGKILL", expected: runtime.Signal_SIGNAL_SIGKILL},
+		{input: "SIGNAL_SIGPIPE", expected: runtime.Signal_SIGNAL_SIGPIPE},
+		{input: "SIGNAL_SIGPOLL", expected: runtime.Signal_SIGNAL_SIGPOLL},
+		{input: "SIGNAL_SIGPROF", expected: runtime.Signal_SIGNAL_SIGPROF},
+		{input: "SIGNAL_SIGPWR", expected: runtime.Signal_SIGNAL_SIGPWR},
+		{input: "SIGNAL_SIGQUIT", expected: runtime.Signal_SIGNAL_SIGQUIT},
+		{input: "SIGNAL_SIGSEGV", expected: runtime.Signal_SIGNAL_SIGSEGV},
+		{input: "SIGNAL_SIGSTKFLT", expected: runtime.Signal_SIGNAL_SIGSTKFLT},
+		{input: "SIGNAL_SIGSTOP", expected: runtime.Signal_SIGNAL_SIGSTOP},
+		{input: "SIGNAL_SIGSYS", expected: runtime.Signal_SIGNAL_SIGSYS},
+		{input: "SIGNAL_SIGTERM", expected: runtime.Signal_SIGNAL_SIGTERM},
+		{input: "SIGNAL_SIGTRAP", expected: runtime.Signal_SIGNAL_SIGTRAP},
+		{input: "SIGNAL_SIGTSTP", expected: runtime.Signal_SIGNAL_SIGTSTP},
+		{input: "SIGNAL_SIGTTIN", expected: runtime.Signal_SIGNAL_SIGTTIN},
+		{input: "SIGNAL_SIGTTOU", expected: runtime.Signal_SIGNAL_SIGTTOU},
+		{input: "SIGNAL_SIGURG", expected: runtime.Signal_SIGNAL_SIGURG},
+		{input: "SIGNAL_SIGUSR1", expected: runtime.Signal_SIGNAL_SIGUSR1},
+		{input: "SIGNAL_SIGUSR2", expected: runtime.Signal_SIGNAL_SIGUSR2},
+		{input: "SIGNAL_SIGVTALRM", expected: runtime.Signal_SIGNAL_SIGVTALRM},
+		{input: "SIGNAL_SIGWINCH", expected: runtime.Signal_SIGNAL_SIGWINCH},
+		{input: "SIGNAL_SIGXCPU", expected: runtime.Signal_SIGNAL_SIGXCPU},
+		{input: "SIGNAL_SIGXFSZ", expected: runtime.Signal_SIGNAL_SIGXFSZ},
+		{input: "SIGNAL_SIGRTMIN", expected: runtime.Signal_SIGNAL_SIGRTMIN},
+		{input: "SIGNAL_SIGRTMIN+1", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS1},
+		{input: "SIGNAL_SIGRTMIN+2", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS2},
+		{input: "SIGNAL_SIGRTMIN+3", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS3},
+		{input: "SIGNAL_SIGRTMIN+4", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS4},
+		{input: "SIGNAL_SIGRTMIN+5", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS5},
+		{input: "SIGNAL_SIGRTMIN+6", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS6},
+		{input: "SIGNAL_SIGRTMIN+7", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS7},
+		{input: "SIGNAL_SIGRTMIN+8", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS8},
+		{input: "SIGNAL_SIGRTMIN+9", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS9},
+		{input: "SIGNAL_SIGRTMIN+10", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS10},
+		{input: "SIGNAL_SIGRTMIN+11", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS11},
+		{input: "SIGNAL_SIGRTMIN+12", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS12},
+		{input: "SIGNAL_SIGRTMIN+13", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS13},
+		{input: "SIGNAL_SIGRTMIN+14", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS14},
+		{input: "SIGNAL_SIGRTMIN+15", expected: runtime.Signal_SIGNAL_SIGRTMINPLUS15},
+		{input: "SIGNAL_SIGRTMAX-14", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS14},
+		{input: "SIGNAL_SIGRTMAX-13", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS13},
+		{input: "SIGNAL_SIGRTMAX-12", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS12},
+		{input: "SIGNAL_SIGRTMAX-11", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS11},
+		{input: "SIGNAL_SIGRTMAX-10", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS10},
+		{input: "SIGNAL_SIGRTMAX-9", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS9},
+		{input: "SIGNAL_SIGRTMAX-8", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS8},
+		{input: "SIGNAL_SIGRTMAX-7", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS7},
+		{input: "SIGNAL_SIGRTMAX-6", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS6},
+		{input: "SIGNAL_SIGRTMAX-5", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS5},
+		{input: "SIGNAL_SIGRTMAX-4", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS4},
+		{input: "SIGNAL_SIGRTMAX-3", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS3},
+		{input: "SIGNAL_SIGRTMAX-2", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS2},
+		{input: "SIGNAL_SIGRTMAX-1", expected: runtime.Signal_SIGNAL_SIGRTMAXMINUS1},
+		{input: "SIGNAL_SIGRTMAX", expected: runtime.Signal_SIGNAL_SIGRTMAX},
+		{input: "SIGNAL_SIGNOPE", expected: runtime.Signal_SIGNAL_RUNTIME_DEFAULT},
+	}
+	for _, test := range tests {
+		t.Run(test.input, func(t *testing.T) {
+			assert.Equal(t, test.expected, toCRISignal(test.input))
 		})
 	}
 }
@@ -311,7 +395,10 @@ func (s *fakeImageService) PullImage(context.Context, string, func(string) (stri
 	return "", errors.New("not implemented")
 }
 
-func (s *fakeImageService) UpdateRuntimeSnapshotter(runtimeName string, imagePlatform images.ImagePlatform) {
+func (s *fakeImageService) UpdateRuntime(runtimeName string, imagePlatform *images.ImagePlatform) {
+}
+
+func (s *fakeImageService) UpdateDefaultRuntimeName(runtimeName string) {
 }
 
 func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {

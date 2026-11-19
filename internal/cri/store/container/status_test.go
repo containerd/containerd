@@ -29,6 +29,56 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
+func TestDeepCopyOfWindowsAffinityCpus(t *testing.T) {
+	orig := Status{
+		Resources: &runtime.ContainerResources{
+			Windows: &runtime.WindowsContainerResources{
+				AffinityCpus: []*runtime.WindowsCpuGroupAffinity{
+					{CpuMask: 0x3, CpuGroup: 0},
+					nil, // test nil handling
+					{CpuMask: 0xf, CpuGroup: 1},
+				},
+			},
+		},
+	}
+	cp := deepCopyOf(orig)
+
+	// Nil entries should be skipped, not copied.
+	assertlib.Equal(t, 2, len(cp.Resources.Windows.AffinityCpus))
+	assertlib.Equal(t, uint64(0x3), cp.Resources.Windows.AffinityCpus[0].CpuMask)
+	assertlib.Equal(t, uint64(0xf), cp.Resources.Windows.AffinityCpus[1].CpuMask)
+
+	// Mutating the copy must not affect the original.
+	cp.Resources.Windows.AffinityCpus[0].CpuMask = 0xff
+	assertlib.Equal(t, uint64(0x3), orig.Resources.Windows.AffinityCpus[0].CpuMask)
+}
+
+func TestDeepCopyOfLinuxAndWindows(t *testing.T) {
+	orig := Status{
+		Resources: &runtime.ContainerResources{
+			Linux: &runtime.LinuxContainerResources{
+				CpuShares: 512,
+				Unified:   map[string]string{"memory.high": "1000"},
+			},
+			Windows: &runtime.WindowsContainerResources{
+				CpuShares: 256,
+			},
+		},
+	}
+	cp := deepCopyOf(orig)
+
+	// Both halves must survive the copy.
+	requirelib.NotNil(t, cp.Resources.Linux)
+	requirelib.NotNil(t, cp.Resources.Windows)
+	assertlib.Equal(t, int64(512), cp.Resources.Linux.CpuShares)
+	assertlib.Equal(t, int64(256), cp.Resources.Windows.CpuShares)
+	assertlib.Equal(t, map[string]string{"memory.high": "1000"}, cp.Resources.Linux.Unified)
+
+	// Mutating the copy's Unified map must not affect the original.
+	cp.Resources.Linux.Unified["memory.high"] = "2000"
+	assertlib.Equal(t, "1000", orig.Resources.Linux.Unified["memory.high"])
+}
+
 func TestContainerState(t *testing.T) {
 	for c, test := range map[string]struct {
 		status Status

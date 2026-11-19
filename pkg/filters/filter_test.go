@@ -80,13 +80,13 @@ func TestFilters(t *testing.T) {
 		},
 	}
 
-	var corpus []interface{}
+	var corpus []any
 	for _, entry := range corpusS {
 		corpus = append(corpus, entry)
 	}
 
 	// adapt shows an example of how to build an adaptor function for a type.
-	adapt := func(o interface{}) Adaptor {
+	adapt := func(o any) Adaptor {
 		obj := o.(cEntry)
 		return AdapterFunc(func(fieldpath []string) (string, bool) {
 			switch fieldpath[0] {
@@ -106,7 +106,7 @@ func TestFilters(t *testing.T) {
 	for _, testcase := range []struct {
 		name      string
 		input     string
-		expected  []interface{}
+		expected  []any
 		errString string
 	}{
 		{
@@ -122,7 +122,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "LabelPresent",
 			input: "labels.foo",
-			expected: []interface{}{
+			expected: []any{
 				corpus[0],
 				corpus[2],
 				corpus[8],
@@ -131,7 +131,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "NameAndLabelPresent",
 			input: "labels.foo,name",
-			expected: []interface{}{
+			expected: []any{
 				corpus[0],
 				corpus[2],
 				corpus[8],
@@ -140,14 +140,14 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "LabelValue",
 			input: "labels.foo==true",
-			expected: []interface{}{
+			expected: []any{
 				corpus[0],
 			},
 		},
 		{
 			name:  "LabelValuePunctuated",
 			input: "labels.foo==omg_asdf.asdf-qwer",
-			expected: []interface{}{
+			expected: []any{
 				corpus[8],
 			},
 		},
@@ -159,7 +159,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "Name",
 			input: "name==bar",
-			expected: []interface{}{
+			expected: []any{
 				corpus[1],
 				corpus[3],
 			},
@@ -167,7 +167,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "NameNotEqual",
 			input: "name!=bar",
-			expected: []interface{}{
+			expected: []any{
 				corpus[0],
 				corpus[2],
 				corpus[4],
@@ -180,21 +180,21 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "NameAndLabelPresent",
 			input: "name==bar,labels.bar",
-			expected: []interface{}{
+			expected: []any{
 				corpus[3],
 			},
 		},
 		{
 			name:  "QuotedValue",
 			input: "other==\"too complex, yo\"",
-			expected: []interface{}{
+			expected: []any{
 				corpus[6],
 			},
 		},
 		{
 			name:  "RegexpValue",
 			input: "other~=[abc]+,name!=foo",
-			expected: []interface{}{
+			expected: []any{
 				corpus[6],
 				corpus[7],
 			},
@@ -202,7 +202,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "RegexpQuotedValue",
 			input: "other~=/[abc]+/,name!=foo",
-			expected: []interface{}{
+			expected: []any{
 				corpus[6],
 				corpus[7],
 			},
@@ -210,7 +210,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "RegexpQuotedValue",
 			input: "other~=/[abc]{1,2}/,name!=foo",
-			expected: []interface{}{
+			expected: []any{
 				corpus[6],
 				corpus[7],
 			},
@@ -223,7 +223,7 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "NameAndLabelValue",
 			input: "name==bar,labels.bar==true",
-			expected: []interface{}{
+			expected: []any{
 				corpus[3],
 			},
 		},
@@ -234,21 +234,21 @@ func TestFilters(t *testing.T) {
 		{
 			name:  "LabelQuotedFieldPathPresent",
 			input: `name==foo,labels."more complex label"`,
-			expected: []interface{}{
+			expected: []any{
 				corpus[2],
 			},
 		},
 		{
 			name:  "LabelQuotedFieldPathPresentWithQuoted",
 			input: `labels."more complex label with \\ and \""==present`,
-			expected: []interface{}{
+			expected: []any{
 				corpus[4],
 			},
 		},
 		{
 			name:  "LabelQuotedFieldPathPresentWithQuotedEmbed",
 			input: `labels."more complex label with \\ and \"".post==present`,
-			expected: []interface{}{
+			expected: []any{
 				corpus[5],
 			},
 		},
@@ -303,7 +303,7 @@ func TestFilters(t *testing.T) {
 				t.Fatal("filter should not be nil")
 			}
 
-			var results []interface{}
+			var results []any
 			for _, item := range corpus {
 				adaptor := adapt(item)
 				if filter.Match(adaptor) {

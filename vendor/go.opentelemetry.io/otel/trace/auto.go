@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/trace"
+package trace
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/internal/telemetry"
 )
@@ -314,6 +314,14 @@ func convAttrValue(value attribute.Value) telemetry.Value {
 	case attribute.STRING:
 		v := truncate(maxSpan.AttrValueLen, value.AsString())
 		return telemetry.StringValue(v)
+	case attribute.BYTESLICE:
+		// len(v.AsString()) is identical to len(v.AsByteSlice()) but
+		// avoids allocating the full slice before truncation.
+		s := value.AsString()
+		if maxSpan.AttrValueLen >= 0 && len(s) > maxSpan.AttrValueLen {
+			return telemetry.BytesValue([]byte(s[:maxSpan.AttrValueLen]))
+		}
+		return telemetry.BytesValue([]byte(s))
 	case attribute.BOOLSLICE:
 		slice := value.AsBoolSlice()
 		out := make([]telemetry.Value, 0, len(slice))
@@ -343,11 +351,28 @@ func convAttrValue(value attribute.Value) telemetry.Value {
 			out = append(out, telemetry.StringValue(v))
 		}
 		return telemetry.SliceValue(out...)
+	case attribute.SLICE:
+		slice := value.AsSlice()
+		out := make([]telemetry.Value, 0, len(slice))
+		for _, v := range slice {
+			out = append(out, convAttrValue(v))
+		}
+		return telemetry.SliceValue(out...)
+	case attribute.MAP:
+		kvs := value.AsMap()
+		out := make([]telemetry.Attr, 0, len(kvs))
+		for _, kv := range kvs {
+			out = append(out, telemetry.Attr{
+				Key:   string(kv.Key),
+				Value: convAttrValue(kv.Value),
+			})
+		}
+		return telemetry.MapValue(out...)
 	}
 	return telemetry.Value{}
 }
 
-// truncate returns a truncated version of s such that it contains less than
+// truncate returns a truncated version of s such that it contains at most
 // the limit number of characters. Truncation is applied by returning the limit
 // number of valid characters contained in s.
 //
@@ -356,7 +381,7 @@ func convAttrValue(value attribute.Value) telemetry.Value {
 // UTF-8 is supported. When truncating, all invalid characters are dropped
 // before applying truncation.
 //
-// If s already contains less than the limit number of bytes, it is returned
+// If s already contains at most the limit number of bytes, it is returned
 // unchanged. No invalid characters are removed.
 func truncate(limit int, s string) string {
 	// This prioritize performance in the following order based on the most
@@ -382,6 +407,10 @@ func truncate(limit int, s string) string {
 			continue
 		}
 
+		// A zero limit also truncates a leading invalid byte or U+FFFD.
+		if limit == 0 {
+			return ""
+		}
 		_, size := utf8.DecodeRuneInString(s[i:])
 		if size == 1 {
 			// Invalid encoding.
@@ -389,6 +418,12 @@ func truncate(limit int, s string) string {
 			_, _ = b.WriteString(s[:i])
 			s = s[i:]
 			break
+		}
+
+		// A valid U+FFFD still consumes one character of the limit.
+		count++
+		if count > limit {
+			return s[:i]
 		}
 	}
 
@@ -463,7 +498,8 @@ func (s *autoSpan) RecordError(err error, opts ...EventOption) {
 	cfg := NewEventConfig(opts...)
 
 	attrs := cfg.Attributes()
-	attrs = append(attrs,
+	attrs = append(
+		attrs,
 		semconv.ExceptionType(typeStr(err)),
 		semconv.ExceptionMessage(err.Error()),
 	)

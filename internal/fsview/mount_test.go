@@ -1,0 +1,412 @@
+/*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package fsview_test
+
+import (
+	"context"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/erofsutils"
+	"github.com/containerd/containerd/v2/internal/fsview"
+	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
+
+	"github.com/containerd/containerd/v2/pkg/archive/tartest"
+	"github.com/containerd/continuity/tarconv"
+	goerofs "github.com/erofs/go-erofs"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestFSMountsLast(t *testing.T) {
+	tmp := t.TempDir()
+	dir1 := filepath.Join(tmp, "dir1")
+	dir2 := filepath.Join(tmp, "dir2")
+	if err := os.Mkdir(dir1, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(dir2, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir1, "f1"), []byte("1"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir2, "f2"), []byte("2"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	mounts := []mount.Mount{
+		{Type: "bind", Source: dir1, Target: "/mnt/dir1"},
+		{Type: "bind", Source: dir2, Target: "/mnt/dir2"},
+	}
+
+	// Should pick the last one (dir2)
+	fs, err := fsview.FSMounts(mounts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fs.Close()
+
+	if _, err := fs.Open("f2"); err != nil {
+		t.Errorf("expected to find f2 in last mount, got %v", err)
+	}
+	if _, err := fs.Open("f1"); err == nil {
+		t.Error("expected NOT to find f1 (should only have dir2)")
+	}
+}
+
+func makeEROFSFromTar(t *testing.T, wt tartest.WriterToTar) string {
+	t.Helper()
+	layerPath := filepath.Join(t.TempDir(), "layer.erofs")
+	rc := tartest.TarFromWriterTo(wt)
+	defer rc.Close()
+	if err := erofsutils.ConvertTarErofs(context.Background(), rc, layerPath, ""); err != nil {
+		t.Fatalf("ConvertTarErofs failed: %v", err)
+	}
+	return layerPath
+}
+
+// indexedLayer is a tar-index layer: an EROFS metadata image whose file data
+// lives in a separate data device.
+type indexedLayer struct {
+	meta string
+	data string
+}
+
+// makeIndexedLayer converts a tar into a tar-index layer. Whiteout entries are
+// kept as .wh.* files so mergeEROFSLayers can apply them.
+func makeIndexedLayer(t *testing.T, wt tartest.WriterToTar) indexedLayer {
+	t.Helper()
+	dir := t.TempDir()
+	l := indexedLayer{meta: filepath.Join(dir, "layer.erofs"), data: filepath.Join(dir, "device-0.blob")}
+	meta, err := os.Create(l.meta)
+	require.NoError(t, err)
+	defer meta.Close()
+	data, err := os.Create(l.data)
+	require.NoError(t, err)
+	defer data.Close()
+
+	rc := tartest.TarFromWriterTo(wt)
+	defer rc.Close()
+	w := goerofs.Create(meta, goerofs.WithBlockSize(512), goerofs.WithDataFile(data))
+	require.NoError(t, tarconv.Apply(w, rc, tarconv.WithPreserveWhiteouts()))
+	require.NoError(t, w.Close())
+	return l
+}
+
+// mergeEROFSLayers merges the metadata of layers, bottom first, into one image
+// that addresses each layer's data device in order. Whiteouts in an upper
+// layer remove entries of the layers below.
+func mergeEROFSLayers(t *testing.T, layers ...indexedLayer) string {
+	t.Helper()
+	output := filepath.Join(t.TempDir(), "merged.erofs")
+	out, err := os.Create(output)
+	require.NoError(t, err)
+	defer out.Close()
+
+	w := goerofs.Create(out)
+	for _, l := range layers {
+		meta, err := os.Open(l.meta)
+		require.NoError(t, err)
+		defer meta.Close()
+		data, err := os.Open(l.data)
+		require.NoError(t, err)
+		defer data.Close()
+		img, err := goerofs.Open(meta, goerofs.WithExtraDevices(data))
+		require.NoError(t, err)
+		require.NoError(t, w.CopyFrom(img, goerofs.MetadataOnly(), goerofs.Merge()))
+	}
+	require.NoError(t, w.Close())
+	return output
+}
+
+// makeBaseErofs builds the base layer EROFS image (replaces testdata/base.erofs).
+func makeBaseErofs(t *testing.T) string {
+	t.Helper()
+
+	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
+	return makeEROFSFromTar(t, tartest.TarAll(
+		tc.Dir("dir1", 0755),
+		tc.File("dir1/file1.txt", []byte("file1 content\n"), 0644),
+		tc.File("dir1/file2.txt", []byte("file2 content\n"), 0644),
+		tc.Dir("dir2", 0755),
+		tc.File("dir2/file2.txt", []byte("file2 content\n"), 0644),
+		tc.Dir("dir2/subdir", 0755),
+		tc.File("dir2/subdir/subfile.txt", []byte("subfile content\n"), 0644),
+	))
+}
+
+// makeUpper1Erofs builds the first upper layer EROFS image (replaces testdata/upper1.erofs).
+// Contains an opaque dir1 with a new file and whiteouts for file1.txt and file2.txt.
+func makeUpper1Erofs(t *testing.T) string {
+	t.Helper()
+
+	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
+	return makeEROFSFromTar(t, tartest.TarAll(
+		tc.Dir("dir1", 0755),
+		tc.File("dir1/.wh..wh..opq", []byte{}, 0644),
+		tc.File("dir1/newfile.txt", []byte("new file content\n"), 0644),
+		tc.File("dir1/.wh.file1.txt", []byte{}, 0644),
+		tc.File("dir1/.wh.file2.txt", []byte{}, 0644),
+		tc.Dir("dir2", 0755),
+	))
+}
+
+// makeUpper2Erofs builds the second upper layer EROFS image (replaces testdata/upper2.erofs).
+// Contains only a whiteout for dir1/file1.txt.
+func makeUpper2Erofs(t *testing.T) string {
+	t.Helper()
+
+	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
+	return makeEROFSFromTar(t, tartest.TarAll(
+		tc.Dir("dir1", 0755),
+		tc.File("dir1/.wh.file1.txt", []byte{}, 0644),
+	))
+}
+
+func TestFSMountsEROFSWithDevices(t *testing.T) {
+	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
+
+	layer1 := makeIndexedLayer(t, tartest.TarAll(
+		tc.Dir("dir", 0755),
+		tc.File("dir/file1.txt", []byte("file1 content"), 0644),
+		tc.File("dir/file2.txt", []byte("file2 content"), 0644),
+	))
+
+	layer2 := makeIndexedLayer(t, tartest.TarAll(
+		tc.Dir("dir", 0755),
+		tc.File("dir/file3.txt", []byte("file3 content"), 0644),
+	))
+
+	metaPath := mergeEROFSLayers(t, layer1, layer2)
+
+	v, err := fsview.FSMounts([]mount.Mount{
+		{
+			Type:    "erofs",
+			Source:  metaPath,
+			Options: []string{"ro", "device=" + layer1.data, "device=" + layer2.data},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	for _, tt := range []struct {
+		path    string
+		content string
+	}{
+		{"dir/file1.txt", "file1 content"},
+		{"dir/file2.txt", "file2 content"},
+		{"dir/file3.txt", "file3 content"},
+	} {
+		f, err := v.Open(tt.path)
+		if err != nil {
+			t.Errorf("failed to open %s: %v", tt.path, err)
+			continue
+		}
+		data, err := io.ReadAll(f)
+		f.Close()
+		if err != nil {
+			t.Errorf("failed to read %s: %v", tt.path, err)
+			continue
+		}
+		if string(data) != tt.content {
+			t.Errorf("%s: got %q, want %q", tt.path, string(data), tt.content)
+		}
+	}
+}
+
+func TestFSMountsOverlayAbsoluteSymlinkEtcGroup(t *testing.T) {
+	expectedContent := "dummygroup:x:1001:root\n"
+	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
+	layerPath := makeEROFSFromTar(t, tartest.TarAll(
+		tc.Dir("etc", 0o755),
+		tc.Dir("nix", 0o755),
+		tc.Dir("nix/store", 0o755),
+		tc.Dir("nix/store/abcd", 0o755),
+		tc.File("nix/store/abcd/group", []byte(expectedContent), 0o644),
+		tc.Symlink("/nix/store/abcd/group", "etc/group"),
+	))
+
+	v, err := fsview.FSMounts([]mount.Mount{
+		{
+			Type:   "erofs",
+			Source: layerPath,
+		},
+		{
+			Type:   "format/overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir={{ mount 0 }}",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	f, err := v.Open("etc/group")
+	if err != nil {
+		t.Fatalf("open etc/group through fsview failed: %v", err)
+	}
+	defer f.Close()
+
+	content, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != expectedContent {
+		t.Errorf("expected content %q, got %q", expectedContent, string(content))
+	}
+}
+
+func TestFSMountsOverlayWithEROFSDevices(t *testing.T) {
+	tc := tartest.TarContext{}.WithModTime(time.Now().UTC())
+
+	// Layer 1 (bottom): regular files including ones that will be hidden
+	layer1 := makeIndexedLayer(t, tartest.TarAll(
+		tc.Dir("dir", 0755),
+		tc.File("dir/file1.txt", []byte("file1 content"), 0644),
+		tc.File("dir/file2.txt", []byte("file2 content"), 0644),
+		tc.File("dir/file5.txt", []byte("file5 content"), 0644),
+		tc.Dir("opaquedir", 0755),
+		tc.File("opaquedir/old.txt", []byte("old content"), 0644),
+	))
+
+	// Layer 2 (top): new files, a whiteout for file5.txt, and an opaque opaquedir.
+	// The AUFS-style markers (.wh.*) are applied by the merge.
+	layer2 := makeIndexedLayer(t, tartest.TarAll(
+		tc.Dir("dir", 0755),
+		tc.File("dir/file3.txt", []byte("file3 content"), 0644),
+		tc.File("dir/.wh.file5.txt", []byte{}, 0644),
+		tc.Dir("opaquedir", 0755),
+		tc.File("opaquedir/.wh..wh..opq", []byte{}, 0644),
+		tc.File("opaquedir/new.txt", []byte("new content"), 0644),
+	))
+
+	// Merge with layer1 as lower (first arg) and layer2 as upper (last arg)
+	// so whiteouts in layer2 apply to layer1.
+	metaPath := mergeEROFSLayers(t, layer1, layer2)
+
+	// Create upper directory with additional and override files
+	upperDir := filepath.Join(t.TempDir(), "upper")
+	if err := os.MkdirAll(filepath.Join(upperDir, "dir"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(upperDir, "dir", "file4.txt"), []byte("file4 content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	// Override file1.txt from lower layer
+	if err := os.WriteFile(filepath.Join(upperDir, "dir", "file1.txt"), []byte("file1 override"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	v, err := fsview.FSMounts([]mount.Mount{
+		{
+			Type:    "erofs",
+			Source:  metaPath,
+			Options: []string{"ro", "device=" + layer1.data, "device=" + layer2.data},
+		},
+		{
+			Type:   "format/overlay",
+			Source: "overlay",
+			Options: []string{
+				"upperdir=" + upperDir,
+				"lowerdir={{ mount 0 }}",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("FSMounts failed: %v", err)
+	}
+	defer v.Close()
+
+	// Verify readable files
+	for _, tt := range []struct {
+		path    string
+		content string
+	}{
+		{"dir/file1.txt", "file1 override"},  // upper overrides lower
+		{"dir/file2.txt", "file2 content"},   // from erofs layer 1
+		{"dir/file3.txt", "file3 content"},   // from erofs layer 2
+		{"dir/file4.txt", "file4 content"},   // from upper only
+		{"opaquedir/new.txt", "new content"}, // from erofs layer 2 (survives opaque)
+	} {
+		f, err := v.Open(tt.path)
+		if err != nil {
+			t.Errorf("failed to open %s: %v", tt.path, err)
+			continue
+		}
+		data, err := io.ReadAll(f)
+		f.Close()
+		if err != nil {
+			t.Errorf("failed to read %s: %v", tt.path, err)
+			continue
+		}
+		if string(data) != tt.content {
+			t.Errorf("%s: got %q, want %q", tt.path, string(data), tt.content)
+		}
+	}
+
+	// Verify whiteout: file5.txt was in layer 1 but whited out by layer 2
+	if _, err := v.Open("dir/file5.txt"); err == nil {
+		t.Error("dir/file5.txt should not exist (whiteout)")
+	}
+
+	// Verify opaque: old.txt was in layer 1's opaquedir but hidden by opaque marker in layer 2
+	if _, err := v.Open("opaquedir/old.txt"); err == nil {
+		t.Error("opaquedir/old.txt should not exist (opaque directory)")
+	}
+}
+
+// TestFormatMountIndexWithSuffix tests {{ mount }} templates that include a path suffix.
+func TestFormatMountIndexWithSuffix(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "root")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "etc"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "sub", "etc"), 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "etc", "passwd"), []byte("root\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "sub", "etc", "passwd"), []byte("guest\n"), 0644))
+
+	mounts := []mount.Mount{
+		{
+			Source: root,
+			Type:   "bind",
+		},
+		{
+			Type:   "format/overlay",
+			Source: "overlay",
+			Options: []string{
+				"lowerdir={{ mount 0 }}/sub",
+			},
+		},
+	}
+
+	viewFS, err := fsview.FSMounts(mounts)
+	require.NoError(t, err)
+	defer viewFS.Close()
+
+	data, err := fs.ReadFile(viewFS, "etc/passwd")
+	require.NoError(t, err)
+	assert.Equal(t, "guest\n", string(data))
+}

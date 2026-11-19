@@ -38,7 +38,7 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.WarningPlugin,
 		ID:   plugins.DeprecationsPlugin,
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			return &service{warnings: make(map[deprecation.Warning]time.Time)}, nil
 		},
 	})

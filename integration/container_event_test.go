@@ -38,9 +38,9 @@ func TestContainerEvents(t *testing.T) {
 
 	t.Log("Set up container events streaming clients")
 	containerEventsStreamingClient1, err := runtimeService.GetContainerEvents(ctx, &runtime.GetEventsRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	containerEventsStreamingClient2, err := runtimeService.GetContainerEvents(ctx, &runtime.GetEventsRequest{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	containerEventsChan1 := make(chan *runtime.ContainerEventResponse)
 	containerEventsChan2 := make(chan *runtime.ContainerEventResponse)
 
@@ -147,9 +147,10 @@ func checkContainerEventResponse(t *testing.T, containerEventsChans []chan *runt
 		select {
 		case resp = <-ch:
 		case <-time.After(readContainerEventChannelTimeout):
-			t.Error("assertContainerEventResponse: timeout waiting for events from channel")
+			t.Fatal("assertContainerEventResponse: timeout waiting for events from channel")
 		}
-		t.Logf("Container Event response received: %+v", *resp)
+		require.NotNil(t, resp)
+		t.Logf("Container Event response received: %+v", resp)
 		assert.Equal(t, expectedType, resp.ContainerEventType)
 
 		// Checking only the State field of PodSandboxStatus

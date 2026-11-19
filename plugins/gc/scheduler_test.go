@@ -85,7 +85,7 @@ func TestDeletionThreshold(t *testing.T) {
 
 	// Increment deletion count 5, checking GC hasn't run in
 	// between each call
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		time.Sleep(time.Millisecond)
 		if c := tc.runCount(); c != 0 {
 			t.Fatalf("GC ran unexpectedly")

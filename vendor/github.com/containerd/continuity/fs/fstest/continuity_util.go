@@ -19,25 +19,24 @@ package fstest
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/containerd/continuity"
+	"os"
 )
 
 type resourceUpdate struct {
-	Original continuity.Resource
-	Updated  continuity.Resource
+	Original resource
+	Updated  resource
 }
 
 func (u resourceUpdate) String() string {
 	return fmt.Sprintf("%s(mode: %o, uid: %d, gid: %d) -> %s(mode: %o, uid: %d, gid: %d)",
-		u.Original.Path(), u.Original.Mode(), u.Original.UID(), u.Original.GID(),
-		u.Updated.Path(), u.Updated.Mode(), u.Updated.UID(), u.Updated.GID(),
+		u.Original.path, u.Original.mode, u.Original.uid, u.Original.gid,
+		u.Updated.path, u.Updated.mode, u.Updated.uid, u.Updated.gid,
 	)
 }
 
 type resourceListDifference struct {
-	Additions []continuity.Resource
-	Deletions []continuity.Resource
+	Additions []resource
+	Deletions []resource
 	Updates   []resourceUpdate
 }
 
@@ -47,7 +46,7 @@ func (l resourceListDifference) HasDiff() bool {
 	}
 
 	for _, add := range l.Additions {
-		if ok := metadataFiles[add.Path()]; !ok {
+		if ok := metadataFiles[add.path]; !ok {
 			return true
 		}
 	}
@@ -58,10 +57,10 @@ func (l resourceListDifference) HasDiff() bool {
 func (l resourceListDifference) String() string {
 	buf := bytes.NewBuffer(nil)
 	for _, add := range l.Additions {
-		fmt.Fprintf(buf, "+ %s\n", add.Path())
+		fmt.Fprintf(buf, "+ %s\n", add.path)
 	}
 	for _, del := range l.Deletions {
-		fmt.Fprintf(buf, "- %s\n", del.Path())
+		fmt.Fprintf(buf, "- %s\n", del.path)
 	}
 	for _, upt := range l.Updates {
 		fmt.Fprintf(buf, "~ %s\n", upt.String())
@@ -69,17 +68,17 @@ func (l resourceListDifference) String() string {
 	return buf.String()
 }
 
-// diffManifest compares two resource lists and returns the list
+// diffResourceList compares two resource lists and returns the list
 // of adds updates and deletes, resource lists are not reordered
 // before doing difference.
-func diffResourceList(r1, r2 []continuity.Resource) resourceListDifference {
+func diffResourceList(r1, r2 []resource) resourceListDifference {
 	i1 := 0
 	i2 := 0
 	var d resourceListDifference
 
 	for i1 < len(r1) && i2 < len(r2) {
-		p1 := r1[i1].Path()
-		p2 := r2[i2].Path()
+		p1 := r1[i1].path
+		p2 := r2[i2].path
 		switch {
 		case p1 < p2:
 			d.Deletions = append(d.Deletions, r1[i1])
@@ -112,103 +111,51 @@ func diffResourceList(r1, r2 []continuity.Resource) resourceListDifference {
 	return d
 }
 
-func compareResource(r1, r2 continuity.Resource) bool {
-	if r1.Path() != r2.Path() {
+func compareResource(r1, r2 resource) bool {
+	if r1.path != r2.path {
 		return false
 	}
-	if r1.Mode() != r2.Mode() {
+	if r1.mode != r2.mode {
 		return false
 	}
-	if r1.UID() != r2.UID() {
+	if r1.uid != r2.uid {
 		return false
 	}
-	if r1.GID() != r2.GID() {
+	if r1.gid != r2.gid {
 		return false
 	}
 
-	// TODO(dmcgowan): Check if is XAttrer
-
-	return compareResourceTypes(r1, r2)
+	return compareResourceType(r1, r2)
 }
 
-func compareResourceTypes(r1, r2 continuity.Resource) bool {
-	switch t1 := r1.(type) {
-	case continuity.RegularFile:
-		t2, ok := r2.(continuity.RegularFile)
-		if !ok {
+func compareResourceType(r1, r2 resource) bool {
+	mode := r1.mode
+	switch {
+	case mode.IsRegular():
+		if r1.size != r2.size {
 			return false
 		}
-		return compareRegularFile(t1, t2)
-	case continuity.Directory:
-		t2, ok := r2.(continuity.Directory)
-		if !ok {
+		if r1.sha256 != r2.sha256 {
 			return false
 		}
-		return compareDirectory(t1, t2)
-	case continuity.SymLink:
-		t2, ok := r2.(continuity.SymLink)
-		if !ok {
+		if len(r1.paths) != len(r2.paths) {
 			return false
 		}
-		return compareSymLink(t1, t2)
-	case continuity.NamedPipe:
-		t2, ok := r2.(continuity.NamedPipe)
-		if !ok {
-			return false
+		for i := range r1.paths {
+			if r1.paths[i] != r2.paths[i] {
+				return false
+			}
 		}
-		return compareNamedPipe(t1, t2)
-	case continuity.Device:
-		t2, ok := r2.(continuity.Device)
-		if !ok {
-			return false
-		}
-		return compareDevice(t1, t2)
+		return true
+	case mode.IsDir():
+		return true
+	case mode&os.ModeSymlink != 0:
+		return r1.target == r2.target
+	case mode&os.ModeNamedPipe != 0:
+		return true
+	case mode&os.ModeDevice != 0:
+		return r1.major == r2.major && r1.minor == r2.minor
 	default:
-		// TODO(dmcgowan): Should this panic?
-		return r1 == r2
+		return true
 	}
-}
-
-func compareRegularFile(r1, r2 continuity.RegularFile) bool {
-	if r1.Size() != r2.Size() {
-		return false
-	}
-	p1 := r1.Paths()
-	p2 := r2.Paths()
-	if len(p1) != len(p2) {
-		return false
-	}
-	for i := range p1 {
-		if p1[i] != p2[i] {
-			return false
-		}
-	}
-	d1 := r1.Digests()
-	d2 := r2.Digests()
-	if len(d1) != len(d2) {
-		return false
-	}
-	for i := range d1 {
-		if d1[i] != d2[i] {
-			return false
-		}
-	}
-
-	return true
-}
-
-func compareSymLink(r1, r2 continuity.SymLink) bool {
-	return r1.Target() == r2.Target()
-}
-
-func compareDirectory(r1, r2 continuity.Directory) bool {
-	return true
-}
-
-func compareNamedPipe(r1, r2 continuity.NamedPipe) bool {
-	return true
-}
-
-func compareDevice(r1, r2 continuity.Device) bool {
-	return r1.Major() == r2.Major() && r1.Minor() == r2.Minor()
 }

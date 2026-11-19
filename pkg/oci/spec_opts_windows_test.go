@@ -19,6 +19,7 @@ package oci
 import (
 	"context"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/containers"
@@ -538,13 +539,13 @@ func TestWindowsDefaultPathEnv(t *testing.T) {
 		ctx            = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	//check that the default PATH environment is not null
+	// check that the default PATH environment is not null
 	if os.Getenv("PATH") == "" {
 		t.Fatal("PATH environment variable is not set")
 	}
 	WithDefaultPathEnv(ctx, nil, nil, &s)
-	//check that the path is not overwritten by the unix default path
-	if Contains(s.Process.Env, defaultUnixEnv) {
+	// check that the path is not overwritten by the unix default path
+	if slices.Contains(s.Process.Env, defaultUnixEnv) {
 		t.Fatal("default Windows Env overwritten by the default Unix Env")
 	}
 }

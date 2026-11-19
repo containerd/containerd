@@ -18,6 +18,7 @@ package opts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,7 +87,7 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 				dst = "C:" + dst
 			}
 		} else if dst[0] == 'c' || dst[0] == 'C' {
-			return nil, fmt.Errorf("destination path can not be C drive")
+			return nil, errors.New("destination path can not be C drive")
 		}
 	}
 
@@ -197,6 +198,23 @@ func WithWindowsResources(resources *runtime.WindowsContainerResources) oci.Spec
 		if limit != 0 {
 			s.Windows.Resources.Memory.Limit = &limit
 		}
+		if len(resources.GetAffinityCpus()) > 0 {
+			affinities := make([]runtimespec.WindowsCPUGroupAffinity, 0, len(resources.GetAffinityCpus()))
+			for _, a := range resources.GetAffinityCpus() {
+				if a != nil {
+					affinities = append(affinities, runtimespec.WindowsCPUGroupAffinity{
+						Mask:  a.CpuMask,
+						Group: a.CpuGroup,
+					})
+				}
+			}
+			if len(affinities) > 0 {
+				if s.Windows.Resources.CPU == nil {
+					s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+				}
+				s.Windows.Resources.CPU.Affinity = affinities
+			}
+		}
 		return nil
 	}
 }
@@ -242,8 +260,8 @@ func WithWindowsDevices(config *runtime.ContainerConfig) oci.SpecOpts {
 			}
 
 			hostPath := device.HostPath
-			if strings.HasPrefix(hostPath, "class/") {
-				hostPath = "class://" + strings.TrimPrefix(hostPath, "class/")
+			if after, ok := strings.CutPrefix(hostPath, "class/"); ok {
+				hostPath = "class://" + after
 			}
 
 			idType, id, ok := strings.Cut(hostPath, "://")

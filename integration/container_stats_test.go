@@ -31,6 +31,9 @@ import (
 
 // Test to verify for a container ID
 func TestContainerStats(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not expose per-container CPU nanosecond stats")
+	}
 	t.Logf("Create a pod config and run sandbox container")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
@@ -129,7 +132,7 @@ func TestContainerConsumedStats(t *testing.T) {
 	}
 
 	go func() {
-		_, _, err = runtimeService.ExecSync(cn, command, 30*time.Second)
+		_, _, _ = runtimeService.ExecSync(cn, command, 30*time.Second)
 	}()
 
 	require.NoError(t, Eventually(func() (bool, error) {
@@ -146,6 +149,9 @@ func TestContainerConsumedStats(t *testing.T) {
 
 // Test to verify filtering without any filter
 func TestContainerListStats(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not expose per-container CPU nanosecond stats")
+	}
 	var (
 		stats []*runtime.ContainerStats
 		err   error
@@ -158,7 +164,7 @@ func TestContainerListStats(t *testing.T) {
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -201,6 +207,9 @@ func TestContainerListStats(t *testing.T) {
 // Test to verify filtering given a specific container ID
 // TODO Convert the filter tests into table driven tests and unit tests
 func TestContainerListStatsWithIdFilter(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not expose per-container CPU nanosecond stats")
+	}
 	var (
 		stats []*runtime.ContainerStats
 		err   error
@@ -213,7 +222,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -261,6 +270,9 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 // Test to verify filtering given a specific Sandbox ID. Stats for
 // all the containers in a pod should be returned
 func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not expose per-container CPU nanosecond stats")
+	}
 	var (
 		stats []*runtime.ContainerStats
 		err   error
@@ -273,7 +285,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -322,6 +334,9 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 // Test to verify filtering given a specific container ID and
 // sandbox ID
 func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not expose per-container CPU nanosecond stats")
+	}
 	var (
 		stats []*runtime.ContainerStats
 		err   error
@@ -334,7 +349,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 
 	t.Logf("Create container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		cName := fmt.Sprintf("container%d", i)
 		containerConfig := ContainerConfig(
 			cName,
@@ -430,6 +445,9 @@ func testStats(t *testing.T,
 }
 
 func TestContainerSysfsStatsWithPrivilegedPod(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("Privileged containers are not supported by runsc")
+	}
 	if goruntime.GOOS == "windows" {
 		t.Skip("Doesn't care about filesystem properties on windows")
 	}

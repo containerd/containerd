@@ -119,11 +119,9 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		wg  sync.WaitGroup
 		buf = bytes.NewBuffer(nil)
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		io.Copy(buf, direct.Stdout)
-	}()
+	})
 
 	if container, err = client.Restore(ctx, id, checkpoint, []RestoreOpts{
 		WithRestoreImage,
@@ -390,7 +388,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 		t.Fatal(err)
 	}
 	if status.Status != Running {
-		t.Fatalf("expected status %q but received %q", Running, status)
+		t.Fatalf("expected status %q but received %q", Running, status.Status)
 	}
 
 	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {

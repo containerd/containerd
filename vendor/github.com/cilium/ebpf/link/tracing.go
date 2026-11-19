@@ -1,3 +1,5 @@
+//go:build !windows
+
 package link
 
 import (
@@ -14,7 +16,7 @@ type tracing struct {
 	RawLink
 }
 
-func (f *tracing) Update(new *ebpf.Program) error {
+func (f *tracing) Update(_ *ebpf.Program) error {
 	return fmt.Errorf("tracing update: %w", ErrNotSupported)
 }
 
@@ -24,9 +26,9 @@ func (f *tracing) Info() (*Info, error) {
 		return nil, fmt.Errorf("tracing link info: %s", err)
 	}
 	extra := &TracingInfo{
-		TargetObjId: info.TargetObjId,
-		TargetBtfId: info.TargetBtfId,
-		AttachType:  info.AttachType,
+		TargetObjectId: info.TargetObjId,
+		TargetBtfId:    info.TargetBtfId,
+		AttachType:     info.AttachType,
 	}
 
 	return &Info{

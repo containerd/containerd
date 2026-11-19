@@ -52,6 +52,15 @@ type Config struct {
 	// server.
 	DisableCompression bool
 
+	// MinConnectionPoolSize, if greater than 1, spreads requests to the server
+	// across at least this many independent transports, each with its own
+	// connections, preferring the one with fewer requests in flight. More
+	// connections may be opened, for example when a connection reaches the
+	// server's limit of concurrent HTTP/2 streams. Values <= 1 keep the default
+	// of a single shared transport. Ignored if Transport is set or if the
+	// ClientsAllowConnectionPool feature gate is disabled.
+	MinConnectionPoolSize int
+
 	// Transport may be used for custom HTTP behavior. This attribute may
 	// not be specified with the TLS client certificate options. Use
 	// WrapTransport for most client level operations.
@@ -134,7 +143,8 @@ type TLSConfig struct {
 	CAFile         string // Path of the PEM-encoded server trusted root certificates.
 	CertFile       string // Path of the PEM-encoded client certificate.
 	KeyFile        string // Path of the PEM-encoded client key.
-	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded
+	ReloadTLSFiles bool   // Set to indicate that the original config provided files, and that they should be reloaded.
+	ReloadCAFiles  bool   // Set to indicate that CA files should be reloaded from disk.
 
 	Insecure   bool   // Server should be accessed without verifying the certificate. For testing only.
 	ServerName string // Override for the server name passed to the server for SNI and used to verify certificates.

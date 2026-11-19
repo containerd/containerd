@@ -21,6 +21,7 @@ package reaper
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os/exec"
 	"runtime"
 	"sync"
@@ -184,9 +185,7 @@ func (m *Monitor) Unsubscribe(c chan runc.Exit) {
 func (m *Monitor) getSubscribers() map[chan runc.Exit]*subscriber {
 	out := make(map[chan runc.Exit]*subscriber)
 	m.Lock()
-	for k, v := range m.subscribers {
-		out[k] = v
-	}
+	maps.Copy(out, m.subscribers)
 	m.Unlock()
 	return out
 }

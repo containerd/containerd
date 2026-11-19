@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/containerd/containerd/api/types"
@@ -42,6 +43,12 @@ type Mount struct {
 	Target string
 	// Options contains zero or more fstab-style mount options. Typically,
 	// these are platform specific.
+	//
+	// These options are formatted as required for passing to mount(8) or
+	// the legacy mount(2) API after joining with ",", so some values may
+	// have option-specific quoting or escaping applied. For example,
+	// SELinux contexts (which can contain commas) are quoted, and
+	// overlayfs uses backslash escaping on paths.
 	Options []string
 }
 
@@ -59,8 +66,8 @@ func All(mounts []Mount, target string) error {
 // UnmountMounts unmounts all the mounts under a target in the reverse order of
 // the mounts array provided.
 func UnmountMounts(mounts []Mount, target string, flags int) error {
-	for i := len(mounts) - 1; i >= 0; i-- {
-		mountpoint, err := fs.RootPath(target, mounts[i].Target)
+	for i, m := range slices.Backward(mounts) {
+		mountpoint, err := fs.RootPath(target, m.Target)
 		if err != nil {
 			return err
 		}
@@ -86,15 +93,35 @@ func CanonicalizePath(path string) (string, error) {
 	return filepath.EvalSymlinks(path)
 }
 
-// ReadOnly returns a boolean value indicating whether this mount has the "ro"
-// option set.
+// ReadOnly reports whether this mount is read-only, deriving it from the mount
+// type where the options alone don't say so.
 func (m *Mount) ReadOnly() bool {
-	for _, option := range m.Options {
-		if option == "ro" {
+	typ := m.Type
+	// The mount type may carry "/"-separated modifiers meaningful only to the
+	// mount manager (e.g. "format/mkdir/overlay"), so only its last segment is
+	// considered.
+	if i := strings.LastIndex(typ, "/"); i >= 0 {
+		typ = typ[i+1:]
+	}
+	switch typ {
+	case "erofs":
+		// Read-only by construction, whatever the options say.
+		return true
+	case "overlay":
+		// Writable only through an upperdir, which a snapshotter signals by
+		// setting it rather than by setting "rw". An element may be a
+		// comma-joined fragment ("lowerdir=a,upperdir=b"), so split first.
+		options := strings.Split(strings.Join(m.Options, ","), ",")
+		// An explicit "ro" wins over an upperdir.
+		if slices.Contains(options, "ro") {
 			return true
 		}
+		return !slices.ContainsFunc(options, func(o string) bool {
+			return strings.HasPrefix(o, "upperdir=")
+		})
+	default:
+		return slices.Contains(m.Options, "ro")
 	}
-	return false
 }
 
 // Mount to the provided target path.
@@ -106,9 +133,9 @@ func (m *Mount) Mount(target string) error {
 	return m.mount(target)
 }
 
-// readonlyMounts modifies the received mount options
-// to make them readonly
+// readonlyMounts returns mounts with readonly options applied.
 func readonlyMounts(mounts []Mount) []Mount {
+	mounts = slices.Clone(mounts)
 	for i, m := range mounts {
 		if m.Type == "overlay" {
 			mounts[i].Options = readonlyOverlay(m.Options)
@@ -135,16 +162,16 @@ func readonlyOverlay(opt []string) []string {
 	out := make([]string, 0, len(opt))
 	upper := ""
 	for _, o := range opt {
-		if strings.HasPrefix(o, "upperdir=") {
-			upper = strings.TrimPrefix(o, "upperdir=")
+		if after, ok := strings.CutPrefix(o, "upperdir="); ok {
+			upper = after
 		} else if !isSkippedReadonlyOption(o) {
 			out = append(out, o)
 		}
 	}
 	if upper != "" {
 		for i, o := range out {
-			if strings.HasPrefix(o, "lowerdir=") {
-				out[i] = "lowerdir=" + upper + ":" + strings.TrimPrefix(o, "lowerdir=")
+			if after, ok := strings.CutPrefix(o, "lowerdir="); ok {
+				out[i] = "lowerdir=" + upper + ":" + after
 			}
 		}
 	}

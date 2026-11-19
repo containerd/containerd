@@ -18,6 +18,7 @@ package rdt
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -322,7 +323,7 @@ func getResctrlMountInfo() (string, map[string]struct{}, error) {
 			return split[1], mountOptions, nil
 		}
 	}
-	return "", mountOptions, fmt.Errorf("resctrl not found in " + mountInfoPath)
+	return "", mountOptions, errors.New("resctrl not found in " + mountInfoPath)
 }
 
 func readFileUint64(path string) (uint64, error) {

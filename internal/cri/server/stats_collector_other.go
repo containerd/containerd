@@ -20,6 +20,7 @@ package server
 
 import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -41,6 +42,7 @@ func (c *StatsCollector) SetDependencies(
 	taskService tasks.TasksClient,
 	listContainers func() []containerstore.Container,
 	listSandboxes func() []sandboxstore.Sandbox,
+	sandboxController func(sandboxer string) (sandbox.Controller, error),
 ) {
 }
 

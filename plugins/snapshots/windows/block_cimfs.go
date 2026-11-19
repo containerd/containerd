@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 /*
    Copyright The containerd Authors.
@@ -22,6 +21,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -42,7 +42,6 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -81,12 +80,12 @@ func init() {
 		Type:   plugins.SnapshotPlugin,
 		ID:     "blockcim",
 		Config: &BlockCIMSnapshotterConfig{},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 
 			config, ok := ic.Config.(*BlockCIMSnapshotterConfig)
 			if !ok {
-				return nil, fmt.Errorf("invalid block CIM snapshotter configuration")
+				return nil, errors.New("invalid block CIM snapshotter configuration")
 			}
 
 			log.G(ic.Context).WithField("config", config).Trace("initializing blockcim snapshotter")
@@ -97,8 +96,8 @@ func init() {
 }
 
 func NewBlockCIMSnapshotter(root string, config *BlockCIMSnapshotterConfig) (snapshots.Snapshotter, error) {
-	if !cimfs.IsBlockCimSupported() {
-		return nil, fmt.Errorf("host windows version doesn't support block CIMs: %w", plugin.ErrSkipPlugin)
+	if !cimfs.IsBlockCimWriteSupported() {
+		return nil, fmt.Errorf("host OS doesn't support writable block CIMs: %w", plugin.ErrSkipPlugin)
 	}
 
 	baseSn, err := newBaseSnapshotter(root)
@@ -120,7 +119,6 @@ func NewBlockCIMSnapshotter(root string, config *BlockCIMSnapshotterConfig) (sna
 		// copy the differing VHD for every new scratch snapshot. If a different size is
 		// specified, we use ExpandVHD to change the size.
 		err = createDifferencingScratchVHDs(context.Background(), root)
-
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare scratch VHDs: %w", err)
@@ -173,7 +171,6 @@ func (s *blockCIMSnapshotter) getSnapshotBlockCIM(ctx context.Context, snID stri
 		Type:      cimfs.BlockCIMTypeSingleFile,
 		BlockPath: s.getSingleFileCIMBlockPath(snID),
 	}, nil
-
 }
 
 func (s *blockCIMSnapshotter) Usage(ctx context.Context, key string) (usage snapshots.Usage, err error) {
@@ -229,7 +226,7 @@ func (s *blockCIMSnapshotter) Mounts(ctx context.Context, key string) (_ []mount
 
 func (s *blockCIMSnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-		return fmt.Errorf("committing a scratch snapshot to read-only cim layer isn't supported yet")
+		return errors.New("committing a scratch snapshot to read-only cim layer isn't supported yet")
 	}
 
 	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
@@ -271,7 +268,7 @@ func (s *blockCIMSnapshotter) createSnapshot(ctx context.Context, kind snapshots
 			return fmt.Errorf("failed to create snapshot: %w", err)
 		}
 
-		log.G(ctx).WithFields(logrus.Fields{
+		log.G(ctx).WithFields(log.Fields{
 			"key":    key,
 			"parent": parent,
 			"ID":     newSnapshot.ID,
@@ -299,7 +296,7 @@ func (s *blockCIMSnapshotter) createSnapshot(ctx context.Context, kind snapshots
 		}
 
 		if len(newSnapshot.ParentIDs) == 0 {
-			return fmt.Errorf("scratch snapshot without any parents isn't supported")
+			return errors.New("scratch snapshot without any parents isn't supported")
 		}
 
 		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
@@ -452,7 +449,7 @@ func (s *blockCIMSnapshotter) mounts(ctx context.Context, sn storage.Snapshot, k
 		m.Source = s.getLayerCIMPathFromCIMBlock(s.getSingleFileCIMBlockPath(sn.ID))
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
+	log.G(ctx).WithFields(log.Fields{
 		"snapshot ID":   sn.ID,
 		"snapshot name": key,
 		"parent IDs":    sn.ParentIDs,
@@ -476,9 +473,9 @@ const (
 // index.  already exists in the 0th snapshot's directory, nothing is done.
 func (s *blockCIMSnapshotter) prepareMergedCIM(ctx context.Context, snapshotIDs []string) (rErr error) {
 	if len(snapshotIDs) < 2 {
-		return fmt.Errorf("merging CIM requires at least 2 snapshots")
+		return errors.New("merging CIM requires at least 2 snapshots")
 	}
-	log.G(ctx).WithFields(logrus.Fields{
+	log.G(ctx).WithFields(log.Fields{
 		"source snapshots": snapshotIDs,
 	}).Debugf("preparing merged CIM")
 
@@ -508,7 +505,7 @@ func (s *blockCIMSnapshotter) prepareMergedCIM(ctx context.Context, snapshotIDs 
 	}
 
 	sourceCIMs := make([]*cimfs.BlockCIM, 0, len(snapshotIDs))
-	for i := 0; i < len(snapshotIDs); i++ {
+	for i := range snapshotIDs {
 		sCIM, err := s.getSnapshotBlockCIM(ctx, snapshotIDs[i], snInfos[i])
 		if err != nil {
 			return err
@@ -536,7 +533,7 @@ func (s *blockCIMSnapshotter) prepareMergedCIM(ctx context.Context, snapshotIDs 
 		return fmt.Errorf("failed to merge CIMs: %w", err)
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
+	log.G(ctx).WithFields(log.Fields{
 		"merged CIM": mergedCIM,
 	}).Debugf("merged CIM created")
 

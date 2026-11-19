@@ -27,7 +27,7 @@ import (
 )
 
 // NewClient returns a new sandbox client that handles both GRPC and TTRPC clients.
-func NewClient(client interface{}) (api.TTRPCSandboxService, error) {
+func NewClient(client any) (api.TTRPCSandboxService, error) {
 	switch c := client.(type) {
 	case *ttrpc.Client:
 		return api.NewTTRPCSandboxClient(c), nil
@@ -78,4 +78,8 @@ func (g *grpcBridge) ShutdownSandbox(ctx context.Context, request *api.ShutdownS
 
 func (g *grpcBridge) SandboxMetrics(ctx context.Context, request *api.SandboxMetricsRequest) (*api.SandboxMetricsResponse, error) {
 	return g.client.SandboxMetrics(ctx, request)
+}
+
+func (g *grpcBridge) UpdateSandbox(ctx context.Context, request *api.UpdateSandboxRequest) (*api.UpdateSandboxResponse, error) {
+	return g.client.UpdateSandbox(ctx, request)
 }

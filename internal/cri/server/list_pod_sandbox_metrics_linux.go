@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -109,7 +110,7 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 					case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to get container metrics, this is likely a transient error")
 						// Don't return error for transient issues, just log and continue
-						return nil
+						continue
 					case errdefs.IsCanceled(err):
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Debug("metrics collection cancelled")
 						// Return the cancellation error to stop other goroutines
@@ -117,7 +118,7 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 					default:
 						log.G(gctx).WithField("podsandboxid", sandbox.ID).WithField("containerid", container.ID).WithError(err).Error("failed to collect container metrics")
 						// Don't return error for individual failures, just log and continue
-						return nil
+						continue
 					}
 				}
 
@@ -275,7 +276,7 @@ func (c *criService) collectContainerMetrics(ctx context.Context, container cont
 			Timestamp:   timestamp,
 			MetricType:  runtime.MetricType_GAUGE,
 			LabelValues: containerLabels,
-			Value:       &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt)},
+			Value:       &runtime.UInt64Value{Value: uint64(container.Status.Get().StartedAt / int64(time.Second))},
 		},
 	}...)
 
@@ -816,6 +817,13 @@ func (c *criService) extractProcessMetrics(ctx context.Context, task containerd.
 					LabelValues: labels,
 					Value:       &runtime.UInt64Value{Value: s.Pids.Limit},
 				},
+				{
+					Name:        containerThreads.Name,
+					Timestamp:   timestamp,
+					MetricType:  runtime.MetricType_GAUGE,
+					LabelValues: labels,
+					Value:       &runtime.UInt64Value{Value: s.Pids.Current},
+				},
 			}...)
 		}
 
@@ -999,7 +1007,7 @@ func (c *criService) findContainerTaskRootfs(container containers.Container) (st
 		return rootfsPath, nil
 	}
 
-	return "", fmt.Errorf("could not determine container root path")
+	return "", errors.New("could not determine container root path")
 }
 
 func (c *criService) extractFilesystemMetrics(ctx context.Context, container containerstore.Container, labels []string, timestamp int64) ([]*runtime.Metric, error) {

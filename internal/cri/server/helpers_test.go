@@ -128,7 +128,7 @@ systemd_cgroup = true
 		desc            string
 		r               criconfig.Runtime
 		c               criconfig.Config
-		expectedOptions interface{}
+		expectedOptions any
 	}{
 		{
 			desc:            "when options is nil, should return nil option for io.containerd.runc.v2",
@@ -361,6 +361,28 @@ func TestGetRuntimeOptions(t *testing.T) {
 	var typeurlAny typeurl.Any = pbany // This is typed nil.
 	_, err = getRuntimeOptions(containers.Container{Runtime: containers.RuntimeInfo{Options: typeurlAny}})
 	require.NoError(t, err)
+}
+
+func TestCopyResourcesToStatusWindowsAffinity(t *testing.T) {
+	spec := &runtimespec.Spec{
+		Windows: &runtimespec.Windows{
+			Resources: &runtimespec.WindowsResources{
+				CPU: &runtimespec.WindowsCPUResources{
+					Affinity: []runtimespec.WindowsCPUGroupAffinity{
+						{Mask: 0x3, Group: 0},
+						{Mask: 0xf, Group: 1},
+					},
+				},
+			},
+		},
+	}
+	status := copyResourcesToStatus(spec, containerstore.Status{})
+	require.NotNil(t, status.Resources)
+	require.NotNil(t, status.Resources.Windows)
+	assert.Equal(t, []*runtime.WindowsCpuGroupAffinity{
+		{CpuMask: 0x3, CpuGroup: 0},
+		{CpuMask: 0xf, CpuGroup: 1},
+	}, status.Resources.Windows.AffinityCpus)
 }
 
 func TestHostNetwork(t *testing.T) {

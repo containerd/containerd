@@ -94,8 +94,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 	var stdinStreamRC io.ReadCloser
 	if e.stdin != nil && opts.Stdin != nil {
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			if _, err := io.Copy(e.stdin, stdinStreamRC); err != nil {
 				log.L.WithError(err).Errorf("Failed to redirect stdin for container exec %q", e.id)
 			}
@@ -113,8 +112,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 					e.stderr.Close()
 				}
 			}
-			wg.Done()
-		}()
+		})
 	}
 
 	attachOutput := func(t StreamType, stream io.WriteCloser, out io.ReadCloser) {

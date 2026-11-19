@@ -18,32 +18,22 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
-	"expvar"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
-	"github.com/docker/go-metrics"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -60,13 +50,11 @@ import (
 	sbproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	ssproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/internal/wintls"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
-	"github.com/containerd/containerd/v2/version"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -84,23 +72,15 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		return err
 	}
 	// chmod is needed for upgrading from an older release that created the dir with 0o711
-	if err := os.Chmod(config.Root, 0o700); err != nil {
+	// We ignore file permission issues due to non-standard rootless deployments that do not put the daemon in UserNS: https://github.com/containerd/containerd/issues/12520
+	// These deployments fundamentally cannot perform this migration without sudo intervention.
+	if err := os.Chmod(config.Root, 0o700); err != nil && !errors.Is(err, os.ErrPermission) {
 		return err
 	}
-
 	// For supporting userns-remapped containers, the state dir cannot be just mkdired with 0o700.
 	// Each of plugins creates a dedicated directory beneath the state dir with appropriate permission bits.
 	if err := sys.MkdirAllWithACL(config.State, 0o711); err != nil {
 		return err
-	}
-	if config.State != defaults.DefaultStateDir {
-		// XXX: socketRoot in pkg/shim is hard-coded to the default state directory.
-		// See https://github.com/containerd/containerd/issues/10502#issuecomment-2249268582 for why it's set up that way.
-		// The default fifo directory in pkg/cio is also configured separately and defaults to the default state directory instead of the configured state directory.
-		// Make sure the default state directory is created with the correct permissions.
-		if err := sys.MkdirAllWithACL(defaults.DefaultStateDir, 0o711); err != nil {
-			return err
-		}
 	}
 
 	if config.TempDir != "" {
@@ -108,41 +88,41 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 			return err
 		}
 		// chmod is needed for upgrading from an older release that created the dir with 0o711
-		if err := os.Chmod(config.Root, 0o700); err != nil {
+		// We ignore file permission issues due to non-standard rootless deployments that do not put the daemon in UserNS: https://github.com/containerd/containerd/issues/12520
+		// These deployments fundamentally cannot perform this migration without sudo intervention.
+		if err := os.Chmod(config.TempDir, 0o700); err != nil && !errors.Is(err, os.ErrPermission) {
 			return err
 		}
-		if runtime.GOOS == "windows" {
-			// On Windows, the Host Compute Service (vmcompute) will read the
-			// TEMP/TMP setting from the calling process when creating the
-			// tempdir to extract an image layer to. This allows the
-			// administrator to align the tempdir location with the same volume
-			// as the snapshot dir to avoid a copy operation when moving the
-			// extracted layer to the snapshot dir location.
-			os.Setenv("TEMP", config.TempDir)
-			os.Setenv("TMP", config.TempDir)
-		} else {
-			os.Setenv("TMPDIR", config.TempDir)
-		}
+		setTempDirEnv(config.TempDir)
 	}
 	return nil
 }
 
+// setTempDirEnv points the process' temp-directory environment variables at
+// tempDir so that components (and the OS) honor the configured temp location.
+func setTempDirEnv(tempDir string) {
+	if runtime.GOOS == "windows" {
+		// On Windows, the Host Compute Service (vmcompute) will read the
+		// TEMP/TMP setting from the calling process when creating the
+		// tempdir to extract an image layer to. This allows the
+		// administrator to align the tempdir location with the same volume
+		// as the snapshot dir to avoid a copy operation when moving the
+		// extracted layer to the snapshot dir location.
+		os.Setenv("TEMP", tempDir)
+		os.Setenv("TMP", tempDir)
+		// Since Go 1.21, os.MkdirTemp/os.TempDir resolve the temp dir via
+		// Windows' GetTempPath2W. For processes running as SYSTEM (as
+		// containerd does under the SCM), that API reads SystemTemp rather
+		// than TEMP/TMP, so set it too to keep the override effective.
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.21.0:src/os/file_windows.go
+		os.Setenv("SystemTemp", tempDir)
+	} else {
+		os.Setenv("TMPDIR", tempDir)
+	}
+}
+
 // New creates and initializes a new containerd server
 func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
-	var (
-		currentVersion = config.Version
-		migrationT     time.Duration
-	)
-	if currentVersion < version.ConfigVersion {
-		// Migrate config to latest version
-		t1 := time.Now()
-		err := config.MigrateConfig(ctx)
-		if err != nil {
-			return nil, err
-		}
-		migrationT = time.Since(t1)
-	}
-
 	if err := apply(ctx, config); err != nil {
 		return nil, err
 	}
@@ -160,127 +140,23 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	for id, p := range config.StreamProcessors {
 		diff.RegisterProcessor(diff.BinaryHandler(id, p.Returns, p.Accepts, p.Path, p.Args, p.Env))
 	}
-
-	var prometheusServerMetricsOpts []grpc_prometheus.ServerMetricsOption
-	if config.Metrics.GRPCHistogram {
-		// Enable grpc time histograms to measure rpc latencies
-		prometheusServerMetricsOpts = append(prometheusServerMetricsOpts, grpc_prometheus.WithServerHandlingTimeHistogram())
-	}
-
-	prometheusServerMetrics := grpc_prometheus.NewServerMetrics(prometheusServerMetricsOpts...)
-	prometheus.MustRegister(prometheusServerMetrics)
-
-	serverOpts := []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainStreamInterceptor(
-			streamNamespaceInterceptor,
-			prometheusServerMetrics.StreamServerInterceptor(),
-		),
-		grpc.ChainUnaryInterceptor(
-			unaryNamespaceInterceptor,
-			prometheusServerMetrics.UnaryServerInterceptor(),
-		),
-	}
-	if config.GRPC.MaxRecvMsgSize > 0 {
-		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize))
-	}
-	if config.GRPC.MaxSendMsgSize > 0 {
-		serverOpts = append(serverOpts, grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize))
-	}
-	ttrpcServer, err := newTTRPCServer()
-	if err != nil {
-		return nil, err
-	}
-	tcpServerOpts := serverOpts
-	if config.GRPC.TCPTLSCert != "" {
-		log.G(ctx).Info("setting up tls on tcp GRPC services...")
-
-		tlsCert, err := tls.LoadX509KeyPair(config.GRPC.TCPTLSCert, config.GRPC.TCPTLSKey)
-		if err != nil {
-			return nil, err
-		}
-		tlsConfig := &tls.Config{Certificates: []tls.Certificate{tlsCert}}
-
-		if config.GRPC.TCPTLSCA != "" {
-			caCertPool := x509.NewCertPool()
-			caCert, err := os.ReadFile(config.GRPC.TCPTLSCA)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load CA file: %w", err)
-			}
-			caCertPool.AppendCertsFromPEM(caCert)
-			tlsConfig.ClientCAs = caCertPool
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		}
-		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
-	} else if config.GRPC.TCPTLSCName != "" {
-		tlsConfig, CA, res, err :=
-			wintls.SetupTLSFromWindowsCertStore(ctx, config.GRPC.TCPTLSCName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to setup TLS from Windows cert store: %w", err)
-		}
-		// Cache resource for cleanup (Windows only)
-		setTLSResource(res)
-		if CA != nil {
-			tlsConfig.ClientCAs = CA
-			tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		}
-		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
-	}
-
-	// grpcService allows GRPC services to be registered with the underlying server
-	type grpcService interface {
-		Register(*grpc.Server) error
-	}
-
-	// tcpService allows GRPC services to be registered with the underlying tcp server
-	type tcpService interface {
-		RegisterTCP(*grpc.Server) error
-	}
-
-	// ttrpcService allows TTRPC services to be registered with the underlying server
-	type ttrpcService interface {
-		RegisterTTRPC(*ttrpc.Server) error
-	}
-
 	var (
-		grpcServer = grpc.NewServer(serverOpts...)
-		tcpServer  = grpc.NewServer(tcpServerOpts...)
-
-		grpcServices  []grpcService
-		tcpServices   []tcpService
-		ttrpcServices []ttrpcService
-		s             = &Server{
-			prometheusServerMetrics: prometheusServerMetrics,
-			grpcServer:              grpcServer,
-			tcpServer:               tcpServer,
-			ttrpcServer:             ttrpcServer,
-			config:                  config,
+		s = &Server{
+			config: config,
 		}
-		initialized = plugin.NewPluginSet()
-		required    = make(map[string]struct{})
+		initialized  = plugin.NewPluginSet()
+		required     = make(map[string]struct{})
+		grpcAddress  = readString(config.Plugins, "io.containerd.server.v1.grpc", "address")
+		ttrpcAddress = readString(config.Plugins, "io.containerd.server.v1.ttrpc", "address")
 	)
+	if grpcAddress == "" {
+		grpcAddress = defaults.DefaultAddress
+	}
+	if ttrpcAddress == "" {
+		ttrpcAddress = defaults.DefaultAddress + ".ttrpc"
+	}
 	for _, r := range config.RequiredPlugins {
 		required[r] = struct{}{}
-	}
-
-	if currentVersion < version.ConfigVersion {
-		t1 := time.Now()
-		// Run migration for each configuration version
-		// Run each plugin migration for each version to ensure that migration logic is simple and
-		// focused on upgrading from one version at a time.
-		for v := currentVersion; v < version.ConfigVersion; v++ {
-			for _, p := range loaded {
-				if p.ConfigMigration != nil {
-					if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
-						return nil, err
-					}
-				}
-			}
-		}
-		migrationT = migrationT + time.Since(t1)
-	}
-	if migrationT > 0 {
-		log.G(ctx).WithField("t", migrationT).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", currentVersion)
 	}
 
 	for _, p := range loaded {
@@ -294,8 +170,8 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			map[string]string{
 				plugins.PropertyRootDir:      filepath.Join(config.Root, id),
 				plugins.PropertyStateDir:     filepath.Join(config.State, id),
-				plugins.PropertyGRPCAddress:  config.GRPC.Address,
-				plugins.PropertyTTRPCAddress: config.TTRPC.Address,
+				plugins.PropertyGRPCAddress:  grpcAddress,
+				plugins.PropertyTTRPCAddress: ttrpcAddress,
 			},
 		)
 		initContext.RegisterReadiness = func() func() {
@@ -334,15 +210,13 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 
 		delete(required, id)
-		// check for grpc services that should be registered with the server
-		if src, ok := instance.(grpcService); ok {
-			grpcServices = append(grpcServices, src)
-		}
-		if src, ok := instance.(ttrpcService); ok {
-			ttrpcServices = append(ttrpcServices, src)
-		}
-		if service, ok := instance.(tcpService); ok {
-			tcpServices = append(tcpServices, service)
+		if p.Type == plugins.ServerPlugin {
+			srv, ok := instance.(server)
+			if !ok {
+				log.G(ctx).WithField("id", id).Warn("plugin does not implement server interface, will not be started")
+			} else {
+				s.servers = append(s.servers, srv)
+			}
 		}
 
 		s.plugins = append(s.plugins, result)
@@ -353,23 +227,6 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			missing = append(missing, id)
 		}
 		return nil, fmt.Errorf("required plugin %s not included", missing)
-	}
-
-	// register services after all plugins have been initialized
-	for _, service := range grpcServices {
-		if err := service.Register(grpcServer); err != nil {
-			return nil, err
-		}
-	}
-	for _, service := range ttrpcServices {
-		if err := service.RegisterTTRPC(ttrpcServer); err != nil {
-			return nil, err
-		}
-	}
-	for _, service := range tcpServices {
-		if err := service.RegisterTCP(tcpServer); err != nil {
-			return nil, err
-		}
 	}
 
 	recordConfigDeprecations(ctx, config, initialized)
@@ -399,70 +256,32 @@ func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set
 	_ = warn
 }
 
+type server interface {
+	Start(context.Context) error
+}
+
 // Server is the containerd main daemon
 type Server struct {
-	prometheusServerMetrics *grpc_prometheus.ServerMetrics
-	grpcServer              *grpc.Server
-	ttrpcServer             *ttrpc.Server
-	tcpServer               *grpc.Server
-	config                  *srvconfig.Config
-	plugins                 []*plugin.Plugin
-	ready                   sync.WaitGroup
+	servers []server
+	config  *srvconfig.Config
+	plugins []*plugin.Plugin
+	ready   sync.WaitGroup
 }
 
-// ServeGRPC provides the containerd grpc APIs on the provided listener
-func (s *Server) ServeGRPC(l net.Listener) error {
-	s.prometheusServerMetrics.InitializeMetrics(s.grpcServer)
-	return trapClosedConnErr(s.grpcServer.Serve(l))
-}
-
-// ServeTTRPC provides the containerd ttrpc APIs on the provided listener
-func (s *Server) ServeTTRPC(l net.Listener) error {
-	return trapClosedConnErr(s.ttrpcServer.Serve(context.Background(), l))
-}
-
-// ServeMetrics provides a prometheus endpoint for exposing metrics
-func (s *Server) ServeMetrics(l net.Listener) error {
-	m := http.NewServeMux()
-	m.Handle("/v1/metrics", metrics.Handler())
-	srv := &http.Server{
-		Handler:           m,
-		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
+// Start the services, this will normally start listening on sockets
+// and serving requests.
+func (s *Server) Start(ctx context.Context) error {
+	for _, srv := range s.servers {
+		if err := srv.Start(ctx); err != nil {
+			return err
+		}
 	}
-	return trapClosedConnErr(srv.Serve(l))
-}
-
-// ServeTCP allows services to serve over tcp
-func (s *Server) ServeTCP(l net.Listener) error {
-	s.prometheusServerMetrics.InitializeMetrics(s.tcpServer)
-	return trapClosedConnErr(s.tcpServer.Serve(l))
-}
-
-// ServeDebug provides a debug endpoint
-func (s *Server) ServeDebug(l net.Listener) error {
-	// don't use the default http server mux to make sure nothing gets registered
-	// that we don't want to expose via containerd
-	m := http.NewServeMux()
-	m.Handle("/debug/vars", expvar.Handler())
-	m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-	m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-	m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-	m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-	m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-	srv := &http.Server{
-		Handler:           m,
-		ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
-	}
-	return trapClosedConnErr(srv.Serve(l))
+	return nil
 }
 
 // Stop the containerd server canceling any open connections
 func (s *Server) Stop() {
-	s.grpcServer.Stop()
-	// Clean up TLS resources (Windows only)
-	cleanupTLSResources()
-	for i := len(s.plugins) - 1; i >= 0; i-- {
-		p := s.plugins[i]
+	for _, p := range slices.Backward(s.plugins) {
 		instance, err := p.Instance()
 		if err != nil {
 			log.L.WithFields(log.Fields{"error": err, "id": p.Registration.URI()}).Error("could not get plugin instance")
@@ -497,7 +316,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 	for name, pp := range config.ProxyPlugins {
 		var (
 			t plugin.Type
-			f func(*grpc.ClientConn) interface{}
+			f func(*grpc.ClientConn) any
 
 			address = pp.Address
 			p       v1.Platform
@@ -508,23 +327,38 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		case string(plugins.SnapshotPlugin), "snapshot":
 			t = plugins.SnapshotPlugin
 			ssname := name
-			f = func(conn *grpc.ClientConn) interface{} {
-				return ssproxy.NewSnapshotter(ssapi.NewSnapshotsClient(conn), ssname)
+			var ssopts []ssproxy.Opt
+			if pp.DefaultTimeout != "" {
+				d, perr := time.ParseDuration(pp.DefaultTimeout)
+				if perr != nil {
+					return nil, fmt.Errorf("proxy plugin %q: unable to parse default_timeout %q into a time duration: %w", name, pp.DefaultTimeout, perr)
+				}
+				ssopts = append(ssopts, ssproxy.WithDefaultTimeout(d))
+			}
+			f = func(conn *grpc.ClientConn) any {
+				return ssproxy.NewSnapshotterWithOpts(ssapi.NewSnapshotsClient(conn), ssname, ssopts...)
 			}
 
 		case string(plugins.ContentPlugin), "content":
 			t = plugins.ContentPlugin
-			f = func(conn *grpc.ClientConn) interface{} {
-				return csproxy.NewContentStore(conn)
+			var opts []csproxy.Opt
+			if blobs := pp.Exports["blobs"]; blobs != "" {
+				if err := checkLocalBlobs(ctx, name, blobs); err != nil {
+					return nil, err
+				}
+				opts = append(opts, csproxy.WithLocalBlobs(blobs))
+			}
+			f = func(conn *grpc.ClientConn) any {
+				return csproxy.NewContentStore(conn, opts...)
 			}
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
-			f = func(conn *grpc.ClientConn) interface{} {
+			f = func(conn *grpc.ClientConn) any {
 				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn), name)
 			}
 		case string(plugins.DiffPlugin), "diff":
 			t = plugins.DiffPlugin
-			f = func(conn *grpc.ClientConn) interface{} {
+			f = func(conn *grpc.ClientConn) any {
 				return diffproxy.NewDiffApplier(diffapi.NewDiffClient(conn))
 			}
 		default:
@@ -548,7 +382,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		registry.Register(&plugin.Registration{
 			Type: t,
 			ID:   name,
-			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			InitFn: func(ic *plugin.InitContext) (any, error) {
 				ic.Meta.Exports = exports
 				ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 				ic.Meta.Capabilities = pp.Capabilities
@@ -587,6 +421,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		Backoff: backoffConfig,
 	}
 	gopts := []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithConnectParams(connParams),
 		grpc.WithContextDialer(dialer.ContextDialer),
@@ -606,9 +441,46 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 	return conn, nil
 }
 
-func trapClosedConnErr(err error) error {
-	if err == nil || errors.Is(err, net.ErrClosed) {
-		return nil
+// checkLocalBlobs checks the blobs directory exported by a content proxy
+// plugin. A relative path is an error, as it would resolve against containerd's
+// working directory. A path which is not a directory is only reported: the
+// plugin may create it after containerd starts, and content is read over the
+// API until it can be read from the directory.
+func checkLocalBlobs(ctx context.Context, name, blobs string) error {
+	if !filepath.IsAbs(blobs) {
+		return fmt.Errorf("proxy plugin %q: blobs %q is not an absolute path", name, blobs)
 	}
-	return err
+	fi, err := os.Stat(blobs)
+	if err == nil && !fi.IsDir() {
+		err = fmt.Errorf("%s is not a directory", blobs)
+	}
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("plugin", name).Warn("content proxy plugin blobs directory is unusable, reading content over the api")
+	}
+	return nil
+}
+
+func readString(properties map[string]any, key ...string) string {
+	for i, k := range key {
+		v, ok := properties[k]
+		if !ok {
+			return ""
+		}
+		if i < len(key)-1 {
+			properties, ok = v.(map[string]any)
+			if !ok {
+				return ""
+			}
+			continue
+		}
+		switch v := v.(type) {
+		case string:
+			return v
+		case fmt.Stringer:
+			return v.String()
+		case []byte:
+			return string(v)
+		}
+	}
+	return ""
 }

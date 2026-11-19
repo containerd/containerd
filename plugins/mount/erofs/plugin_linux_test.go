@@ -17,14 +17,18 @@
 package erofs
 
 import (
+	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/internal/fsmount"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	snapshotserofs "github.com/containerd/containerd/v2/plugins/snapshots/erofs"
@@ -34,10 +38,6 @@ import (
 // TestFsmountLoopDevice tests fsmount with loop device
 func TestFsmountLoopDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
-
-	if _, err := exec.LookPath("mkfs.erofs"); err != nil {
-		t.Skipf("mkfs.erofs not found: %v", err)
-	}
 
 	if !snapshotserofs.FindErofs() {
 		t.Skip("erofs kernel support not available")
@@ -58,9 +58,8 @@ func TestFsmountLoopDevice(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	cmd := exec.Command("mkfs.erofs", layerPath, layerDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to create erofs image: %v, output: %s", err, output)
+	if err := erofsutils.ConvertErofs(context.Background(), layerPath, layerDir); err != nil {
+		t.Fatalf("failed to create erofs image: %v", err)
 	}
 
 	loopFile, err := mount.SetupLoop(layerPath, mount.LoopParams{
@@ -108,10 +107,6 @@ func TestFsmountLoopDevice(t *testing.T) {
 func TestMountOptionsPageSizeLimit(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	if _, err := exec.LookPath("mkfs.erofs"); err != nil {
-		t.Skipf("mkfs.erofs not found: %v", err)
-	}
-
 	if !snapshotserofs.FindErofs() {
 		t.Skip("erofs kernel support not available")
 	}
@@ -131,9 +126,8 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 		t.Fatalf("failed to write test file: %v", err)
 	}
 
-	cmd := exec.Command("mkfs.erofs", layerPath, layerDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to create erofs image: %v, output: %s", err, output)
+	if err := erofsutils.ConvertErofs(context.Background(), layerPath, layerDir); err != nil {
+		t.Fatalf("failed to create erofs image: %v", err)
 	}
 
 	loopFile, err := mount.SetupLoop(layerPath, mount.LoopParams{
@@ -154,7 +148,7 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 	var optionsBuilder strings.Builder
 	optionsBuilder.WriteString("ro")
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		fakeDevice := filepath.Join(tempDir, strings.Repeat("x", 50), "fake_device_"+strings.Repeat("0", 10))
 		opt := "device=" + fakeDevice
 		options = append(options, opt)
@@ -225,7 +219,7 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 		var builder strings.Builder
 		builder.WriteString("ro")
 
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			manyOptions = append(manyOptions, "dax=always")
 			builder.WriteString(",dax=always")
 		}
@@ -246,4 +240,79 @@ func TestMountOptionsPageSizeLimit(t *testing.T) {
 
 		mount.Unmount(mountPoint, 0)
 	})
+}
+
+// TestDmverityDeviceName covers the naming rule for dm-verity devices. Mount
+// closes the device it creates when the mount fails, so two mounts that share a
+// name would let one of them close a device the other is using.
+func TestDmverityDeviceName(t *testing.T) {
+	const (
+		snapshotBlob = "/var/lib/containerd/snapshots/42/layer.erofs"
+		// A layer content cache shards blobs by the first two characters of the
+		// digest, so a whole shard shares one directory.
+		cachedBlob      = "/mnt/cache/sha256/ab/abcdef0123456789.erofs"
+		cachedBlobOther = "/mnt/cache/sha256/ab/abfedcba9876543210.erofs"
+	)
+
+	// The same blob mounted in two places is two mounts, each owning a device.
+	assert.NotEqual(t,
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		dmverityDeviceName(cachedBlob, "/run/b"),
+		"one blob mounted in two places names two devices")
+
+	// Two blobs in one cache shard are two layers.
+	assert.NotEqual(t,
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		dmverityDeviceName(cachedBlobOther, "/run/a"),
+		"two blobs in a shard name two devices")
+
+	assert.NotEqual(t,
+		dmverityDeviceName(snapshotBlob, "/run/a"),
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		"a snapshot blob and a cached blob name two devices")
+
+	// A device left behind by a crash is reused for the same blob in the same
+	// place, where its root hash still matches.
+	assert.Equal(t,
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		dmverityDeviceName(cachedBlob, "/run/a"),
+		"one blob in one place names one device")
+
+	name := dmverityDeviceName(cachedBlob, "/run/a")
+	assert.True(t, strings.HasPrefix(name, "containerd-erofs-"), "Unmount finds the device by this prefix")
+	assert.Less(t, len(name), 128, "a device-mapper name is limited to 127 characters")
+}
+
+// TestDataDeviceDmverityName covers the naming rule for the dm-verity devices of
+// data devices. Unmount finds them by the mount point's prefix alone, since a
+// data device does not show in the mount table.
+func TestDataDeviceDmverityName(t *testing.T) {
+	const device = "/var/lib/containerd/snapshots/42/device-0.blob"
+
+	name := dataDeviceDmverityName("/run/a", 0, device)
+	assert.True(t, strings.HasPrefix(name, dataDeviceDmverityPrefix("/run/a")), "Unmount finds the device by the mount point's prefix")
+	assert.False(t, strings.HasPrefix(name, dataDeviceDmverityPrefix("/run/b")), "another mount's Unmount must not close it")
+	assert.NotEqual(t, name, dataDeviceDmverityName("/run/a", 1, device), "two devices of one mount name two devices")
+	assert.NotEqual(t, name, dataDeviceDmverityName("/run/a", 0, "/var/lib/containerd/snapshots/43/device-0.blob"),
+		"a different blob at the same index names another device")
+	assert.NotEqual(t, name, dmverityDeviceName(device, "/run/a"), "a data device and a source name two devices")
+	assert.Less(t, len(name), 128, "a device-mapper name is limited to 127 characters")
+}
+
+// TestIsBlockDevice covers how Mount tells a block device from a file. The
+// path alone does not say: a layer file can live under /dev/shm.
+func TestIsBlockDevice(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "layer.erofs")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0644))
+	assert.False(t, isBlockDevice(file), "a regular file")
+	assert.False(t, isBlockDevice("/dev/null"), "a character device")
+	assert.False(t, isBlockDevice(filepath.Join(t.TempDir(), "missing")), "a missing path")
+
+	matches, _ := filepath.Glob("/dev/loop[0-9]*")
+	for _, m := range matches {
+		if fi, err := os.Stat(m); err == nil && fi.Mode()&os.ModeDevice != 0 && fi.Mode()&os.ModeCharDevice == 0 {
+			assert.True(t, isBlockDevice(m), "a loop block device")
+			return
+		}
+	}
 }

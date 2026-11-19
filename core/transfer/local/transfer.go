@@ -26,6 +26,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -65,7 +66,17 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	return ts
 }
 
-func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
+// SupportsUnpack reports whether the transfer service is configured to unpack
+// the given platform into the given snapshotter.
+func (ts *localTransferService) SupportsUnpack(ctx context.Context, platform ocispec.Platform, snapshotter string) bool {
+	matched, _ := getSupportedPlatform(ctx, transfer.UnpackConfiguration{
+		Platform:    platform,
+		Snapshotter: snapshotter,
+	}, ts.config.UnpackPlatforms)
+	return matched
+}
+
+func (ts *localTransferService) Transfer(ctx context.Context, src any, dest any, opts ...transfer.Opt) error {
 	topts := &transfer.Config{}
 	for _, opt := range opts {
 		opt(topts)
@@ -99,7 +110,7 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 	return fmt.Errorf("unable to transfer from %s to %s: %w", name(src), name(dest), errdefs.ErrNotImplemented)
 }
 
-func name(t interface{}) string {
+func name(t any) string {
 	switch s := t.(type) {
 	case fmt.Stringer:
 		return s.String()
@@ -182,6 +193,12 @@ type TransferConfig struct {
 	// 512 bytes, parallel layer fetch is enabled. It can accelerate pulls for
 	// big images.
 	ConcurrentLayerFetchBuffer int
+
+	// IgnoreDescriptorURLs skips URLs in image descriptors during pull.
+	IgnoreDescriptorURLs bool
+
+	// ResolverStats holds optional metric counters for image resolver operations.
+	ResolverStats *transfer.ImageResolverStats
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int

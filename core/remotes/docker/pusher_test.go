@@ -26,13 +26,17 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -45,6 +49,59 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Fetch can also copy local content to a pusher-backed ingester, as BuildKit's
+// registry cache exporter does. The source must remain seekable after EOF so
+// content.Copy can replay it when the push writer returns content.ErrReset.
+func TestFetchPushRetryAfterEOF(t *testing.T) {
+	for _, size := range []int{128, 2 << 20} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+			payload := bytes.Repeat([]byte("x"), size)
+			desc := ocispec.Descriptor{
+				MediaType: ocispec.MediaTypeImageLayer,
+				Digest:    digest.FromBytes(payload),
+				Size:      int64(len(payload)),
+			}
+			path := filepath.Join(t.TempDir(), "layer")
+			require.NoError(t, os.WriteFile(path, payload, 0600))
+			var attempts atomic.Int32
+			registry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					w.Header().Set("Location", "/v2/cache/blobs/uploads/test")
+					w.WriteHeader(http.StatusAccepted)
+				case http.MethodPut:
+					body, err := io.ReadAll(r.Body)
+					if !assert.NoError(t, err) || !assert.Equal(t, payload, body) {
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+					if attempts.Add(1) == 1 {
+						w.WriteHeader(http.StatusRequestTimeout)
+						return
+					}
+					w.Header().Set("Docker-Content-Digest", desc.Digest.String())
+					w.WriteHeader(http.StatusCreated)
+				default:
+					w.WriteHeader(http.StatusNotFound)
+				}
+			}))
+			defer registry.Close()
+			resolver := NewResolver(ResolverOptions{PlainHTTP: true})
+			pusher, err := resolver.Pusher(ctx, strings.TrimPrefix(registry.URL, "http://")+"/cache:latest")
+			require.NoError(t, err)
+			ingester, ok := pusher.(content.Ingester)
+			require.True(t, ok)
+			fetcher := remotes.FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+				return os.Open(path)
+			})
+			require.NoError(t, remotes.Fetch(ctx, ingester, fetcher, desc))
+			require.EqualValues(t, 2, attempts.Load())
+		})
+	}
+}
 
 func TestGetManifestPath(t *testing.T) {
 	for _, tc := range []struct {
@@ -92,6 +149,23 @@ func TestPusherErrClosedRetry(t *testing.T) {
 	if err := tryUpload(ctx, t, p, layerContent); err != nil {
 		t.Errorf("upload should succeed but got %v", err)
 	}
+}
+func TestPusherCustomNamespace(t *testing.T) {
+	ctx := context.Background()
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+	reg.putHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path == "/upload" {
+			reg.lastPutQueryParams = r.URL.Query()
+		}
+		return false
+	}
+
+	assert.Nil(t, tryUpload(ctx, t, p, []byte("test")))
+	assert.Equal(t, samplePusherHostname, reg.lastPutQueryParams.Get("ns"))
+	assert.NotEmpty(t, reg.lastPutQueryParams.Get("digest"))
 }
 
 func TestPusherAcceptsMissingDigestHeader(t *testing.T) {
@@ -426,12 +500,13 @@ var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 type uploadableMockRegistry struct {
 	availableContents  []string
 	uploadable         bool
-	omitDigestHdr     bool
+	omitDigestHdr      bool
 	putHandlerFunc     func(w http.ResponseWriter, r *http.Request) bool
 	defaultHandlerFunc func(w http.ResponseWriter, r *http.Request) bool
 	locationPrefix     string
 	username           string
 	secret             string
+	lastPutQueryParams url.Values // Track query params from last PUT request
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -525,12 +600,7 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 // checks if the content is already present in the registry
 func (u *uploadableMockRegistry) isContentAlreadyExist(c string) bool {
-	for _, ct := range u.availableContents {
-		if ct == c {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(u.availableContents, c)
 }
 
 func Test_dockerPusher_push(t *testing.T) {
@@ -725,4 +795,129 @@ func Test_dockerPusher_push(t *testing.T) {
 
 		})
 	}
+}
+
+func TestPusherForbiddenGETFallbackForErrorBody(t *testing.T) {
+	// When the existence-check HEAD returns 403, the pusher should issue
+	// a follow-up GET to retrieve the registry's error body for diagnostics.
+	const errorMessage = "encryption key is disabled"
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			// HEAD: no body
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage,
+		"expected registry error body from GET fallback")
+	assert.Contains(t, err.Error(), "403")
+}
+
+func TestPusherForbiddenGETFallbackProxy(t *testing.T) {
+	// When the pusher is configured as a proxy (Host != image hostname),
+	// the GET fallback must include the ?ns= query parameter so the proxy
+	// can route the request to the correct upstream registry.
+	const errorMessage = "encryption key is disabled"
+
+	var gotNsParam string
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.defaultHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		if strings.Contains(r.URL.Path, "/manifests/") || strings.Contains(r.URL.Path, "/blobs/sha256:") {
+			if r.Method == http.MethodGet {
+				gotNsParam = r.URL.Query().Get("ns")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			if r.Method == http.MethodGet {
+				w.Write([]byte(fmt.Sprintf(`{"errors":[{"code":"DENIED","message":"%s"}]}`, errorMessage)))
+			}
+			return true
+		}
+		return false
+	}
+
+	ctx := context.Background()
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromString("test-manifest"),
+		Size:      100,
+	}
+
+	_, err := p.push(ctx, desc, "test-ref", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errorMessage)
+	assert.Equal(t, samplePusherHostname, gotNsParam,
+		"GET fallback on proxy must include ?ns= query parameter")
+}
+
+// If authorizing the upload request fails, the request is never sent and
+// nobody reads the body pipe. A pending Write must be unblocked with the
+// authorization error instead of staying stuck forever.
+func TestPusherAuthorizeFailureUnblocksWrite(t *testing.T) {
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	// Authorization of the upload PUT fails, like a bearer token refresh that
+	// fails or is cancelled after the upload was initiated.
+	authErr := errors.New("token fetch failed")
+	bodyCh := make(chan io.ReadCloser, 1)
+	p.hosts[0].Authorizer = &mockAuthorizer{
+		authorize: func(_ context.Context, r *http.Request) error {
+			if r.Method != http.MethodPut {
+				return nil
+			}
+			bodyCh <- r.Body
+			return authErr
+		},
+	}
+	reg.uploadable = true
+
+	ct := []byte("layer-content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(ct),
+		Size:      int64(len(ct)),
+	}
+
+	w, err := p.push(t.Context(), desc, remotes.MakeRefKey(t.Context(), desc), false)
+	require.NoError(t, err)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := w.Write(ct)
+		errCh <- err
+	}()
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, authErr)
+	case <-time.After(5 * time.Second):
+		// Release the blocked Write so it does not outlive the test.
+		(<-bodyCh).Close()
+		<-errCh
+		t.Fatal("Write is blocked after the upload request failed to authorize")
+	}
+	require.NoError(t, w.Close())
 }

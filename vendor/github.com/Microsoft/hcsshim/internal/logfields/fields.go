@@ -7,13 +7,23 @@ const (
 	Namespace = "namespace"
 	Operation = "operation"
 
-	ID          = "id"
-	SandboxID   = "sid"
-	ContainerID = "cid"
-	ExecID      = "eid"
-	ProcessID   = "pid"
-	TaskID      = "tid"
-	UVMID       = "uvm-id"
+	ID                      = "id"
+	SourceContainerID       = "src_cid"
+	DestinationContainerID  = "dst_cid"
+	ContainerID             = "cid"
+	GCSContainerID          = "gcs_container_id"
+	ExecID                  = "eid"
+	GuestNetworkNamespaceID = "guest_netns_id"
+	MigratedNamespaceID     = "migrated_netns_id"
+	NamespaceID             = "namespace-id"
+	SourcePodID             = "src_pod_id"
+	DestinationPodID        = "dst_pod_id"
+	PodID                   = "pod-id"
+	ProcessID               = "pid"
+	SandboxID               = "sandbox-id"
+	TaskID                  = "tid"
+	UVMID                   = "uvm-id"
+	VirtualSandboxID        = "virtual-sandbox-id"
 
 	// networking and IO
 
@@ -21,6 +31,13 @@ const (
 	Path  = "path"
 	Bytes = "bytes"
 	Pipe  = "pipe"
+
+	// SCSI Constants
+
+	Controller = "controller"
+	LUN        = "lun"
+	DiskType   = "disk-type"
+	Partition  = "partition"
 
 	// Common Misc
 
@@ -50,9 +67,54 @@ const (
 	Uint32       = "uint32"
 	Uint64       = "uint64"
 
+	// task / process lifecycle
+
+	Bundle           = "bundle"
+	Terminal         = "terminal"
+	Stdin            = "stdin"
+	Stdout           = "stdout"
+	Stderr           = "stderr"
+	Checkpoint       = "checkpoint"
+	ParentCheckpoint = "parent-checkpoint"
+	Status           = "status"
+	ExitStatus       = "exit-status"
+	ExitedAt         = "exited-at"
+	Signal           = "signal"
+	All              = "all"
+	Width            = "width"
+	Height           = "height"
+	Version          = "version"
+	ShimPid          = "shim-pid"
+	TaskPid          = "task-pid"
+
+	// vpci device
+
+	VMBusGUID = "vmBusGUID"
+	DeviceID  = "deviceInstanceID"
+	VFIndex   = "virtualFunctionIndex"
+
+	// sandbox
+
+	NetNsPath = "net-ns-path"
+	Verbose   = "verbose"
+
+	// shimdiag
+
+	Args     = "args"
+	Workdir  = "workdir"
+	HostPath = "host-path"
+	UVMPath  = "uvm-path"
+	ReadOnly = "readonly"
+	Execs    = "execs"
+
 	// runhcs
 
 	VMShimOperation = "vmshim-op"
+
+	// migration
+
+	SessionID = "session-id"
+	Action    = "action"
 
 	// logging and tracing
 

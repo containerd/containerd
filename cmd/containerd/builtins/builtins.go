@@ -18,6 +18,8 @@ package builtins
 
 // register containerd builtins here
 import (
+	_ "github.com/containerd/containerd/v2/plugins/mount/fsview/erofs"
+
 	_ "github.com/containerd/containerd/v2/core/runtime/v2"
 	_ "github.com/containerd/containerd/v2/plugins/content/local/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/events"
@@ -29,6 +31,10 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/nri"
 	_ "github.com/containerd/containerd/v2/plugins/restart"
 	_ "github.com/containerd/containerd/v2/plugins/sandbox"
+	_ "github.com/containerd/containerd/v2/plugins/server/debug"
+	_ "github.com/containerd/containerd/v2/plugins/server/grpc"
+	_ "github.com/containerd/containerd/v2/plugins/server/metrics"
+	_ "github.com/containerd/containerd/v2/plugins/server/ttrpc"
 	_ "github.com/containerd/containerd/v2/plugins/services/containers"
 	_ "github.com/containerd/containerd/v2/plugins/services/content"
 	_ "github.com/containerd/containerd/v2/plugins/services/diff"

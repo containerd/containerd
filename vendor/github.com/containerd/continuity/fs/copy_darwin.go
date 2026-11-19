@@ -23,13 +23,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func copyFile(target, source string) error {
+func copyFile(target, source string, sync bool) error {
 	if err := unix.Clonefile(source, target, unix.CLONE_NOFOLLOW); err != nil {
 		if !errors.Is(err, unix.ENOTSUP) && !errors.Is(err, unix.EXDEV) {
 			return fmt.Errorf("clonefile failed: %w", err)
 		}
 
-		return openAndCopyFile(target, source)
+		return openAndCopyFile(target, source, sync)
 	}
 	return nil
 }

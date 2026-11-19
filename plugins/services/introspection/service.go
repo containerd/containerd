@@ -39,7 +39,7 @@ func init() {
 		Type:     plugins.GRPCPlugin,
 		ID:       "introspection",
 		Requires: []plugin.Type{plugins.ServicePlugin},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetByID(plugins.ServicePlugin, services.IntrospectionService)
 			if err != nil {
 				return nil, err

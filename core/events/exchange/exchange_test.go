@@ -25,7 +25,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/prototestutil"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
@@ -103,7 +103,7 @@ func TestExchangeBasic(t *testing.T) {
 				break subscribercheck
 			}
 
-			if cmp.Equal(received, testevents, protobuf.Compare) {
+			if cmp.Equal(received, testevents, prototestutil.Compare) {
 				// when we do this, we expect the errs channel to be closed and
 				// this will return.
 				subscriber.cancel()
@@ -261,7 +261,7 @@ func TestExchangeFilters(t *testing.T) {
 				break subscribercheck
 			}
 
-			if cmp.Equal(received, subscriber.expectEvents, protobuf.Compare) {
+			if cmp.Equal(received, subscriber.expectEvents, prototestutil.Compare) {
 				// when we do this, we expect the errs channel to be closed and
 				// this will return.
 				subscriber.cancel()

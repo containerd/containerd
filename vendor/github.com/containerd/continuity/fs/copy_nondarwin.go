@@ -1,4 +1,4 @@
-//go:build !darwin
+//go:build !darwin && !linux
 
 /*
    Copyright The containerd Authors.
@@ -18,4 +18,6 @@
 
 package fs
 
-var copyFile = openAndCopyFile
+func copyFile(target, source string, sync bool) error {
+	return openAndCopyFile(target, source, sync)
+}

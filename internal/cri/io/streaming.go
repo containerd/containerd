@@ -37,7 +37,7 @@ import (
 
 // ioStream is a stream created by streaming api for io transfer
 // we add a field c as io.Closer because we do connect the streaming server
-// and create a client everytime we create a stream. so we need to close
+// and create a client every time we create a stream. so we need to close
 // the connection if the stream is closed.
 type ioStream struct {
 	streamingapi.Stream
@@ -75,13 +75,12 @@ func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error)
 	// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
 	protocol, scheme, ok := strings.Cut(u.Scheme, "+")
 	if !ok {
-		return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-			" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+		return nil, errors.New("the scheme of sandbox address should be in the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 	}
 
 	id := u.Query().Get("streaming_id")
 	if id == "" {
-		return nil, fmt.Errorf("no stream id in url queries")
+		return nil, errors.New("no stream id in url queries")
 	}
 	realAddress := fmt.Sprintf("%s://%s/%s", scheme, u.Host, u.Path)
 	conn, err := shim.AnonReconnectDialer(realAddress, 100*time.Second)
@@ -113,6 +112,6 @@ func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error)
 		}
 		return &ioStream{Stream: stream, c: conn}, nil
 	default:
-		return nil, fmt.Errorf("protocol not supported")
+		return nil, errors.New("protocol not supported")
 	}
 }

@@ -26,41 +26,41 @@ import (
 )
 
 // isNil returns true if the given parameter is nil or typed nil.
-func isNil(x interface{}) bool {
+func isNil(x any) bool {
 	if x == nil {
 		return true
 	}
 	v := reflect.ValueOf(x)
-	return v.Kind() == reflect.Ptr && v.IsNil()
+	return v.Kind() == reflect.Pointer && v.IsNil()
 }
 
 var compareNil = cmp.FilterValues(
-	func(x, y interface{}) bool {
+	func(x, y any) bool {
 		return isNil(x) && isNil(y)
 	},
-	cmp.Comparer(func(_, _ interface{}) bool {
+	cmp.Comparer(func(_, _ any) bool {
 		return true
 	}),
 )
 
 var ignoreTime = cmp.FilterValues(
-	func(x, y interface{}) bool {
+	func(x, y any) bool {
 		_, xok := x.(time.Time)
 		_, yok := y.(time.Time)
 		return xok && yok
 	},
-	cmp.Comparer(func(_, _ interface{}) bool {
+	cmp.Comparer(func(_, _ any) bool {
 		return true
 	}),
 )
 
 var compareAny = cmp.FilterValues(
-	func(x, y interface{}) bool {
+	func(x, y any) bool {
 		_, xok := x.(typeurl.Any)
 		_, yok := y.(typeurl.Any)
 		return xok && yok
 	},
-	cmp.Comparer(func(x, y interface{}) bool {
+	cmp.Comparer(func(x, y any) bool {
 		vx, ok := x.(typeurl.Any)
 		if !ok {
 			return false

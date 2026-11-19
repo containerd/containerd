@@ -21,6 +21,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -65,11 +66,9 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 		return "", err
 	}
 
-	for _, capab := range capabs {
-		if capab == capaRemapIDs {
-			// Snapshotter supports ID remapping, we don't need to do anything.
-			return parent, nil
-		}
+	if slices.Contains(capabs, capaRemapIDs) {
+		// Snapshotter supports ID remapping, we don't need to do anything.
+		return parent, nil
 	}
 
 	var local snapshots.Info
@@ -110,7 +109,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	}
 
 	if _, err := rsn.IDMap.RootPair(); err != nil {
-		return "", fmt.Errorf("container UID/GID mapping entries of 0 are required but not found")
+		return "", errors.New("container UID/GID mapping entries of 0 are required but not found")
 	}
 
 	usernsID, err := rsn.ID()

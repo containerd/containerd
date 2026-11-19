@@ -99,3 +99,35 @@ func skipIfBinaryUnavailable(t *testing.T, binaryName string) {
 func toPtr[T comparable](v T) *T {
 	return &v
 }
+
+func TestWatcherStopRemovesFromMap(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	skipIfCgroupUnavailable(t)
+
+	group := fmt.Sprintf("/%s", t.Name())
+	mgr, err := cgroupsv2.NewManager(defaultCgroup2Path, group, &cgroupsv2.Resources{})
+	require.NoError(t, err)
+
+	// A dummy process to get a valid pid and cgroup
+	cmd := exec.Command("sleep", "10000")
+	require.NoError(t, cmd.Start())
+	defer func() {
+		cmd.Process.Kill()
+		cmd.Wait()
+	}()
+
+	require.NoError(t, mgr.AddProc(uint64(cmd.Process.Pid)))
+
+	watchers := New()
+	containerID := "test-stop-removes"
+
+	fn := func(cid string) {}
+
+	require.NoError(t, watchers.Add(containerID, cmd.Process.Pid, fn))
+	require.NoError(t, watchers.Stop(containerID))
+
+	// Should be able to add again with the same containerID
+	require.NoError(t, watchers.Add(containerID, cmd.Process.Pid, fn))
+	require.NoError(t, watchers.Stop(containerID))
+}

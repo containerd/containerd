@@ -24,8 +24,10 @@ import (
 	"github.com/containerd/continuity/testutil/loopback"
 )
 
+// WithMkfs creates a loopback device, formats it with the given mkfs command,
+// mounts it, and runs f with TMPDIR set to the mount point.
+// The caller should ensure root access before calling this function.
 func WithMkfs(t *testing.T, f func(), mkfs ...string) {
-	testutil.RequiresRoot(t)
 	mnt := t.TempDir()
 	loop, err := loopback.New(100 << 20) // 100 MB
 	if err != nil {

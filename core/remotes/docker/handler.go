@@ -18,7 +18,6 @@ package docker
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strings"
 
@@ -71,7 +70,7 @@ func AppendDistributionSourceLabel(manager content.Manager, ref string) (images.
 				key: value,
 			},
 		}
-		_, err = manager.Update(ctx, info, fmt.Sprintf("labels.%s", key))
+		_, err = manager.Update(ctx, info, "labels."+key)
 		return nil, err
 	}, nil
 }
@@ -123,7 +122,7 @@ func selectRepositoryMountCandidate(refspec reference.Spec, sources map[string]s
 
 	n, match := 0, ""
 	components := strings.Split(target, "/")
-	for _, repo := range strings.Split(repoLabel, ",") {
+	for repo := range strings.SplitSeq(repoLabel, ",") {
 		// the target repo is not a candidate
 		if repo == target {
 			continue

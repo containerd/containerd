@@ -334,6 +334,16 @@ func TestGCRefs(t *testing.T) {
 			string(labelGCImageBackRef), "image2",
 			string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
 
+		// Conditional References
+		addContent("ns3", dgst(20), labelmap(string(labelGCSnapConditional)+".overlay", "usedat<2h|sn6")),
+		addContent("ns3", dgst(21), labelmap(string(labelGCSnapConditional)+".overlay", "usedat<2h|sn7")),
+		addImage("ns1", "image5", dgst(30), labelmap(string(labelGCSnapConditional)+".overlay", "usedat<2h|sn10")),
+		addSnapshot("ns3", "overlay", "sn4", "", nil),
+		addSnapshot("ns3", "overlay", "sn5", "", nil),
+		addSnapshot("ns3", "overlay", "sn6", "sn4", labelmap(string(labelGCConditionalUsedValue), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
+		addSnapshot("ns3", "overlay", "sn7", "sn5", labelmap(string(labelGCConditionalUsedValue), time.Now().Add(-3*time.Hour).Format(time.RFC3339))),
+		addSnapshot("ns1", "overlay", "sn10", "", labelmap(string(labelGCConditionalUsedValue), time.Now().Add(-30*time.Minute).Format(time.RFC3339))),
+
 		addSnapshot("ns3", "overlay", "sn1", "", nil),
 		addSnapshot("ns3", "overlay", "sn2", "sn1", nil),
 		addSnapshot("ns3", "overlay", "sn3", "", labelmap(string(labelGCSnapRef)+"btrfs", "sn1", string(labelGCSnapRef)+"overlay", "sn1")),
@@ -413,10 +423,21 @@ func TestGCRefs(t *testing.T) {
 			gcnode(ResourceImage, "ns1", "image1"),
 			gcnode(ResourceImage, "ns1", "image4"),
 		},
+		gcnode(ResourceImage, "ns1", "image5"): {
+			gcnode(ResourceContent, "ns1", dgst(30).String()),
+			gcnode(ResourceSnapshot, "ns1", "overlay/sn10"),
+		},
 		gcnode(ResourceIngest, "ns1", "ingest-1"): nil,
 		gcnode(ResourceIngest, "ns2", "ingest-2"): {
 			gcnode(ResourceContent, "ns2", dgst(8).String()),
 		},
+		gcnode(ResourceContainer, "ns3", "container1"): {
+			gcnode(ResourceContent, "ns3", dgst(10).String()),
+		},
+		gcnode(ResourceContent, "ns3", dgst(20).String()): {
+			gcnode(ResourceSnapshot, "ns3", "overlay/sn6"),
+		},
+		gcnode(ResourceContent, "ns3", dgst(21).String()): {},
 		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn2"): {
 			gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
 		},
@@ -611,6 +632,113 @@ func TestCollectibleResources(t *testing.T) {
 	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
 		return c.scanAll(ctx, tx, fn)
 	})
+}
+
+// TestCollectionWithReferences verifies that gcContext.references invokes the
+// collectionWithReferences hook for externally-registered resource types and
+// that built-in core-type references are unaffected.
+func TestCollectionWithReferences(t *testing.T) {
+	db, err := newDatabase(t)
+	require.NoError(t, err)
+
+	testResource := gc.ResourceType(0x20)
+
+	// Set up a content blob that the forward-reference collector will reference.
+	alters := []alterFunc{
+		addContent("ns1", dgst(1), nil),
+		addContent("ns1", dgst(2), labelmap(string(labelGCContentRef), dgst(1).String())),
+	}
+
+	if err := db.Update(func(tx *bolt.Tx) error {
+		v1bkt, err := tx.CreateBucketIfNotExists(bucketKeyVersion)
+		if err != nil {
+			return err
+		}
+		for _, alter := range alters {
+			if err := alter(v1bkt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Update failed: %+v", err)
+	}
+
+	// refNode is the node the collector will emit as a forward reference.
+	refNode := gcnode(ResourceContent, "ns1", dgst(1).String())
+	testNode := gcnode(testResource, "ns1", "myresource")
+
+	collector := &testForwardRefCollector{
+		testCollector: testCollector{
+			all: []gc.Node{testNode},
+		},
+		refs: map[gc.Node][]gc.Node{
+			testNode: {refNode},
+		},
+	}
+
+	ctx := context.Background()
+	c := startGCContext(ctx, map[gc.ResourceType]Collector{
+		testResource: collector,
+	})
+
+	// The external resource type should emit forward references via collectionWithReferences.
+	checkNodeC(ctx, t, db, []gc.Node{refNode}, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c.references(ctx, tx, testNode, func(n gc.Node) {
+			select {
+			case nc <- n:
+			case <-ctx.Done():
+			}
+		})
+	})
+
+	// Core type (content blob with a label ref) must still resolve its own
+	// forward references without interference from the collector.
+	content2 := gcnode(ResourceContent, "ns1", dgst(2).String())
+	checkNodeC(ctx, t, db, []gc.Node{gcnode(ResourceContent, "ns1", dgst(1).String())},
+		func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+			return c.references(ctx, tx, content2, func(n gc.Node) {
+				select {
+				case nc <- n:
+				case <-ctx.Done():
+				}
+			})
+		})
+
+	// A node whose type is not registered with a forward-reference collector
+	// should produce no references (other than those from built-in logic).
+	unknownNode := gcnode(testResource, "ns1", "notregistered")
+	unknownCollector := &testCollector{
+		all: []gc.Node{unknownNode},
+	}
+	c2 := startGCContext(ctx, map[gc.ResourceType]Collector{
+		testResource: unknownCollector,
+	})
+	checkNodeC(ctx, t, db, nil, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c2.references(ctx, tx, unknownNode, func(n gc.Node) {
+			select {
+			case nc <- n:
+			case <-ctx.Done():
+			}
+		})
+	})
+}
+
+// testForwardRefCollector extends testCollector with collectionWithReferences
+// support, emitting pre-configured forward edges for each visited node.
+type testForwardRefCollector struct {
+	testCollector
+	refs map[gc.Node][]gc.Node
+}
+
+func (tc *testForwardRefCollector) StartCollection(context.Context) (CollectionContext, error) {
+	return tc, nil
+}
+
+func (tc *testForwardRefCollector) References(_ context.Context, node gc.Node, fn func(gc.Node)) {
+	for _, ref := range tc.refs[node] {
+		fn(ref)
+	}
 }
 
 type testCollector struct {

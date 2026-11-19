@@ -18,8 +18,10 @@ package command
 
 import (
 	"context"
+	"iter"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
@@ -27,10 +29,11 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func outputConfig(ctx context.Context, config *srvconfig.Config) error {
@@ -40,7 +43,7 @@ func outputConfig(ctx context.Context, config *srvconfig.Config) error {
 	}
 	if len(plugins) != 0 {
 		if config.Plugins == nil {
-			config.Plugins = make(map[string]interface{})
+			config.Plugins = make(map[string]any)
 		}
 		for _, p := range plugins {
 			if p.Config == nil {
@@ -82,12 +85,11 @@ func defaultConfig() *srvconfig.Config {
 var configCommand = &cli.Command{
 	Name:  "config",
 	Usage: "Information on the containerd config",
-	Subcommands: []*cli.Command{
+	Commands: []*cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
-			Action: func(cliContext *cli.Context) error {
-				ctx := cliContext.Context
+			Action: func(ctx context.Context, cmd *cli.Command) error {
 				return outputConfig(ctx, defaultConfig())
 			},
 		},
@@ -105,40 +107,36 @@ var configCommand = &cli.Command{
 	},
 }
 
-func dumpConfig(cliContext *cli.Context) error {
+func dumpConfig(ctx context.Context, cmd *cli.Command) error {
 	config := defaultConfig()
-	ctx := cliContext.Context
-	if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
+
+	g := registry.Graph(func(*plugin.Registration) bool { return false })
+	plugins := func() iter.Seq[plugin.Registration] {
+		return slices.Values(g)
+	}
+	if err := srvconfig.LoadConfigWithPlugins(ctx, cmd.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	if config.Version < version.ConfigVersion {
-		plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
-		for _, p := range plugins {
-			if p.ConfigMigration != nil {
-				if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
-					return err
-				}
-			}
-		}
-	}
 	return outputConfig(ctx, config)
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: version.ConfigVersion,
-		Root:    defaults.DefaultRootDir,
-		State:   defaults.DefaultStateDir,
-		GRPC: srvconfig.GRPCConfig{
-			Address:        defaults.DefaultAddress,
-			MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
-			MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
-		},
+		Version:          version.ConfigVersion,
+		Root:             defaults.DefaultRootDir,
+		State:            defaults.DefaultStateDir,
 		DisabledPlugins:  []string{},
 		RequiredPlugins:  []string{},
 		StreamProcessors: streamProcessors(),
 		Imports:          []string{defaults.DefaultConfigIncludePattern},
+		Plugins: map[string]any{
+			"io.containerd.server.v1.grpc": map[string]any{
+				"address":               defaults.DefaultAddress,
+				"max_recv_message_size": defaults.DefaultMaxRecvMsgSize,
+				"max_send_message_size": defaults.DefaultMaxSendMsgSize,
+			},
+		},
 	}
 }
 

@@ -75,7 +75,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	# CriuWorkPath is the criu work path.
 	CriuWorkPath = ""
 `
-	var m map[string]interface{}
+	var m map[string]any
 	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
 
 	return RuntimeConfig{
@@ -104,10 +104,10 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		EnableCDI:                        func() *bool { v := true; return &v }(),
 		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
 		DrainExecSyncIOTimeout:           "0s",
 		EnableUnprivilegedPorts:          true,
 		EnableUnprivilegedICMP:           true,
+		EnableCRIU:                       func() *bool { v := true; return &v }(),
 	}
 }

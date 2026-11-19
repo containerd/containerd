@@ -18,9 +18,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	goruntime "runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -32,6 +34,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	streaming "k8s.io/cri-streaming/pkg/streaming"
 
 	apitypes "github.com/containerd/containerd/api/types"
 
@@ -48,15 +51,14 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
-	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 var kernelSupportsRRO bool
@@ -78,6 +80,7 @@ type sandboxService interface {
 	CreateSandbox(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error
 	StartSandbox(ctx context.Context, sandboxer string, sandboxID string) (sandbox.ControllerInstance, error)
 	WaitSandbox(ctx context.Context, sandboxer string, sandboxID string) (<-chan containerd.ExitStatus, error)
+	UpdateSandbox(ctx context.Context, sandboxer string, sandboxID string, sandbox sandbox.Sandbox, fields ...string) error
 	StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error
 	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
 	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
@@ -112,7 +115,8 @@ type ImageService interface {
 
 	Config() criconfig.ImageConfig
 
-	UpdateRuntimeSnapshotter(runtimeName string, imagePlatform images.ImagePlatform)
+	UpdateRuntime(runtimeName string, imagePlatform *images.ImagePlatform)
+	UpdateDefaultRuntimeName(runtimeName string)
 }
 
 // criService implements CRIService.
@@ -128,6 +132,11 @@ type criService struct {
 	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
 	os osinterface.OS
+	// labels reserves the MCS levels of the SELinux process labels held by the
+	// sandbox and container stores. It is shared with both, so reservations are
+	// refcounted per level across pods and containers that use the same one.
+	labels *label.Store
+
 	// sandboxStore stores all resources associated with sandboxes.
 	sandboxStore *sandboxstore.Store
 	// sandboxNameIndex stores all sandbox names and make sure each name
@@ -168,6 +177,13 @@ type criService struct {
 	runtimeFeatures *runtime.RuntimeFeatures
 	// statsCollector collects CPU stats in background for UsageNanoCores calculation
 	statsCollector *StatsCollector
+	// shimPath is the custom PATH environment variable value from the shim manager
+	shimPath string
+	// warningService is used to emit deprecation warnings.
+	warningService warning.Service
+
+	checkCriuOnce sync.Once //nolint:nolintlint,unused // Ignore on non-Linux
+	checkCriuErr  error     //nolint:nolintlint,unused // Ignore on non-Linux
 }
 
 type CRIServiceOptions struct {
@@ -186,6 +202,12 @@ type CRIServiceOptions struct {
 	//
 	// TODO: Replace this gradually with directly configured instances
 	Client *containerd.Client
+
+	// ShimPath is the custom PATH environment variable value from the shim manager
+	ShimPath string
+
+	// WarningService is used to emit deprecation warnings.
+	WarningService warning.Service
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -205,6 +227,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
+		labels:             labels,
 		sandboxStore:       sandboxstore.NewStore(labels, statsCollector),
 		containerStore:     containerstore.NewStore(labels, statsCollector),
 		sandboxNameIndex:   registrar.NewRegistrar(),
@@ -213,6 +236,8 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 		statsCollector:     statsCollector,
+		shimPath:           options.ShimPath,
+		warningService:     options.WarningService,
 	}
 
 	// TODO: Make discard time configurable
@@ -264,12 +289,8 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
-		SupplementalGroupsPolicy: true,
-	}
-
-	if c.config.EnableCDI != nil && !*c.config.EnableCDI {
-		msg, _ := deprecation.Message(deprecation.CRIEnableCDI)
-		log.L.Warnf("enable_cdi set to false. %s", msg)
+		SupplementalGroupsPolicy:  true,
+		UserNamespacesHostNetwork: goruntime.GOOS == "linux",
 	}
 
 	return c, c, nil
@@ -285,10 +306,12 @@ func (c *criService) Run(ready func()) error {
 	// Start the background stats collector for UsageNanoCores calculation
 	log.L.Info("Start stats collector")
 	if c.statsCollector != nil {
+		// TODO: Find a better way to inject service dependencies.
 		c.statsCollector.SetDependencies(
 			c.client.TaskService(),
 			c.containerStore.List,
 			c.sandboxStore.List,
+			c.sandboxService.SandboxController,
 		)
 		c.statsCollector.Start()
 	}
@@ -421,6 +444,9 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 		userns := supportsCRIUserns(rawFeatures)
 		h.Features.UserNamespaces = userns
 		log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
+		cgroupns := supportsCRICgroupns(rawFeatures)
+		h.Features.CgroupNamespaces = cgroupns
+		log.G(ctx).Debugf("runtime %q supports CRI cgroupns: %v", name, cgroupns)
 	}
 
 	c.runtimeHandlers[name] = h
@@ -438,14 +464,8 @@ func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introsp
 }
 
 func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {
-	if r.Type != plugins.RuntimeRuncV2 {
-		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
-			plugins.RuntimeRuncV2, r.Type)
-		// For other runtimes, typeurl.MarshalAnyToProto will cause nil panic during typeurl dereference
-	}
-
 	rr := &apitypes.RuntimeRequest{
-		RuntimePath: r.Type, // "io.containerd.runc.v2"
+		RuntimePath: r.Type, // e.g. "io.containerd.runc.v2" or "io.containerd.runsc.v1"
 	}
 	if r.Path != "" {
 		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
@@ -454,6 +474,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, err
 	}
+	// options is nil when the runtime has no config section; marshalling a nil interface panics in typeurl.
 	if options != nil {
 		rr.Options, err = typeurl.MarshalAnyToProto(options)
 		if err != nil {
@@ -465,9 +486,15 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}
+	if infoResp.Extra == nil {
+		return nil, errors.New("runtime plugin info has no extra data")
+	}
 	var info apitypes.RuntimeInfo
 	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
 		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
+	}
+	if info.Features == nil {
+		return nil, errors.New("runtime info has no features")
 	}
 	featuresX, err := typeurl.UnmarshalAny(info.Features)
 	if err != nil {
@@ -481,7 +508,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 }
 
 func supportsCRIUserns(f *features.Features) bool {
-	if f == nil {
+	if f == nil || f.Linux == nil {
 		return false
 	}
 	userns := slices.Contains(f.Linux.Namespaces, "user")
@@ -495,4 +522,11 @@ func supportsCRIUserns(f *features.Features) bool {
 
 	// user namespace support in CRI requires userns and idmap support.
 	return userns && idmap
+}
+
+func supportsCRICgroupns(f *features.Features) bool {
+	if f == nil || f.Linux == nil {
+		return false
+	}
+	return slices.Contains(f.Linux.Namespaces, "cgroup")
 }

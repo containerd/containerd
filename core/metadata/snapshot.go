@@ -19,6 +19,7 @@ package metadata
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -38,7 +39,6 @@ import (
 
 const (
 	inheritedLabelsPrefix = "containerd.io/snapshot/"
-	labelSnapshotRef      = "containerd.io/snapshot.ref"
 )
 
 type snapshotter struct {
@@ -250,9 +250,7 @@ func overlayInfo(info, overlay snapshots.Info) snapshots.Info {
 	if info.Labels == nil {
 		info.Labels = overlay.Labels
 	} else {
-		for k, v := range overlay.Labels {
-			info.Labels[k] = v
-		}
+		maps.Copy(info.Labels, overlay.Labels)
 	}
 	return info
 }
@@ -317,7 +315,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 	}
 
 	var (
-		target  = base.Labels[labelSnapshotRef]
+		target  = base.Labels[snapshots.LabelSnapshotRef]
 		bparent string
 		bkey    string
 		bopts   = []snapshots.Opt{
@@ -389,10 +387,10 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 	if errdefs.IsAlreadyExists(err) {
 		if target != "" {
 			var tinfo *snapshots.Info
-			filter := fmt.Sprintf(`labels."containerd.io/snapshot.ref"==%s,parent==%q`, target, bparent)
+			filter := fmt.Sprintf(`labels.%q==%s,parent==%q`, snapshots.LabelSnapshotRef, target, bparent)
 			if err := s.Snapshotter.Walk(ctx, func(ctx context.Context, i snapshots.Info) error {
 				if tinfo == nil && i.Kind == snapshots.KindCommitted {
-					if i.Labels["containerd.io/snapshot.ref"] != target {
+					if i.Labels[snapshots.LabelSnapshotRef] != target {
 						// Walk did not respect filter
 						return nil
 					}

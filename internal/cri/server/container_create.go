@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -43,7 +42,7 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/blockio"
@@ -76,6 +75,18 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		sandboxID  = cstatus.SandboxID
 		sandboxPid = cstatus.Pid
 	)
+	if sandbox.Status.Get().State != sandboxstore.StateReady {
+		return nil, fmt.Errorf("sandbox container %q is not running", sandboxID)
+	}
+	// A sandbox without a process (pid 0) describes the namespaces and files it
+	// holds in the spec it returned on start; containers are wired up from it.
+	var sandboxSpec *runtimespec.Spec
+	if sandboxPid == 0 {
+		sandboxSpec, err = c.sandboxSpec(ctx, sandboxID)
+		if err != nil {
+			return nil, err
+		}
+	}
 	span.SetAttributes(
 		tracing.Attribute("sandbox.id", sandboxID),
 		tracing.Attribute("sandbox.pid", sandboxPid),
@@ -95,9 +106,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	containerName := metadata.Name
 	name := makeContainerName(metadata, sandboxMetadata)
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
+	if _, err := criSignalToOCIStopSignal(config.GetStopSignal()); err != nil {
+		return nil, err
+	}
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
-		var resErr *registrar.ReservedErr
-		if errors.As(err, &resErr) {
+		if _, ok := errors.AsType[*registrar.ReservedErr](err); ok {
 			log.G(ctx).WithError(err).Warn("possible concurrent CreateContainer request")
 			return nil, fmt.Errorf("failed to reserve container name %q; check if another CreateContainer request is in progress: %w", name, err)
 		}
@@ -120,52 +133,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		Name:      name,
 		SandboxID: sandboxID,
 		Config:    config,
-	}
-
-	// Check if image is a file. If it is a file it might be a checkpoint archive.
-	checkpointImage, err := func() (bool, error) {
-		if _, err := c.os.Stat(config.GetImage().GetImage()); err == nil {
-			log.G(ctx).Infof(
-				"%q is a file. Assuming it is a checkpoint archive",
-				config.GetImage().GetImage(),
-			)
-			return true, nil
-		}
-		// Check if this is an OCI checkpoint image
-		imageID, err := c.checkIfCheckpointOCIImage(ctx, config.GetImage().GetImage())
-		if err != nil {
-			return false, fmt.Errorf("failed to check if this is a checkpoint image: %w", err)
-		}
-
-		return imageID != "", nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	if checkpointImage {
-		// This might be a checkpoint image. Let's pass
-		// it to the checkpoint code.
-
-		if sandboxConfig.GetMetadata() == nil {
-			return nil, fmt.Errorf("sandboxConfig must not be empty")
-		}
-
-		ctrID, err := c.CRImportCheckpoint(
-			ctx,
-			&meta,
-			&sandbox,
-			sandboxConfig,
-		)
-		if err != nil {
-			log.G(ctx).Errorf("failed to prepare %s for restore %q", ctrID, err)
-			return nil, err
-		}
-		log.G(ctx).Infof("Prepared %s for restore", ctrID)
-
-		return &runtime.CreateContainerResponse{
-			ContainerId: id,
-		}, nil
 	}
 
 	// Prepare container image snapshot. For container, the image should have
@@ -195,6 +162,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			podSandboxConfig:      sandboxConfig,
 			sandboxRuntimeHandler: sandbox.Metadata.RuntimeHandler,
 			sandboxPid:            sandboxPid,
+			sandboxSpec:           sandboxSpec,
 			NetNSPath:             sandbox.NetNSPath,
 			containerName:         containerName,
 			containerdImage:       &containerdImage,
@@ -212,7 +180,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 type createContainerRequest struct {
 	ctx                   context.Context
 	containerID           string
-	sandbox               *sandbox.Sandbox
+	sandbox               *sandboxstore.Sandbox
 	sandboxID             string
 	imageID               string
 	containerConfig       *runtime.ContainerConfig
@@ -224,8 +192,11 @@ type createContainerRequest struct {
 	containerName         string
 	containerdImage       *containerd.Image
 	meta                  *containerstore.Metadata
-	restore               bool
 	start                 time.Time
+	// sandboxSpec is the spec returned by the sandbox controller on start. It is
+	// only loaded for sandboxes without a process (sandboxPid == 0), where it is
+	// the source of the pod namespace paths and shared file mounts.
+	sandboxSpec *runtimespec.Spec
 }
 
 func (c *criService) createContainer(r *createContainerRequest) (_ string, retErr error) {
@@ -318,6 +289,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		volumeMounts,
 		ociRuntime,
 		runtimeHandler,
+		r.sandboxSpec,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate container %q spec: %w", r.containerID, err)
@@ -341,7 +313,10 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	log.G(r.ctx).Debugf("Container %q spec: %#+v", r.containerID, spew.NewFormatter(spec))
+	logger := log.G(r.ctx)
+	if logger.Logger.IsLevelEnabled(log.DebugLevel) {
+		logger.WithField("spec", spec).Debugf("Container %q spec", r.containerID)
+	}
 
 	// Grab any platform specific snapshotter opts.
 	sOpts, err := snapshotterOpts(r.containerConfig)
@@ -367,7 +342,17 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
 	r.meta.ImageRef = r.imageID
-	r.meta.StopSignal = r.imageConfig.StopSignal
+	r.meta.ImageDigest = (*r.containerdImage).Target().Digest.String()
+	r.meta.ImageName = (*r.containerdImage).Name()
+	if signal := r.containerConfig.GetStopSignal(); signal != runtime.Signal_SIGNAL_RUNTIME_DEFAULT {
+		stopSignal, err := criSignalToOCIStopSignal(signal)
+		if err != nil {
+			return "", err
+		}
+		r.meta.StopSignal = stopSignal
+	} else if r.imageConfig.StopSignal != "" {
+		r.meta.StopSignal = r.imageConfig.StopSignal
+	}
 
 	// Validate log paths and compose full container log path.
 	if r.podSandboxConfig.GetLogDirectory() != "" && r.containerConfig.GetLogPath() != "" {
@@ -446,7 +431,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		}
 	}()
 
-	status := containerstore.Status{CreatedAt: time.Now().UnixNano(), Restore: r.restore}
+	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
 	status = copyResourcesToStatus(spec, status)
 	container, err := containerstore.NewContainer(*r.meta,
 		containerstore.WithStatus(status, containerRootDir),
@@ -642,6 +627,7 @@ func (c *criService) buildContainerSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 	runtimeHandler *runtime.RuntimeHandler,
+	sandboxSpec *runtimespec.Spec,
 ) (_ *runtimespec.Spec, retErr error) {
 	var (
 		specOpts []oci.SpecOpts
@@ -657,12 +643,13 @@ func (c *criService) buildContainerSpec(
 	case isLinux:
 		// Generate container mounts.
 		// No mounts are passed for other platforms.
-		linuxMounts := c.linuxContainerMounts(sandboxID, config)
+		linuxMounts := c.linuxContainerMounts(sandboxID, config, sandboxSpec)
 
 		specOpts, err = c.buildLinuxSpec(
 			id,
 			sandboxID,
 			sandboxPid,
+			sandboxSpec,
 			containerName,
 			imageName,
 			config,
@@ -710,6 +697,7 @@ func (c *criService) buildLinuxSpec(
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
+	sandboxSpec *runtimespec.Spec,
 	containerName string,
 	imageName string,
 	config *runtime.ContainerConfig,
@@ -763,7 +751,7 @@ func (c *criService) buildLinuxSpec(
 	// can override them.
 	env := append([]string{}, imageConfig.Env...)
 	for _, e := range config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
+		env = append(env, e.GetKey()+"="+string(e.GetValue()))
 	}
 	specOpts = append(specOpts, oci.WithEnv(env))
 
@@ -791,6 +779,32 @@ func (c *criService) buildLinuxSpec(
 			selinux.ReleaseLabel(processLabel)
 		}
 	}()
+
+	cgroupnsMode, err := resolveCgroupnsMode(securityContext, isUnifiedCgroupsMode())
+	if err != nil {
+		return nil, err
+	}
+	switch cgroupnsMode {
+	case runtime.NamespaceMode_CONTAINER:
+		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
+	case runtime.NamespaceMode_NODE:
+		// A writable cgroup filesystem in the node cgroupns would expose the
+		// node's entire cgroup hierarchy as writable to the container.
+		if !securityContext.GetPrivileged() {
+			if securityContext.GetCgroupMountMode() == runtime.CgroupMountMode_CGROUP_MOUNT_MODE_READ_WRITE {
+				return nil, errors.New("cgroup mount mode READ_WRITE cannot be used with cgroup namespace mode NODE for a non-privileged container")
+			}
+			if ociRuntime.CgroupWritable {
+				return nil, errors.New("cgroup_writable cannot be used with cgroup namespace mode NODE for a non-privileged container")
+			}
+		}
+		// When NODE is explicitly specified, remove the cgroupns that might be
+		// inherited from the base runtime spec.
+		// When CgroupnsOptions is nil, the base runtime spec is kept as is, for compatibility.
+		if securityContext.GetNamespaceOptions().GetCgroupnsOptions() != nil {
+			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.CgroupNamespace))
+		}
+	}
 
 	var ociSpecOpts oci.SpecOpts
 	if ociRuntime.CgroupWritable {
@@ -920,23 +934,37 @@ func (c *criService) buildLinuxSpec(
 		return nil, fmt.Errorf("user namespace config for sandbox is different from container. Sandbox userns config: %v - Container userns config: %v", sandboxUsernsOpts, nsOpts.GetUsernsOptions())
 	}
 
+	// Determine if user namespace is enabled
+	var usernsEnabled bool
+	if nsOpts.GetUsernsOptions() != nil && nsOpts.GetUsernsOptions().GetMode() == runtime.NamespaceMode_POD {
+		usernsEnabled = true
+	}
+
+	// When using both host network and user namespace, we need to bind mount /sys
+	// instead of mounting sysfs, because mounting sysfs will fail with EPERM in this configuration.
+	sandboxNsOpts := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	if sandboxNsOpts.GetNetwork() == runtime.NamespaceMode_NODE && usernsEnabled {
+		specOpts = append(specOpts, oci.WithoutMounts("/sys"))
+		// Add bind mount for /sys
+		specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
+			{
+				Source:      "/sys",
+				Destination: "/sys",
+				Type:        "bind",
+				Options:     []string{"rbind", "rro", "nosuid", "nodev", "noexec"},
+			},
+		}))
+	}
+
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
+		customopts.WithPodNamespacePaths(securityContext, sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions(), podNamespacePaths(sandboxPid, targetPid, sandboxSpec), uids, gids),
 		customopts.WithSupplementalGroups(supplementalGroups),
 	)
 	specOpts = append(
 		specOpts,
 		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
 	)
-
-	// cgroupns is used for hiding /sys/fs/cgroup from containers.
-	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
-	// https://github.com/containers/libpod/issues/4363
-	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
-	if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
-		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
-	}
 
 	return specOpts, nil
 }
@@ -980,7 +1008,7 @@ func (c *criService) buildWindowsSpec(
 	// can override them.
 	env := append([]string{}, imageConfig.Env...)
 	for _, e := range config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
+		env = append(env, e.GetKey()+"="+string(e.GetValue()))
 	}
 	specOpts = append(specOpts, oci.WithEnv(env))
 
@@ -1069,7 +1097,7 @@ func (c *criService) buildDarwinSpec(
 	// can override them.
 	env := append([]string{}, imageConfig.Env...)
 	for _, e := range config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
+		env = append(env, e.GetKey()+"="+string(e.GetValue()))
 	}
 	specOpts = append(specOpts, oci.WithEnv(env))
 
@@ -1092,9 +1120,94 @@ func (c *criService) buildDarwinSpec(
 	return specOpts, nil
 }
 
+// sandboxSpec loads the OCI spec the sandbox controller returned when the
+// sandbox was started. It is nil when the controller returned none.
+func (c *criService) sandboxSpec(ctx context.Context, sandboxID string) (*runtimespec.Spec, error) {
+	sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox %q from metadata store: %w", sandboxID, err)
+	}
+	if sandboxInfo.Spec == nil {
+		return nil, nil
+	}
+	var spec runtimespec.Spec
+	if err := typeurl.UnmarshalTo(sandboxInfo.Spec, &spec); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal spec of sandbox %q: %w", sandboxID, err)
+	}
+	return &spec, nil
+}
+
+// podNamespacePaths resolves the namespaces a container joins.
+//
+// A PID-backed sandbox (pause) is a member of every pod namespace, so the
+// paths are derived from its pid exactly as before. A sandbox without a
+// process holds the pod namespaces itself and lists their paths in the Linux
+// section of the spec it returned on start; a namespace missing from that
+// spec is one the sandbox does not hold, which WithPodNamespacePaths turns into
+// the host namespace when the pod asked for it and into an error otherwise.
+//
+// A sandbox that reports no process and returns no spec (or none with a Linux
+// section) is a pre-existing Sandbox API shim that describes neither (VM based
+// shims ignore the paths CRI generates); those keep the historical pid derived
+// construction so that their behavior does not change.
+func podNamespacePaths(sandboxPid, targetPid uint32, sandboxSpec *runtimespec.Spec) customopts.PodNamespacePaths {
+	if sandboxPid != 0 || sandboxSpec == nil || sandboxSpec.Linux == nil {
+		return customopts.PodNamespacePathsFromPid(sandboxPid, targetPid)
+	}
+	var paths customopts.PodNamespacePaths
+	for _, ns := range sandboxSpec.Linux.Namespaces {
+		switch ns.Type {
+		case runtimespec.NetworkNamespace:
+			paths.Network = ns.Path
+		case runtimespec.IPCNamespace:
+			paths.IPC = ns.Path
+		case runtimespec.UTSNamespace:
+			paths.UTS = ns.Path
+		case runtimespec.PIDNamespace:
+			// A PID namespace entry without a path is the sandbox declaring
+			// that it holds none and that each container gets a new one.
+			paths.PID = ns.Path
+			paths.PrivatePID = ns.Path == ""
+		case runtimespec.UserNamespace:
+			paths.User = ns.Path
+		}
+	}
+	// A container targeting another container's PID namespace joins that
+	// container, not the sandbox.
+	if targetPid != sandboxPid {
+		paths.PID = customopts.GetPIDNamespace(targetPid)
+	}
+	return paths
+}
+
+// sandboxSharedFile returns the host path of a pod shared file, i.e. a file
+// the sandbox provides to every container of the pod at destination (for
+// example /etc/hosts). The fixed location under the CRI sandbox directory
+// wins when it exists; otherwise the mount the sandbox declared for that
+// destination in its spec is used, which is how a sandbox implementation that
+// owns the files, such as a Sandbox API shim, hands them over. The result is
+// empty when neither exists.
+func (c *criService) sandboxSharedFile(fixedPath, destination string, sandboxSpec *runtimespec.Spec) string {
+	if _, err := c.os.Stat(fixedPath); err == nil {
+		return fixedPath
+	}
+	if sandboxSpec == nil {
+		return ""
+	}
+	for _, m := range sandboxSpec.Mounts {
+		if m.Destination != destination || m.Source == "" {
+			continue
+		}
+		if _, err := c.os.Stat(m.Source); err == nil {
+			return m.Source
+		}
+	}
+	return ""
+}
+
 // linuxContainerMounts sets up necessary container system file mounts
 // including /dev/shm, /etc/hosts and /etc/resolv.conf.
-func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
+func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.ContainerConfig, sandboxSpec *runtimespec.Spec) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
 	var uidMappings, gidMappings []*runtime.IDMapping
@@ -1109,8 +1222,7 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		// do not mount this in that case.
 		// TODO(random-liu): Remove the check and always mount this when
 		// containerd 1.1 and 1.2 are deprecated.
-		hostpath := c.getSandboxHostname(sandboxID)
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if hostpath := c.sandboxSharedFile(c.getSandboxHostname(sandboxID), etcHostname, sandboxSpec); hostpath != "" {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  etcHostname,
 				HostPath:       hostpath,
@@ -1123,10 +1235,9 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 	}
 
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
-		hostpath := c.getSandboxHosts(sandboxID)
 		// /etc/hosts could be delegated to remote sandbox controller. That file isn't required to be existed
 		// in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if hostpath := c.sandboxSharedFile(c.getSandboxHosts(sandboxID), etcHosts, sandboxSpec); hostpath != "" {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  etcHosts,
 				HostPath:       hostpath,
@@ -1141,10 +1252,9 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 	// Mount sandbox resolv.config.
 	// TODO: Need to figure out whether we should always mount it as read-only
 	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
-		hostpath := c.getResolvPath(sandboxID)
 		// The ownership of /etc/resolv.conf could be delegated to remote sandbox controller. That file isn't
 		// required to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
-		if _, err := c.os.Stat(hostpath); err == nil {
+		if hostpath := c.sandboxSharedFile(c.getResolvPath(sandboxID), resolvConfPath, sandboxSpec); hostpath != "" {
 			mounts = append(mounts, &runtime.Mount{
 				ContainerPath:  resolvConfPath,
 				HostPath:       hostpath,
@@ -1160,6 +1270,8 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		sandboxDevShm := c.getSandboxDevShm(sandboxID)
 		if securityContext.GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 			sandboxDevShm = devShm
+		} else if source := c.sandboxSharedFile(sandboxDevShm, devShm, sandboxSpec); source != "" {
+			sandboxDevShm = source
 		}
 		// The ownership of /dev/shm could be delegated to remote sandbox controller. That file isn't required
 		// to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
@@ -1197,4 +1309,31 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 	}
 
 	return "", nil, err
+}
+
+// resolveCgroupnsMode returns the cgroup namespace mode for a container.
+//
+// When CgroupnsOptions is not specified, cgroupns is used only for
+// non-privileged containers on cgroup v2 hosts, for compatibility.
+// cgroupns is used for hiding /sys/fs/cgroup from containers.
+// https://github.com/containers/libpod/issues/4363
+// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
+//
+// When CgroupnsOptions is specified, its mode is used as is (KEP-5714).
+// Only CONTAINER and NODE are supported.
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/5714-cgroupns/README.md
+func resolveCgroupnsMode(securityContext *runtime.LinuxContainerSecurityContext, unifiedCgroups bool) (runtime.NamespaceMode, error) {
+	cgroupnsOpts := securityContext.GetNamespaceOptions().GetCgroupnsOptions()
+	if cgroupnsOpts == nil {
+		if unifiedCgroups && !securityContext.GetPrivileged() {
+			return runtime.NamespaceMode_CONTAINER, nil
+		}
+		return runtime.NamespaceMode_NODE, nil
+	}
+	switch mode := cgroupnsOpts.GetMode(); mode {
+	case runtime.NamespaceMode_CONTAINER, runtime.NamespaceMode_NODE:
+		return mode, nil
+	default:
+		return 0, fmt.Errorf("unsupported cgroup namespace mode: %s", mode)
+	}
 }

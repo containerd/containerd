@@ -28,7 +28,6 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/internal/cri/clock"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 )
 
@@ -39,7 +38,7 @@ const (
 )
 
 type EventHandler interface {
-	HandleEvent(any interface{}) error
+	HandleEvent(any any) error
 }
 
 // EventMonitor monitors containerd event and updates internal state correspondingly.
@@ -63,14 +62,12 @@ type backOff struct {
 	minDuration   time.Duration
 	maxDuration   time.Duration
 	checkDuration time.Duration
-	clock         clock.Clock
 }
 
 type backOffQueue struct {
-	events     []interface{}
+	events     []any
 	expireTime time.Time
 	duration   time.Duration
-	clock      clock.Clock
 }
 
 // NewEventMonitor create new event monitor. New event monitor will Start subscribing containerd event. All events
@@ -90,7 +87,7 @@ func (em *EventMonitor) Subscribe(subscriber events.Subscriber, filters []string
 	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
 }
 
-func convertEvent(e typeurl.Any) (string, interface{}, error) {
+func convertEvent(e typeurl.Any) (string, any, error) {
 	id := ""
 	evt, err := typeurl.UnmarshalAny(e)
 	if err != nil {
@@ -188,7 +185,7 @@ func (em *EventMonitor) Start() <-chan error {
 	return errCh
 }
 
-func (em *EventMonitor) Backoff(key string, evt interface{}) {
+func (em *EventMonitor) Backoff(key string, evt any) {
 	em.backOff.enBackOff(key, evt)
 }
 
@@ -205,7 +202,6 @@ func newBackOff() *backOff {
 		minDuration:   backOffInitDuration,
 		maxDuration:   backOffMaxDuration,
 		checkDuration: backOffExpireCheckDuration,
-		clock:         clock.RealClock{},
 	}
 }
 
@@ -233,7 +229,7 @@ func (b *backOff) isInBackOff(key string) bool {
 }
 
 // enBackOff start to backOff and put event to the tail of queue
-func (b *backOff) enBackOff(key string, evt interface{}) {
+func (b *backOff) enBackOff(key string, evt any) {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
@@ -241,7 +237,7 @@ func (b *backOff) enBackOff(key string, evt interface{}) {
 		queue.events = append(queue.events, evt)
 		return
 	}
-	b.queuePool[key] = newBackOffQueue([]interface{}{evt}, b.minDuration, b.clock)
+	b.queuePool[key] = newBackOffQueue([]any{evt}, b.minDuration)
 }
 
 // deBackOff get out the whole queue
@@ -255,12 +251,12 @@ func (b *backOff) deBackOff(key string) *backOffQueue {
 }
 
 // enBackOff start to backOff again and put events to the queue
-func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.Duration) {
+func (b *backOff) reBackOff(key string, events []any, oldDuration time.Duration) {
 	b.queuePoolMu.Lock()
 	defer b.queuePoolMu.Unlock()
 
 	duration := min(2*oldDuration, b.maxDuration)
-	b.queuePool[key] = newBackOffQueue(events, duration, b.clock)
+	b.queuePool[key] = newBackOffQueue(events, duration)
 }
 
 func (b *backOff) start() <-chan time.Time {
@@ -278,16 +274,14 @@ func (b *backOff) stop() {
 	}
 }
 
-func newBackOffQueue(events []interface{}, init time.Duration, c clock.Clock) *backOffQueue {
+func newBackOffQueue(events []any, init time.Duration) *backOffQueue {
 	return &backOffQueue{
 		events:     events,
 		duration:   init,
-		expireTime: c.Now().Add(init),
-		clock:      c,
+		expireTime: time.Now().Add(init),
 	}
 }
 
 func (q *backOffQueue) isExpire() bool {
-	// return time.Now >= expireTime
-	return !q.clock.Now().Before(q.expireTime)
+	return !time.Now().Before(q.expireTime)
 }

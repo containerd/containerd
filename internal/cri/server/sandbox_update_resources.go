@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 
@@ -73,6 +74,14 @@ func (c *criService) UpdatePodSandboxResources(ctx context.Context, r *runtime.U
 	}
 	if _, err := c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox %s in core store: %w", sandbox.ID, err)
+	}
+
+	if err := c.sandboxService.UpdateSandbox(ctx, sandboxInfo.Sandboxer, sandboxInfo.ID, sandboxInfo, "extensions"); err != nil {
+		// Tolerate these errors for older sandbox controllers that may not support this yet.
+		if !errdefs.IsNotImplemented(err) {
+			return nil, fmt.Errorf("failed to update sandbox controller: %w", err)
+		}
+		log.G(ctx).Tracef("sandbox controller %q does not implement Update endpoint", sandboxInfo.Sandboxer)
 	}
 
 	err = c.nri.PostUpdatePodSandboxResources(ctx, &sandbox)

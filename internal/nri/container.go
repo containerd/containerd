@@ -49,6 +49,7 @@ type Container interface {
 	GetCDIDevices() []*nri.CDIDevice
 	GetRlimits() []*nri.POSIXRlimit
 	GetUser() *nri.User
+	GetImage() *nri.Image
 }
 
 type LinuxContainer interface {
@@ -87,6 +88,7 @@ func commonContainerToNRI(ctr Container) *nri.Container {
 		ExitCode:     status.ExitCode,
 		Rlimits:      ctr.GetRlimits(),
 		User:         ctr.GetUser(),
+		Image:        ctr.GetImage(),
 	}
 }
 

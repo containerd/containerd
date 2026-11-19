@@ -40,16 +40,14 @@ func openPipe(ctx context.Context, fn string, flag int, perm os.FileMode) (io.Re
 		return nil, err
 	}
 	p := &pipe{l: l}
-	p.conWg.Add(1)
-	go func() {
-		defer p.conWg.Done()
+	p.conWg.Go(func() {
 		c, err := l.Accept()
 		if err != nil {
 			p.conErr = err
 			return
 		}
 		p.con = c
-	}()
+	})
 	go func() {
 		<-ctx.Done()
 		p.Close()

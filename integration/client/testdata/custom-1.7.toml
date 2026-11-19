@@ -51,9 +51,8 @@ version = 2
     disable_proc_mount = false
     disable_tcp_service = true
     drain_exec_sync_io_timeout = "0s"
-    # Updated in latest release
+    # Removed in latest
     #enable_cdi = false
-    enable_cdi = true
     enable_selinux = false
     enable_tls_streaming = true
     # Updated in latest release
@@ -67,7 +66,7 @@ version = 2
     max_container_log_line_size = 16384
     netns_mounts_under_state_dir = false
     restrict_oom_score_adj = false
-    sandbox_image = "custom.io/pause:3.10.1"
+    sandbox_image = "custom.io/pause:3.10.2"
     selinux_category_range = 1024
     stats_collect_period = 10
     stream_idle_timeout = "2h0m0s"

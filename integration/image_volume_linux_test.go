@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +134,9 @@ func TestImageVolumeBasic(t *testing.T) {
 				if !selinux.GetEnabled() {
 					t.Skip("SELinux is not enabled")
 				}
+				if runtimeHandlerIsRunsc() {
+					t.Skip("runsc does not support SELinux labels in the OCI spec")
+				}
 			}
 
 			podCtx, cnID, err := setupRunningContainerWithImageVolume(t, tc.selinuxLevel, tc.containerImage, tc.imageVolumeImage, tc.imageSubPath, tc.containerPath)
@@ -187,6 +191,35 @@ func TestImageVolumeBasic(t *testing.T) {
 	}
 }
 
+func TestImageVolumeReusableAfterFailure(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+	image := images.Get(images.Alpine)
+	pullImagesByCRI(t, imageService, image)
+
+	img, err := containerdClient.GetImage(ctx, image)
+	require.NoError(t, err)
+	podCtx := newPodTCtx(t, runtimeService, t.Name(), "image-volume")
+	defer podCtx.stop(true)
+
+	target := filepath.Join(podCtx.imageVolumeDir(), img.Target().Digest.Encoded())
+
+	cfg := ContainerConfig("invalid-image-subpath", image,
+		WithImageVolumeMount(image, "does-not-exist", "/image-mount"))
+	_, err = podCtx.rSvc.CreateContainer(podCtx.id, cfg, podCtx.cfg)
+	require.ErrorContains(t, err, "failed to ensure image subpath")
+
+	_, err = containerdClient.SnapshotService("overlayfs").Stat(ctx, target)
+	require.NoError(t, err, "image volume snapshot should remain after the failed attempt")
+
+	cnID := podCtx.createContainer("valid-image-subpath", image,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "1d"),
+		WithImageVolumeMount(image, "etc", "/image-mount"))
+	stdout, _, err := podCtx.rSvc.ExecSync(cnID, []string{"cat", "/image-mount/os-release"}, 0)
+	require.NoError(t, err)
+	require.Contains(t, string(stdout), "Alpine Linux")
+}
+
 func setupRunningContainerWithImageVolume(t *testing.T, selinuxLevel string, containerImage string, imageVolumeName, imageSubPath, containerPath string) (podCtx *podTCtx, cnID string, err error) {
 	podLogDir := t.TempDir()
 
@@ -220,6 +253,50 @@ func setupRunningContainerWithImageVolume(t *testing.T, selinuxLevel string, con
 	return podCtx, cnID, nil
 }
 
+// TestImageVolumeReportsResolvedDigest verifies that image-volume mount
+// status reports the resolved config digest while preserving the requested image.
+func TestImageVolumeReportsResolvedDigest(t *testing.T) {
+	containerImage := images.Get(images.Alpine)
+	imageVolumeImage := images.Get(images.Pause)
+	containerPath := "/image-mount"
+
+	podCtx, cnID, err := setupRunningContainerWithImageVolume(t, "", containerImage, imageVolumeImage, "", containerPath)
+	require.NoError(t, err)
+	defer podCtx.stop(true)
+
+	imgStatus, err := imageService.ImageStatus(&criruntime.ImageSpec{Image: imageVolumeImage})
+	require.NoError(t, err)
+	require.NotNil(t, imgStatus)
+	require.NotEmpty(t, imgStatus.GetId())
+	var repoDigest string
+	for _, ref := range imgStatus.GetRepoDigests() {
+		if i := strings.LastIndexByte(ref, '@'); i >= 0 {
+			repoDigest = ref[i+1:]
+			break
+		}
+	}
+	require.NotEmpty(t, repoDigest, "expected the multi-platform pause image to have a repository digest")
+	require.NotEqual(t, imgStatus.GetId(), repoDigest,
+		"the repo digest should differ from the platform-specific config digest")
+
+	status, err := runtimeService.ContainerStatus(cnID)
+	require.NoError(t, err)
+
+	var found bool
+	for _, m := range status.GetMounts() {
+		if m.GetContainerPath() != containerPath {
+			continue
+		}
+		found = true
+		require.Equal(t, imageVolumeImage, m.GetImage().GetImage())
+
+		require.Equal(t, imgStatus.GetId(), m.GetImage().GetImageRef(),
+			"image volume mount should report the resolved config digest as ImageRef")
+		break
+	}
+	require.True(t, found, "expected to find the image-volume mount in container status")
+}
+
 func TestImageVolumeCheckVolatileOption(t *testing.T) {
 	ok, _ := kernel.GreaterEqualThan(
 		kernel.KernelVersion{
@@ -247,7 +324,8 @@ func TestImageVolumeCheckVolatileOption(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, mpInfo.Mountpoint, imageVolumeMount)
 	require.Equal(t, "overlay", mpInfo.FSType)
-	require.Contains(t, strings.Split(mpInfo.VFSOptions, ","), "volatile")
+	vfsOpts := strings.Split(mpInfo.VFSOptions, ",")
+	require.True(t, slices.Contains(vfsOpts, "volatile") || slices.Contains(vfsOpts, "fsync=volatile"), "VFSOptions should contain either 'volatile' or 'fsync=volatile'")
 }
 
 func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
@@ -327,6 +405,9 @@ func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
 }
 
 func TestImageVolumeWithUserNamespace(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc does not support host user namespaces")
+	}
 	// Check if user namespace and idmap are supported
 	if !supportsUserNS() {
 		t.Skip("user namespace not supported")

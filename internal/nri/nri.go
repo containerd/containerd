@@ -23,7 +23,9 @@ import (
 
 	"github.com/containerd/log"
 
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
+
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 
@@ -111,7 +113,7 @@ type local struct {
 var _ API = &local{}
 
 // New creates an instance of the NRI interface with the given configuration.
-func New(cfg *Config) (API, error) {
+func New(cfg *Config, ws warning.Service) (API, error) {
 	l := &local{
 		cfg: cfg,
 	}
@@ -131,6 +133,7 @@ func New(cfg *Config) (API, error) {
 	)
 
 	cfg.ConfigureTimeouts()
+	opts = append(opts, nri.WithDeprecationRecorder(&recorder{ws: ws}))
 
 	l.nri, err = nri.New(name, version, syncFn, updateFn, opts...)
 	if err != nil {

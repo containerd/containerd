@@ -54,8 +54,8 @@ func cleanupWCOWLayers(root string) error {
 	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if path != root && info.IsDir() {
 			name := filepath.Base(path)
-			if strings.HasPrefix(name, "rm-") {
-				layerNum, err := strconv.Atoi(strings.TrimPrefix(name, "rm-"))
+			if after, ok := strings.CutPrefix(name, "rm-"); ok {
+				layerNum, err := strconv.Atoi(after)
 				if err != nil {
 					return err
 				}

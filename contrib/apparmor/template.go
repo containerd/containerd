@@ -40,8 +40,8 @@ import (
 const dir = "/etc/apparmor.d"
 
 const defaultTemplate = `
-abi <abi/3.0>,
-
+{{if .Abi}}abi <{{.Abi}}>,
+{{end}}
 {{range $value := .Imports}}
 {{$value}}
 {{end}}
@@ -52,6 +52,10 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 {{end}}
 
   network,
+  # Disallow AF_ALG (Linux kernel crypto API); see https://copy.fail/
+  deny network alg,
+  # Disallow AF_VSOCK to prevent host/guest communication.
+  deny network vsock,
   capability,
   file,
   umount,
@@ -65,6 +69,10 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   signal (receive) peer={{.DaemonProfile}},
   # Container processes may send signals amongst themselves.
   signal (send,receive) peer={{.Name}},
+  # With kernel.apparmor_restrict_unprivileged_unconfined=1, an unprivileged
+  # profile change is converted to stacking, producing "{{.Name}}//&unconfined".
+  # Allow signals to peers with this stacked label as well.
+  signal (send,receive) peer={{.Name}}//&unconfined,
 {{if .RootlessKit}}
   # https://github.com/containerd/nerdctl/issues/2730
   signal (receive) peer={{.RootlessKit}},
@@ -92,10 +100,13 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   # allow processes within the container to trace each other,
   # provided all other LSM and yama setting allow it.
   ptrace (trace,tracedby,read,readby) peer={{.Name}},
+  # Same stacked-label peer as the signal rule above.
+  ptrace (trace,tracedby,read,readby) peer={{.Name}}//&unconfined,
 }
 `
 
 type data struct {
+	Abi           string
 	Name          string
 	Imports       []string
 	InnerImports  []string
@@ -116,6 +127,11 @@ func cleanProfileName(profile string) string {
 func loadData(name string) (*data, error) {
 	p := data{
 		Name: name,
+	}
+
+	const abi = "abi/3.0"
+	if macroExists(abi) {
+		p.Abi = abi
 	}
 
 	if macroExists("tunables/global") {
@@ -172,7 +188,7 @@ func macroExists(m string) bool {
 }
 
 func aaParser(args ...string) (string, error) {
-	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
+	out, err := exec.Command("apparmor_parser", args...).CombinedOutput() //nolint:gosec // G702: arguments are passed directly to a fixed executable.
 	return string(out), err
 }
 

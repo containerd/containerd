@@ -146,13 +146,17 @@ bench() {
 
     pushd "$dir"
 
+    tags=""
     if [ "${replace}" != "" ]; then
-        find ./benchmark/ -iname '*.go' -exec sed -i -E "s|github.com/pelletier/go-toml/v2|${replace}|g" {} \;
+        find ./benchmark/ -iname '*.go' -exec sed -i -E "s|github.com/pelletier/go-toml/v2\"|${replace}\"|g" {} \;
         go get "${replace}"
+        # The realworld benchmarks use v2-only API and cannot compile against
+        # the other libraries; exclude them from cross-library comparisons.
+        tags="-tags cross_library_benchmark"
     fi
 
     export GOMAXPROCS=2
-    go test '-bench=^Benchmark(Un)?[mM]arshal' -count=10 -run=Nothing ./... | tee "${out}"
+    go test ${tags} '-bench=^Benchmark(Un)?[mM]arshal' -count=10 -run=Nothing ./... | tee "${out}"
     popd
 
     if [ "${branch}" != "HEAD" ]; then
@@ -195,6 +199,11 @@ for line in reversed(lines[2:]):
         "%.1fx" % (float(line[3])/v2),  # v1
         "%.1fx" % (float(line[7])/v2),  # bs
     ])
+
+if not results:
+    print("No benchmark results to display.", file=sys.stderr)
+    sys.exit(1)
+
 # move geomean to the end
 results.append(results[0])
 del results[0]

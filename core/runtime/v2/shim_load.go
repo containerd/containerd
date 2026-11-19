@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"golang.org/x/sync/errgroup"
@@ -130,6 +131,13 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		id      = bundle.ID
 	)
 
+	// One budget for the whole load: shims are loaded during plugin
+	// initialization, so a shim that never answers would otherwise stall
+	// containerd startup. Nested timeouts can only shorten a deadline, so this
+	// bounds the load however many calls it makes.
+	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
+	defer cancel()
+
 	// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
 	if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
 		runtime = string(data)
@@ -162,6 +170,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 			runtime:      runtime,
 			address:      m.containerdAddress,
 			ttrpcAddress: m.containerdTTRPCAddress,
+			socketDir:    m.socketDir,
 			env:          m.env,
 		})
 	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
@@ -173,7 +182,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		m.shims.Delete(ctx, id)
 	})
 	if err != nil {
-		cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
+		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
 		return fmt.Errorf("unable to load shim %q: %w", id, err)
 	}
 
@@ -187,16 +196,33 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 
 	_, sgetErr := m.sandboxStore.Get(ctx, id)
 	pInfo, pidErr := shim.Pids(ctx)
-	if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
-		log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
-		// We are unable to get Pids from the shim and it's not a sandbox
-		// shim. We should clean it up her.
-		// No need to do anything for removeTask since we never added this shim.
-		shim.delete(ctx, false, func(ctx context.Context, id string) {})
+	if shouldCleanupShim(sgetErr, pidErr, pInfo) {
+		logEntry := log.G(ctx).WithField("id", id)
+		if pidErr != nil {
+			logEntry = logEntry.WithError(pidErr)
+		}
+		logEntry.Info("cleaning leaked shim process")
+		if err := cleanupShimTask(ctx, shim); err != nil && !errdefs.IsNotFound(err) {
+			// Returning an error makes loadShims remove the bundle; a shim we
+			// cannot reap would otherwise be reloaded on every start.
+			return fmt.Errorf("failed to clean up leaked shim %q: %w", id, err)
+		}
 	} else {
+		if pidErr != nil {
+			log.G(ctx).WithField("id", id).WithError(pidErr).Warn("failed to query shim pids, keeping shim registered")
+		}
 		m.shims.Add(ctx, shim.ShimInstance)
 	}
 	return nil
+}
+
+// shouldCleanupShim determines whether or not a shim is in such a state that
+// we should reap it. To be reapable we confirm that it is not a sandbox shim
+// and it has no pids running
+func shouldCleanupShim(sgetErr, pidErr error, pInfo []runtimeapi.ProcessInfo) bool {
+	return errors.Is(sgetErr, errdefs.ErrNotFound) &&
+		(errors.Is(pidErr, errdefs.ErrNotFound) ||
+			(pidErr == nil && len(pInfo) == 0))
 }
 
 func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
@@ -209,9 +235,6 @@ func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimT
 	if err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
-	defer cancel()
 
 	if _, err := s.PID(ctx); err != nil {
 		if !errdefs.IsNotImplemented(err) {

@@ -98,7 +98,7 @@ func (e *epoller) Run(ctx context.Context) {
 }
 
 // Add cgroups.Cgroup to the epoll monitor
-func (e *epoller) Add(id string, cgx interface{}) error {
+func (e *epoller) Add(id string, cgx any) error {
 	cg, ok := cgx.(cgroup1.Cgroup)
 	if !ok {
 		return fmt.Errorf("expected cgroups.Cgroup, got: %T", cgx)

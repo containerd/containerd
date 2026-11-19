@@ -92,12 +92,10 @@ func TestRegressionIssue6772(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	var wg sync.WaitGroup
-	for i := 0; i < maxItem; i++ {
+	for i := range maxItem {
 		id := i
-		wg.Add(1)
 
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			err := collector.Add(
 				&mockStatT{
@@ -110,7 +108,7 @@ func TestRegressionIssue6772(t *testing.T) {
 			if err != nil {
 				errCh <- err
 			}
-		}()
+		})
 	}
 
 	finishedCh := make(chan struct{})

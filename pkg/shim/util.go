@@ -17,14 +17,12 @@
 package shim
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,61 +31,10 @@ import (
 	"github.com/containerd/typeurl/v2"
 
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 )
-
-type CommandConfig struct {
-	Runtime      string
-	Address      string
-	TTRPCAddress string
-	Path         string
-	Args         []string
-	Opts         *types.Any
-	Env          []string
-}
-
-// Command returns the shim command with the provided args and configuration
-func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return nil, err
-	}
-	self, err := os.Executable()
-	if err != nil {
-		return nil, err
-	}
-	args := []string{
-		"-namespace", ns,
-		"-address", config.Address,
-		"-publish-binary", self,
-	}
-	args = append(args, config.Args...)
-	cmd := exec.CommandContext(ctx, config.Runtime, args...)
-	cmd.Dir = config.Path
-	cmd.Env = append(
-		os.Environ(),
-		"GOMAXPROCS=2",
-		fmt.Sprintf("%s=2", maxVersionEnv),
-		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
-		fmt.Sprintf("%s=%s", grpcAddressEnv, config.Address),
-		fmt.Sprintf("%s=%s", namespaceEnv, ns),
-	)
-	if len(config.Env) > 0 {
-		cmd.Env = append(cmd.Env, config.Env...)
-	}
-	cmd.SysProcAttr = getSysProcAttr()
-	if config.Opts != nil {
-		d, err := proto.Marshal(config.Opts)
-		if err != nil {
-			return nil, err
-		}
-		cmd.Stdin = bytes.NewReader(d)
-	}
-	return cmd, nil
-}
 
 // BinaryName returns the shim binary name from the runtime name,
 // empty string returns means runtime name is invalid
@@ -202,14 +149,14 @@ func chainUnaryServerInterceptors(interceptors ...ttrpc.UnaryServerInterceptor) 
 		return nil
 	}
 
-	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (interface{}, error) {
+	return func(ctx context.Context, unmarshal ttrpc.Unmarshaler, info *ttrpc.UnaryServerInfo, method ttrpc.Method) (any, error) {
 		currentMethod := method
 
 		for i := n - 1; i > 0; i-- {
 			interceptor := interceptors[i]
 			innerMethod := currentMethod
 
-			currentMethod = func(currentCtx context.Context, currentUnmarshal func(interface{}) error) (interface{}, error) {
+			currentMethod = func(currentCtx context.Context, currentUnmarshal func(any) error) (any, error) {
 				return interceptor(currentCtx, currentUnmarshal, info, innerMethod)
 			}
 		}

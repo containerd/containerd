@@ -231,8 +231,9 @@ func TestVolumeOwnership(t *testing.T) {
 }
 
 func getContainerBindVolumes(t *testing.T, containerID string) (map[string]string, error) {
-	client, err := RawRuntimeClient()
+	client, conn, err := RawRuntimeClient()
 	require.NoError(t, err, "failed to get raw grpc runtime service client")
+	defer conn.Close()
 	request := &v1.ContainerStatusRequest{
 		ContainerId: containerID,
 		Verbose:     true,

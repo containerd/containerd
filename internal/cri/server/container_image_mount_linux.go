@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -52,19 +53,7 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 	}
 
 	for i, m := range mounts {
-		if m.Type != "overlay" {
-			continue
-		}
-
-		need := true
-		for _, opt := range m.Options {
-			if opt == "volatile" {
-				need = false
-				break
-			}
-		}
-
-		if !need {
+		if m.Type != "overlay" || slices.Contains(m.Options, "volatile") || slices.Contains(m.Options, "fsync=volatile") {
 			continue
 		}
 		mounts[i].Options = append(mounts[i].Options, "volatile")
@@ -74,7 +63,7 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 
 // ensureImageVolumeMounted ensures target volume is mounted.
 //
-// NOTE: Currently, kubelet creates containers in pod sequencially. It won't
+// NOTE: Currently, kubelet creates containers in pod sequentially. It won't
 // cause multiple mountpoints on same target path.
 func ensureImageVolumeMounted(target string) (bool, error) {
 	_, err := os.Stat(target)

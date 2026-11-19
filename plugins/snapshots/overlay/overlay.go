@@ -20,6 +20,7 @@ package overlay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -147,7 +148,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, err
 	}
 
-	if !hasOption(config.mountOptions, "userxattr", false) {
+	if !hasOption(config.mountOptions, "userxattr") {
 		// figure out whether "userxattr" option is recognized by the kernel && needed
 		userxattr, err := overlayutils.NeedsUserXAttr(root)
 		if err != nil {
@@ -158,7 +159,9 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		}
 	}
 
-	if !hasOption(config.mountOptions, "index", false) && supportsIndex() {
+	// Mount options are last-wins in the kernel, so appending "index=off"
+	// after a configured "index=on" would silently override it.
+	if !hasOption(config.mountOptions, "index") && supportsIndex() {
 		config.mountOptions = append(config.mountOptions, "index=off")
 	}
 
@@ -173,13 +176,14 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}, nil
 }
 
-func hasOption(options []string, key string, hasValue bool) bool {
+// hasOption reports whether the "key" option is present in options, either
+// as a bare flag ("userxattr") or in "key=value" form ("index=on").
+func hasOption(options []string, key string) bool {
 	for _, option := range options {
-		if hasValue {
-			if strings.HasPrefix(option, key) && len(option) > len(key) && option[len(key)] == '=' {
-				return true
-			}
-		} else if option == key {
+		if option == key {
+			return true
+		}
+		if optionKey, _, ok := strings.Cut(option, "="); ok && optionKey == key {
 			return true
 		}
 	}
@@ -504,7 +508,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				}
 				stat, ok := st.Sys().(*syscall.Stat_t)
 				if !ok {
-					return fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
+					return errors.New("incompatible types after stat call: *syscall.Stat_t expected")
 				}
 				mappedUID = int(stat.Uid)
 				mappedGID = int(stat.Gid)
@@ -554,10 +558,10 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 
 	if o.remapIDs {
 		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
-			options = append(options, fmt.Sprintf("uidmap=%s", v))
+			options = append(options, "uidmap="+v)
 		}
 		if v, ok := info.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
-			options = append(options, fmt.Sprintf("gidmap=%s", v))
+			options = append(options, "gidmap="+v)
 		}
 	}
 
@@ -582,8 +586,8 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 
 	if s.Kind == snapshots.KindActive {
 		options = append(options,
-			fmt.Sprintf("workdir=%s", o.workPath(s.ID)),
-			fmt.Sprintf("upperdir=%s", o.upperPath(s.ID)),
+			"workdir="+o.workPath(s.ID),
+			"upperdir="+o.upperPath(s.ID),
 		)
 	} else if len(s.ParentIDs) == 1 {
 		return []mount.Mount{
@@ -602,7 +606,7 @@ func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mo
 	for i := range s.ParentIDs {
 		parentPaths[i] = o.upperPath(s.ParentIDs[i])
 	}
-	options = append(options, fmt.Sprintf("lowerdir=%s", strings.Join(parentPaths, ":")))
+	options = append(options, "lowerdir="+strings.Join(parentPaths, ":"))
 	options = append(options, o.options...)
 
 	return []mount.Mount{

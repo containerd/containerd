@@ -184,10 +184,10 @@ func TestIDMappedOverlay(t *testing.T) {
 			}
 
 			for _, o := range m.Options {
-				if strings.HasPrefix(o, "upperdir=") {
-					upperPath = strings.TrimPrefix(o, "upperdir=")
-				} else if strings.HasPrefix(o, "lowerdir=") {
-					lowerPaths = strings.Split(strings.TrimPrefix(o, "lowerdir="), ",")
+				if after, ok := strings.CutPrefix(o, "upperdir="); ok {
+					upperPath = after
+				} else if after, ok := strings.CutPrefix(o, "lowerdir="); ok {
+					lowerPaths = strings.Split(after, ",")
 				}
 			}
 

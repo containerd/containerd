@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -72,7 +74,7 @@ func (c *criService) mutateImageMount(
 	snapshotter string,
 	sandboxID string,
 	platform imagespec.Platform,
-) (retErr error) {
+) error {
 	imageSpec := extraMount.GetImage()
 	if imageSpec == nil {
 		return nil
@@ -92,33 +94,38 @@ func (c *criService) mutateImageMount(
 	if err != nil {
 		return fmt.Errorf("failed to resolve image %q: %w", ref, err)
 	}
-	containerdImage, err := c.toContainerdImage(ctx, image)
+	imageRef := imageVolumeReference(ref, image.ID, image.References)
+	if imageRef == "" {
+		return fmt.Errorf("invalid image with no reference %q", image.ID)
+	}
+	containerdImage, err := c.client.GetImage(ctx, imageRef)
 	if err != nil {
-		return fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return fmt.Errorf("failed to get image from containerd %q: %w", imageRef, err)
 	}
 
-	// This is a digest of the manifest
-	imageID := containerdImage.Target().Digest.Encoded()
+	// Use the image target digest to key the host mount path so a retagged
+	// image gets a fresh mount.
+	imageDigest := containerdImage.Target().Digest.Encoded()
+	target := c.getImageVolumeHostPath(sandboxID, imageDigest)
 
-	target := c.getImageVolumeHostPath(sandboxID, imageID)
+	imageForMount := containerd.NewImageWithPlatform(c.client, containerdImage.Metadata(), platforms.Only(platform))
+	// Match the image ID exposed by ImageStatus and ContainerStatus.ImageId.
+	imageSpec.ImageRef = image.ID
 
 	// Already mounted in another container on the same pod
+	//
+	// TODO: Serialize image volume setup per target to avoid races between
+	// checking the mount and mounting it.
 	mounted, err := ensureImageVolumeMounted(target)
 	if err != nil {
 		return fmt.Errorf("failed to ensure %s is mounted: %w", target, err)
 	}
 	if !mounted {
-		img, err := c.client.ImageService().Get(ctx, ref)
-		if err != nil {
-			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
-		}
-
-		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
-		if err := i.Unpack(ctx, snapshotter); err != nil {
+		if err := imageForMount.Unpack(ctx, snapshotter); err != nil {
 			return fmt.Errorf("failed to unpack image volume: %w", err)
 		}
 
-		diffIDs, err := i.RootFS(ctx)
+		diffIDs, err := imageForMount.RootFS(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get diff IDs for image volume %q: %w", ref, err)
 		}
@@ -131,6 +138,10 @@ func (c *criService) mutateImageMount(
 		}
 
 		s := c.client.SnapshotService(snapshotter)
+
+		// Keep the snapshot on failure because the leased mount-manager
+		// activation can back-reference it. Sandbox cleanup and GC
+		// release both resources.
 		mounts, err := s.Prepare(ctx, target, chainID, snapshotOpts...)
 		if err != nil {
 			if errdefs.IsAlreadyExists(err) {
@@ -140,19 +151,41 @@ func (c *criService) mutateImageMount(
 		if err != nil {
 			return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
 		}
-		defer func() {
-			if retErr != nil {
-				_ = s.Remove(ctx, target)
-			}
-		}()
 
 		err = os.MkdirAll(target, 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 		}
 
+		id := "cri-image-mount-" + target
+		activateOpts := []mount.ActivateOpt{
+			mount.WithLabels(map[string]string{
+				"containerd.io/gc.bref.snapshot." + snapshotter: target,
+			}),
+		}
+
+		mm := c.client.MountManager()
+		info, err := mm.Activate(ctx, id, mounts, activateOpts...)
+		if err == nil {
+			mounts = info.System
+		} else if errdefs.IsAlreadyExists(err) {
+			// Reuse an existing activation (e.g. after a restart or a
+			// previous failed attempt that left state behind).
+			info, err = mm.Info(ctx, id)
+			if err != nil {
+				return fmt.Errorf("failed to get activation info for %q: %w", target, err)
+			}
+			mounts = info.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("failed to activate mounts %q: %w", target, err)
+		}
+
 		mounts = addVolatileOptionOnImageVolumeMount(mounts)
+
 		if err := mount.All(mounts, target); err != nil {
+			if unmountErr := mount.UnmountAll(target, 0); unmountErr != nil {
+				log.G(ctx).WithError(unmountErr).Errorf("failed to unmount image volume component %q", target)
+			}
 			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 		}
 	}
@@ -176,6 +209,32 @@ func (c *criService) mutateImageMount(
 	extraMount.GidMappings = nil
 
 	return nil
+}
+
+// imageVolumeReference selects a stable reference for an image volume when
+// one is available. A requested digest is exact; the config digest alias and
+// repo digests avoid resolving a mutable tag again after LocalResolve.
+func imageVolumeReference(requestedRef, imageID string, references []string) string {
+	for _, ref := range references {
+		if ref == requestedRef && strings.Contains(ref, "@") {
+			return ref
+		}
+	}
+	for _, ref := range references {
+		if ref == imageID {
+			return ref
+		}
+	}
+	_, repoDigests := util.ParseImageReferences(references)
+	for _, ref := range repoDigests {
+		if strings.Contains(ref, "@") {
+			return ref
+		}
+	}
+	if len(references) > 0 {
+		return references[0]
+	}
+	return ""
 }
 
 func (c *criService) cleanupImageMounts(

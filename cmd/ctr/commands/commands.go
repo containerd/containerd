@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 var (
@@ -35,7 +35,7 @@ var (
 		&cli.StringFlag{
 			Name:    "snapshotter",
 			Usage:   "Snapshotter name. Empty value stands for the default value.",
-			EnvVars: []string{"CONTAINERD_SNAPSHOTTER"},
+			Sources: cli.EnvVars("CONTAINERD_SNAPSHOTTER"),
 		},
 	}
 
@@ -232,10 +232,10 @@ var (
 )
 
 // ObjectWithLabelArgs returns the first arg and a LabelArgs object
-func ObjectWithLabelArgs(cliContext *cli.Context) (string, map[string]string) {
+func ObjectWithLabelArgs(cmd *cli.Command) (string, map[string]string) {
 	var (
-		first        = cliContext.Args().First()
-		labelStrings = cliContext.Args().Tail()
+		first        = cmd.Args().First()
+		labelStrings = cmd.Args().Tail()
 	)
 
 	return first, LabelArgs(labelStrings)
@@ -269,7 +269,7 @@ func AnnotationArgs(annoStrings []string) (map[string]string, error) {
 }
 
 // PrintAsJSON prints input in JSON format
-func PrintAsJSON(x interface{}) {
+func PrintAsJSON(x any) {
 	b, err := json.MarshalIndent(x, "", "    ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "can't marshal %+v as a JSON string: %v\n", x, err)

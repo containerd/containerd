@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sigs.k8s.io/structured-merge-diff/v6/value"
+	"sigs.k8s.io/structured-merge-diff/v7/value"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -150,6 +150,7 @@ type fromUnstructuredContext struct {
 	// the full path to each unknown field in the
 	// object.
 	unknownFieldErrors []error
+	topLevelKeys       map[string]interface{}
 }
 
 // pushMatchedKeyTracker adds a placeholder set for tracking
@@ -237,23 +238,32 @@ func (c *fromUnstructuredContext) pushKey(key string) {
 // It uses encoding/json/Unmarshaler if object implements it or reflection if not.
 // It takes a validationDirective that indicates how to behave when it encounters unknown fields.
 func (c *unstructuredConverter) FromUnstructuredWithValidation(u map[string]interface{}, obj interface{}, returnUnknownFields bool) error {
+	return c.FromUnstructuredWithValidationTopLevel(u, obj, returnUnknownFields, nil)
+}
+
+// FromUnstructuredWithValidationTopLevel converts an object from map[string]interface{} representation into obj,
+// updating only the top-level struct fields whose JSON names appear in topLevelKeys when topLevelKeys is non-nil.
+func (c *unstructuredConverter) FromUnstructuredWithValidationTopLevel(u map[string]interface{}, obj interface{}, returnUnknownFields bool, topLevelKeys map[string]interface{}) error {
 	t := reflect.TypeOf(obj)
 	value := reflect.ValueOf(obj)
-	if t.Kind() != reflect.Pointer || value.IsNil() {
+	if t == nil || t.Kind() != reflect.Pointer || value.IsNil() {
 		return fmt.Errorf("FromUnstructured requires a non-nil pointer to an object, got %v", t)
 	}
 
 	fromUnstructuredContext := &fromUnstructuredContext{
 		returnUnknownFields: returnUnknownFields,
+		topLevelKeys:        topLevelKeys,
 	}
 	err := fromUnstructured(reflect.ValueOf(u), value.Elem(), fromUnstructuredContext)
-	if c.mismatchDetection {
+	if c.mismatchDetection && topLevelKeys == nil {
 		newObj := reflect.New(t.Elem()).Interface()
 		newErr := fromUnstructuredViaJSON(u, newObj)
 		if (err != nil) != (newErr != nil) {
+			//nolint:logcheck // Should not be reached.
 			klog.Fatalf("FromUnstructured unexpected error for %v: error: %v", u, err)
 		}
 		if err == nil && !c.comparison.DeepEqual(obj, newObj) {
+			//nolint:logcheck // Should not be reached.
 			klog.Fatalf("FromUnstructured mismatch\nobj1: %#v\nobj2: %#v", obj, newObj)
 		}
 	}
@@ -376,8 +386,8 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	// Cache miss - we need to compute the field name.
 	info := &fieldInfo{}
 	typeField := structType.Field(field)
-	jsonTag := typeField.Tag.Get("json")
-	if len(jsonTag) == 0 {
+	jsonTag, exists := typeField.Tag.Lookup("json")
+	if !exists || len(jsonTag) == 0 {
 		if !typeField.Anonymous {
 			// match stdlib behavior for naming fields that don't specify a json tag name
 			info.name = typeField.Name
@@ -385,7 +395,10 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	} else {
 		items := strings.Split(jsonTag, ",")
 		info.name = items[0]
-		if len(info.name) == 0 && !typeField.Anonymous {
+		if isInlinedFromTag(typeField, items[0], items[1:]) {
+			// match stdlib behavior when controlled by tag
+			info.name = ""
+		} else if len(info.name) == 0 && !typeField.Anonymous {
 			// match stdlib behavior for naming fields that don't specify a json tag name
 			info.name = typeField.Name
 		}
@@ -528,7 +541,9 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 		ctx.parentPath = ctx.parentPath[:pathLen]
 		ctx.isInlined = svInlined
 	}()
+	var topLevelKeys map[string]interface{}
 	if !svInlined {
+		topLevelKeys, ctx.topLevelKeys = ctx.topLevelKeys, nil
 		ctx.pushMatchedKeyTracker()
 	}
 	for i := 0; i < dt.NumField(); i++ {
@@ -550,6 +565,14 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 			// the parentPath to indicate that we are one level
 			// deeper.
 			ctx.recordMatchedKey(fieldInfo.name)
+			if topLevelKeys != nil {
+				if shouldSkipTopLevelField(fieldInfo, topLevelKeys) {
+					continue
+				}
+				// Zero the pre-populated field before unmarshaling so map/slice/struct
+				// conversions do not merge into or alias original values.
+				fv.SetZero()
+			}
 			value := unwrapInterface(sv.MapIndex(fieldInfo.nameValue))
 			if value.IsValid() {
 				ctx.isInlined = false
@@ -570,6 +593,14 @@ func structFromUnstructured(sv, dv reflect.Value, ctx *fromUnstructuredContext) 
 	return nil
 }
 
+func shouldSkipTopLevelField(fieldInfo *fieldInfo, topLevelKeys map[string]interface{}) bool {
+	if topLevelKeys == nil || len(fieldInfo.name) == 0 {
+		return false
+	}
+	_, ok := topLevelKeys[fieldInfo.name]
+	return !ok
+}
+
 func interfaceFromUnstructured(sv, dv reflect.Value) error {
 	// TODO: Is this conversion safe?
 	dv.Set(sv)
@@ -579,26 +610,40 @@ func interfaceFromUnstructured(sv, dv reflect.Value) error {
 // ToUnstructured converts an object into map[string]interface{} representation.
 // It uses encoding/json/Marshaler if object implements it or reflection if not.
 func (c *unstructuredConverter) ToUnstructured(obj interface{}) (map[string]interface{}, error) {
+	return c.ToUnstructuredTopLevel(obj, nil)
+}
+
+// ToUnstructuredTopLevel converts an object into map[string]interface{} representation.
+// When topLevelKeys is non-nil and obj is a pointer to a struct without a custom converter,
+// only top-level struct fields whose JSON names appear in topLevelKeys (plus inlined fields) are converted.
+func (c *unstructuredConverter) ToUnstructuredTopLevel(obj interface{}, topLevelKeys map[string]interface{}) (map[string]interface{}, error) {
 	var u map[string]interface{}
 	var err error
 	if unstr, ok := obj.(Unstructured); ok {
 		u = unstr.UnstructuredContent()
 	} else {
 		t := reflect.TypeOf(obj)
-		value := reflect.ValueOf(obj)
-		if t.Kind() != reflect.Pointer || value.IsNil() {
+		v := reflect.ValueOf(obj)
+		if t == nil || t.Kind() != reflect.Pointer || v.IsNil() {
 			return nil, fmt.Errorf("ToUnstructured requires a non-nil pointer to an object, got %v", t)
 		}
 		u = map[string]interface{}{}
-		err = toUnstructured(value.Elem(), reflect.ValueOf(&u).Elem())
+		sv, dv := v.Elem(), reflect.ValueOf(&u).Elem()
+		if topLevelKeys != nil && sv.Kind() == reflect.Struct && !value.TypeReflectEntryOf(sv.Type()).CanConvertToUnstructured() {
+			err = structToUnstructuredTopLevel(sv, dv, topLevelKeys)
+		} else {
+			err = toUnstructured(sv, dv)
+		}
 	}
-	if c.mismatchDetection {
+	if c.mismatchDetection && topLevelKeys == nil {
 		newUnstr := map[string]interface{}{}
 		newErr := toUnstructuredViaJSON(obj, &newUnstr)
 		if (err != nil) != (newErr != nil) {
+			//nolint:logcheck // Should not be reached.
 			klog.Fatalf("ToUnstructured unexpected error for %v: error: %v; newErr: %v", obj, err, newErr)
 		}
 		if err == nil && !c.comparison.DeepEqual(u, newUnstr) {
+			//nolint:logcheck // Should not be reached.
 			klog.Fatalf("ToUnstructured mismatch\nobj1: %#v\nobj2: %#v", u, newUnstr)
 		}
 	}
@@ -680,11 +725,11 @@ func toUnstructured(sv, dv reflect.Value) error {
 		dv.Set(reflect.ValueOf(sv.Int()))
 		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		uVal := sv.Uint()
-		if uVal > math.MaxInt64 {
-			return fmt.Errorf("unsigned value %d does not fit into int64 (overflow)", uVal)
+		val, err := uintToUnstructuredHelper(sv.Uint())
+		if err != nil {
+			return err
 		}
-		dv.Set(reflect.ValueOf(int64(uVal)))
+		dv.Set(reflect.ValueOf(val))
 		return nil
 	case reflect.Float32, reflect.Float64:
 		dv.Set(reflect.ValueOf(sv.Float()))
@@ -804,6 +849,10 @@ func isEmpty(v reflect.Value) bool {
 }
 
 func structToUnstructured(sv, dv reflect.Value) error {
+	return structToUnstructuredTopLevel(sv, dv, nil)
+}
+
+func structToUnstructuredTopLevel(sv, dv reflect.Value, topLevelKeys map[string]interface{}) error {
 	st, dt := sv.Type(), dv.Type()
 	if dt.Kind() == reflect.Interface && dv.NumMethod() == 0 {
 		dv.Set(reflect.MakeMapWithSize(mapStringInterfaceType, st.NumField()))
@@ -819,7 +868,7 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		fieldInfo := fieldInfoFromField(st, i)
 		fv := sv.Field(i)
 
-		if fieldInfo.name == "-" {
+		if fieldInfo.name == "-" || shouldSkipTopLevelField(fieldInfo, topLevelKeys) {
 			// This field should be skipped.
 			continue
 		}
@@ -846,7 +895,11 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			realMap[fieldInfo.name] = fv.Int()
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			realMap[fieldInfo.name] = fv.Uint()
+			val, err := uintToUnstructuredHelper(fv.Uint())
+			if err != nil {
+				return err
+			}
+			realMap[fieldInfo.name] = val
 		case reflect.Float32, reflect.Float64:
 			realMap[fieldInfo.name] = fv.Float()
 		default:
@@ -866,4 +919,11 @@ func interfaceToUnstructured(sv, dv reflect.Value) error {
 		return nil
 	}
 	return toUnstructured(sv.Elem(), dv)
+}
+
+func uintToUnstructuredHelper(uVal uint64) (int64, error) {
+	if uVal > math.MaxInt64 {
+		return 0, fmt.Errorf("unsigned value %d does not fit into int64 (overflow)", uVal)
+	}
+	return int64(uVal), nil
 }

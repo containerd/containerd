@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -159,11 +160,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 
 func mergeMap(m1, m2 map[string]string) map[string]string {
 	merged := make(map[string]string, len(m1)+len(m2))
-	for k, v := range m1 {
-		merged[k] = v
-	}
-	for k, v := range m2 {
-		merged[k] = v
-	}
+	maps.Copy(merged, m1)
+	maps.Copy(merged, m2)
 	return merged
 }

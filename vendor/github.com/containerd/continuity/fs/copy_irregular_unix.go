@@ -34,6 +34,11 @@ func copyIrregular(dst string, fi os.FileInfo) error {
 	if fi.Mode()&os.ModeDevice == os.ModeDevice {
 		rDev = int(st.Rdev)
 	}
+
 	//nolint:unconvert
-	return syscall.Mknod(dst, uint32(st.Mode), rDev)
+	if err := syscall.Mknod(dst, uint32(st.Mode), rDev); err != nil {
+		return fmt.Errorf("failed to mknod %q: %w", dst, err)
+	}
+
+	return nil
 }

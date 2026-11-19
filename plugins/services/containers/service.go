@@ -36,7 +36,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.ServicePlugin,
 		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+		InitFn: func(ic *plugin.InitContext) (any, error) {
 			i, err := ic.GetByID(plugins.ServicePlugin, services.ContainersService)
 			if err != nil {
 				return nil, err

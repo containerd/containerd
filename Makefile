@@ -91,7 +91,7 @@ ifdef BUILDTAGS
 	GO_BUILDTAGS = ${BUILDTAGS}
 endif
 GO_BUILDTAGS ?=
-GO_BUILDTAGS += urfave_cli_no_docs
+GO_BUILDTAGS += grpcnotrace
 GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
@@ -102,13 +102,18 @@ SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
-GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+GO_LD_X = \
+	-X $(PKG)/version.Version=$(VERSION) \
+	-X $(PKG)/version.Revision=$(REVISION) \
+	-X $(PKG)/version.Package=$(PACKAGE)
+
+GO_LDFLAGS=-ldflags '$(GO_LD_X) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
 	GO_LDFLAGS += -extldflags "-static"
 endif
 GO_LDFLAGS+='
 
-SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '$(GO_LD_X) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
 PACKAGES := $(shell $(GO) list ${GO_TAGS} ./... | grep -v /integration)
@@ -141,6 +146,8 @@ GO_GCFLAGS=$(shell				\
 	)
 
 BINARIES=$(addprefix bin/,$(COMMANDS))
+GOEXE := $(shell $(GO) env GOEXE)
+CRI_INTEGRATION_TEST_BINARY := bin/cri-integration.test$(GOEXE)
 
 #include platform specific makefile
 -include Makefile.$(GOOS)
@@ -156,7 +163,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos check-gosocialcheck coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -164,7 +171,7 @@ CRIDIR=$(OUTPUTDIR)/cri
 
 all: binaries
 
-check: proto-fmt ## run all linters
+check: check-protos ## run all linters
 	@echo "$(WHALE) $@"
 	GOGC=75 golangci-lint run
 
@@ -194,7 +201,22 @@ check-protos: ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
 	@(cd api && buf format --diff --exit-code --exclude-path vendor \
 		$(if $(GITHUB_ACTIONS),--error-format github-actions)) || \
-		(echo "$(ONI) please run 'make protos' when making changes to proto files" && false)
+		(echo "$(ONI) please run 'make proto-fmt' to fix formatting or 'make protos' to regenerate proto files" && false)
+
+# gosocialcheck reports dependencies that do not appear to be adopted by a trusted project
+# (CNCF Graduated). Modules that are trusted anyway are annotated `gosocialcheck:trusted` in go.mod.
+# https://github.com/AkihiroSuda/gosocialcheck
+# Not part of `make check`: the verdict is advisory. On GitHub Actions, `--gha` reports the findings
+# as workflow annotations and always exits 0.
+# GOSOCIALCHECK_MODULES lists the module directories to check.
+GOSOCIALCHECK_MODULES ?= . api
+
+check-gosocialcheck: ## check if dependencies are adopted by a trusted project (advisory)
+	@echo "$(WHALE) $@"
+	@rc=0; for m in $(GOSOCIALCHECK_MODULES); do \
+		echo "$(WHALE) $@: $$m"; \
+		(cd $$m && gosocialcheck run $(if $(GITHUB_ACTIONS),--gha) ./...) || rc=1; \
+	done; exit $$rc
 
 proto-fmt: ## format proto files
 	@echo "$(WHALE) $@"
@@ -206,6 +228,7 @@ build: ## build the go packages
 
 test: ## run tests, except integration tests and tests that require root
 	@echo "$(WHALE) $@"
+	@$(GO) -C api test ${TESTFLAGS} ${API_PACKAGES}
 	@$(GOTEST) ${TESTFLAGS} ${PACKAGES}
 
 root-test: ## run tests, except integration tests
@@ -214,18 +237,17 @@ root-test: ## run tests, except integration tests
 
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
-	@$(GO) -C "${ROOTDIR}/integration/client" mod download
 	@cd "${ROOTDIR}/integration/client" && \
-		$(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+		$(GOTEST) -v ${TESTFLAGS} ${GO_TAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
-bin/cri-integration.test:
+$(CRI_INTEGRATION_TEST_BINARY):
 	@echo "$(WHALE) $@"
-	@$(GO) test -c ./integration -o bin/cri-integration.test
+	@$(GO) test -c ./integration -o $(CRI_INTEGRATION_TEST_BINARY)
 
-cri-integration: binaries bin/cri-integration.test ## run cri integration tests (example: FOCUS=TestContainerListStats make cri-integration)
+cri-integration: binaries $(CRI_INTEGRATION_TEST_BINARY) ## run cri integration tests (example: FOCUS=TestContainerListStats make cri-integration)
 	@echo "$(WHALE) $@"
 	@bash ./script/test/cri-integration.sh
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 
 # build runc shimv2 with failpoint control, only used by integration test
 bin/containerd-shim-runc-fp-v1: integration/failpoint/cmd/containerd-shim-runc-fp-v1 FORCE
@@ -262,14 +284,21 @@ endef
 bin/%: cmd/% FORCE
 	$(call BUILD_BINARY)
 
-# gen-manpages must not have the urfave_cli_no_docs build-tag set
 bin/gen-manpages: cmd/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./cmd/gen-manpages
+	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS} ./cmd/gen-manpages
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
 	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
+
+bin/containerd-shim-sandboxed-runc-v2: cmd/containerd-shim-sandboxed-runc-v2 FORCE # experimental pause-less sandbox shim, static like containerd-shim-runc-v2
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-sandboxed-runc-v2
+
+bin/containerd-sandbox-init: cmd/containerd-sandbox-init FORCE # PID 1 of a shared pod PID namespace for the sandboxed shim, static like the shims
+	@echo "$(WHALE) $@"
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-sandbox-init
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
@@ -404,7 +433,7 @@ clean: ## clean up binaries
 	@rm -f $(BINARIES)
 	@rm -f releases/*.tar.gz*
 	@rm -rf $(OUTPUTDIR)
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 
 clean-test: ## clean up debris from previously failed tests
 	@echo "$(WHALE) $@"
@@ -419,7 +448,7 @@ clean-test: ## clean up debris from previously failed tests
 	@rm -rf /run/containerd/runc/*
 	@rm -rf /run/containerd/fifo/*
 	@rm -rf /run/containerd-test/*
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 	@rm -rf bin/cni-bridge-fp
 	@rm -rf bin/containerd-shim-runc-fp-v1
 
@@ -476,10 +505,10 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 cri-integration-coverage: binaries  ## generate coverage profile for cri integration tests
 	@echo "$(WHALE) $@"
 	@rm -f cri-integration-coverage.txt
-	@$(GO) test -c -coverpkg=./... -covermode=atomic ./integration -o bin/cri-integration.test
+	@$(GO) test -c -coverpkg=./... -covermode=atomic ./integration -o $(CRI_INTEGRATION_TEST_BINARY)
 	@bash ./script/test/cri-integration.sh -test.coverprofile=cri-integration-coverage.txt
 	@echo "Coverage profile generated at cri-integration-coverage.txt"
-	@rm -rf bin/cri-integration.test
+	@rm -rf $(CRI_INTEGRATION_TEST_BINARY)
 
 remove-replace:
 	@echo "$(WHALE) $@"

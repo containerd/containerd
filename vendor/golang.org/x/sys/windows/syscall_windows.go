@@ -452,6 +452,7 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	RtlInitString(destinationString *NTString, sourceString *byte) = ntdll.RtlInitString
 //sys	NtCreateFile(handle *Handle, access uint32, oa *OBJECT_ATTRIBUTES, iosb *IO_STATUS_BLOCK, allocationSize *int64, attributes uint32, share uint32, disposition uint32, options uint32, eabuffer uintptr, ealength uint32) (ntstatus error) = ntdll.NtCreateFile
 //sys	NtCreateNamedPipeFile(pipe *Handle, access uint32, oa *OBJECT_ATTRIBUTES, iosb *IO_STATUS_BLOCK, share uint32, disposition uint32, options uint32, typ uint32, readMode uint32, completionMode uint32, maxInstances uint32, inboundQuota uint32, outputQuota uint32, timeout *int64) (ntstatus error) = ntdll.NtCreateNamedPipeFile
+//sys	NtQueryInformationFile(handle Handle, iosb *IO_STATUS_BLOCK, outBuffer *byte, outBufferLen uint32, class uint32) (ntstatus error) = ntdll.NtQueryInformationFile
 //sys	NtSetInformationFile(handle Handle, iosb *IO_STATUS_BLOCK, inBuffer *byte, inBufferLen uint32, class uint32) (ntstatus error) = ntdll.NtSetInformationFile
 //sys	RtlDosPathNameToNtPathName(dosName *uint16, ntName *NTUnicodeString, ntFileNamePart *uint16, relativeName *RTL_RELATIVE_NAME) (ntstatus error) = ntdll.RtlDosPathNameToNtPathName_U_WithStatus
 //sys	RtlDosPathNameToRelativeNtPathName(dosName *uint16, ntName *NTUnicodeString, ntFileNamePart *uint16, relativeName *RTL_RELATIVE_NAME) (ntstatus error) = ntdll.RtlDosPathNameToRelativeNtPathName_U_WithStatus
@@ -460,6 +461,8 @@ func NewCallbackCDecl(fn interface{}) uintptr {
 //sys	NtSetInformationProcess(proc Handle, procInfoClass int32, procInfo unsafe.Pointer, procInfoLen uint32) (ntstatus error) = ntdll.NtSetInformationProcess
 //sys	NtQuerySystemInformation(sysInfoClass int32, sysInfo unsafe.Pointer, sysInfoLen uint32, retLen *uint32) (ntstatus error) = ntdll.NtQuerySystemInformation
 //sys	NtSetSystemInformation(sysInfoClass int32, sysInfo unsafe.Pointer, sysInfoLen uint32) (ntstatus error) = ntdll.NtSetSystemInformation
+//sys	NtQueryEaFile(handle Handle, iosb *IO_STATUS_BLOCK, outBuffer *byte, outBufferLen uint32, returnSingleEntry bool, eaList *byte, eaListLen uint32, eaIndex *uint32, restartScan bool) (ntstatus error) = ntdll.NtQueryEaFile
+//sys	NtSetEaFile(handle Handle, iosb *IO_STATUS_BLOCK, inBuffer *byte, inBufferLen uint32) (ntstatus error) = ntdll.NtSetEaFile
 //sys	RtlAddFunctionTable(functionTable *RUNTIME_FUNCTION, entryCount uint32, baseAddress uintptr) (ret bool) = ntdll.RtlAddFunctionTable
 //sys	RtlDeleteFunctionTable(functionTable *RUNTIME_FUNCTION) (ret bool) = ntdll.RtlDeleteFunctionTable
 
@@ -504,7 +507,7 @@ func CurrentThread() Handle { return Handle(^uintptr(2 - 1)) }
 // GetProcAddressByOrdinal retrieves the address of the exported
 // function from module by ordinal.
 func GetProcAddressByOrdinal(module Handle, ordinal uintptr) (proc uintptr, err error) {
-	r0, _, e1 := syscall.Syscall(procGetProcAddress.Addr(), 2, uintptr(module), ordinal, 0)
+	r0, _, e1 := syscall.SyscallN(procGetProcAddress.Addr(), uintptr(module), ordinal)
 	proc = uintptr(r0)
 	if proc == 0 {
 		err = errnoErr(e1)
@@ -892,9 +895,13 @@ const socket_error = uintptr(^uint32(0))
 //sys	MultiByteToWideChar(codePage uint32, dwFlags uint32, str *byte, nstr int32, wchar *uint16, nwchar int32) (nwrite int32, err error) = kernel32.MultiByteToWideChar
 //sys	getBestInterfaceEx(sockaddr unsafe.Pointer, pdwBestIfIndex *uint32) (errcode error) = iphlpapi.GetBestInterfaceEx
 //sys   GetIfEntry2Ex(level uint32, row *MibIfRow2) (errcode error) = iphlpapi.GetIfEntry2Ex
+//sys   GetIfTable2Ex(level uint32, table **MibIfTable2) (errcode error) = iphlpapi.GetIfTable2Ex
 //sys   GetIpForwardEntry2(row *MibIpForwardRow2) (errcode error) = iphlpapi.GetIpForwardEntry2
 //sys   GetIpForwardTable2(family uint16, table **MibIpForwardTable2) (errcode error) = iphlpapi.GetIpForwardTable2
+//sys   GetIpInterfaceEntry(row *MibIpInterfaceRow) (errcode error) = iphlpapi.GetIpInterfaceEntry
+//sys   GetIpInterfaceTable(family uint16, table **MibIpInterfaceTable) (errcode error) = iphlpapi.GetIpInterfaceTable
 //sys   GetUnicastIpAddressEntry(row *MibUnicastIpAddressRow) (errcode error) = iphlpapi.GetUnicastIpAddressEntry
+//sys   GetUnicastIpAddressTable(family uint16, table **MibUnicastIpAddressTable) (errcode error) = iphlpapi.GetUnicastIpAddressTable
 //sys   FreeMibTable(memory unsafe.Pointer) = iphlpapi.FreeMibTable
 //sys   NotifyIpInterfaceChange(family uint16, callback uintptr, callerContext unsafe.Pointer, initialNotification bool, notificationHandle *Handle) (errcode error) = iphlpapi.NotifyIpInterfaceChange
 //sys   NotifyRouteChange2(family uint16, callback uintptr, callerContext unsafe.Pointer, initialNotification bool, notificationHandle *Handle) (errcode error) = iphlpapi.NotifyRouteChange2
@@ -1199,7 +1206,7 @@ func LoadConnectEx() error {
 }
 
 func connectEx(s Handle, name unsafe.Pointer, namelen int32, sendBuf *byte, sendDataLen uint32, bytesSent *uint32, overlapped *Overlapped) (err error) {
-	r1, _, e1 := syscall.Syscall9(connectExFunc.addr, 7, uintptr(s), uintptr(name), uintptr(namelen), uintptr(unsafe.Pointer(sendBuf)), uintptr(sendDataLen), uintptr(unsafe.Pointer(bytesSent)), uintptr(unsafe.Pointer(overlapped)), 0, 0)
+	r1, _, e1 := syscall.SyscallN(connectExFunc.addr, uintptr(s), uintptr(name), uintptr(namelen), uintptr(unsafe.Pointer(sendBuf)), uintptr(sendDataLen), uintptr(unsafe.Pointer(bytesSent)), uintptr(unsafe.Pointer(overlapped)))
 	if r1 == 0 {
 		if e1 != 0 {
 			err = error(e1)
@@ -1264,7 +1271,7 @@ func WSASendMsg(fd Handle, msg *WSAMsg, flags uint32, bytesSent *uint32, overlap
 	if err != nil {
 		return err
 	}
-	r1, _, e1 := syscall.Syscall6(sendRecvMsgFunc.sendAddr, 6, uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(flags), uintptr(unsafe.Pointer(bytesSent)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)))
+	r1, _, e1 := syscall.SyscallN(sendRecvMsgFunc.sendAddr, uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(flags), uintptr(unsafe.Pointer(bytesSent)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)))
 	if r1 == socket_error {
 		err = errnoErr(e1)
 	}
@@ -1276,7 +1283,7 @@ func WSARecvMsg(fd Handle, msg *WSAMsg, bytesReceived *uint32, overlapped *Overl
 	if err != nil {
 		return err
 	}
-	r1, _, e1 := syscall.Syscall6(sendRecvMsgFunc.recvAddr, 5, uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(unsafe.Pointer(bytesReceived)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)), 0)
+	r1, _, e1 := syscall.SyscallN(sendRecvMsgFunc.recvAddr, uintptr(fd), uintptr(unsafe.Pointer(msg)), uintptr(unsafe.Pointer(bytesReceived)), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)))
 	if r1 == socket_error {
 		err = errnoErr(e1)
 	}
@@ -1490,20 +1497,6 @@ func Getgid() (gid int)                  { return -1 }
 func Getegid() (egid int)                { return -1 }
 func Getgroups() (gids []int, err error) { return nil, syscall.EWINDOWS }
 
-type Signal int
-
-func (s Signal) Signal() {}
-
-func (s Signal) String() string {
-	if 0 <= s && int(s) < len(signals) {
-		str := signals[s]
-		if str != "" {
-			return str
-		}
-	}
-	return "signal " + itoa(int(s))
-}
-
 func LoadCreateSymbolicLink() error {
 	return procCreateSymbolicLinkW.Find()
 }
@@ -1707,10 +1700,13 @@ func NewNTUnicodeString(s string) (*NTUnicodeString, error) {
 	if err != nil {
 		return nil, err
 	}
-	n := uint16(len(s16) * 2)
+	n := len(s16) * 2
+	if n > (1<<16)-1 {
+		return nil, syscall.EINVAL
+	}
 	return &NTUnicodeString{
-		Length:        n - 2, // subtract 2 bytes for the NULL terminator
-		MaximumLength: n,
+		Length:        uint16(n) - 2, // subtract 2 bytes for the NULL terminator
+		MaximumLength: uint16(n),
 		Buffer:        &s16[0],
 	}, nil
 }
@@ -1732,11 +1728,15 @@ func (s *NTUnicodeString) String() string {
 // the more common *uint16 string type.
 func NewNTString(s string) (*NTString, error) {
 	var nts NTString
-	s8, err := BytePtrFromString(s)
+	s8, err := ByteSliceFromString(s)
 	if err != nil {
 		return nil, err
 	}
-	RtlInitString(&nts, s8)
+	// The source string plus its terminating NUL must fit within MAX_USHORT.
+	if len(s8) > MAX_USHORT {
+		return nil, syscall.EINVAL
+	}
+	RtlInitString(&nts, &s8[0])
 	return &nts, nil
 }
 
@@ -1805,7 +1805,7 @@ type PSAPI_WORKING_SET_EX_BLOCK uint64
 // Valid returns the validity of this page.
 // If this bit is 1, the subsequent members are valid; otherwise they should be ignored.
 func (b PSAPI_WORKING_SET_EX_BLOCK) Valid() bool {
-	return (b & 1) == 1
+	return (b & 1) != 0
 }
 
 // ShareCount is the number of processes that share this page. The maximum value of this member is 7.
@@ -1822,7 +1822,7 @@ func (b PSAPI_WORKING_SET_EX_BLOCK) Win32Protection() uint64 {
 // Shared returns the shared status of this page.
 // If this bit is 1, the page can be shared.
 func (b PSAPI_WORKING_SET_EX_BLOCK) Shared() bool {
-	return (b & (1 << 15)) == 1
+	return (b & (1 << 15)) != 0
 }
 
 // Node is the NUMA node. The maximum value of this member is 63.
@@ -1833,19 +1833,19 @@ func (b PSAPI_WORKING_SET_EX_BLOCK) Node() uint64 {
 // Locked returns the locked status of this page.
 // If this bit is 1, the virtual page is locked in physical memory.
 func (b PSAPI_WORKING_SET_EX_BLOCK) Locked() bool {
-	return (b & (1 << 22)) == 1
+	return (b & (1 << 22)) != 0
 }
 
 // LargePage returns the large page status of this page.
 // If this bit is 1, the page is a large page.
 func (b PSAPI_WORKING_SET_EX_BLOCK) LargePage() bool {
-	return (b & (1 << 23)) == 1
+	return (b & (1 << 23)) != 0
 }
 
 // Bad returns the bad status of this page.
 // If this bit is 1, the page is has been reported as bad.
 func (b PSAPI_WORKING_SET_EX_BLOCK) Bad() bool {
-	return (b & (1 << 31)) == 1
+	return (b & (1 << 31)) != 0
 }
 
 // intField extracts an integer field in the PSAPI_WORKING_SET_EX_BLOCK union.

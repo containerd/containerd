@@ -40,11 +40,24 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	snapshotter := c.config.Snapshotter
 	var wg sync.WaitGroup
 	for _, i := range cImages {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
+			name := i.Name()
+			platform, err := imagePlatformFromLabels(i.Labels())
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to get platform for image %q", name)
+				return
+			}
+			if platform == nil {
+				platform = platforms.Default()
+			} else {
+				i, err = c.client.GetImageWithPlatform(ctx, name, platform)
+				if err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to get image %q for its platform", name)
+					return
+				}
+			}
 			// TODO: Check platform/snapshot combination. Snapshot check should come first
-			ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), platform)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 				return
@@ -69,7 +82,7 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 				return
 			}
 			log.G(ctx).Debugf("Loaded image %q", i.Name())
-		}()
+		})
 	}
 	wg.Wait()
 	return nil

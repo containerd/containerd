@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -26,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -33,8 +35,8 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
-	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
+	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
@@ -52,6 +54,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -61,6 +64,11 @@ const (
 	loadTimeout     = "io.containerd.timeout.shim.load"
 	cleanupTimeout  = "io.containerd.timeout.shim.cleanup"
 	shutdownTimeout = "io.containerd.timeout.shim.shutdown"
+
+	// rootFsDiffTar is the name of the rootfs diff archive written next to a
+	// checkpoint. It is part of the checkpoint layout produced by CRIU tooling,
+	// so it must stay in sync with github.com/checkpoint-restore/checkpointctl/lib.RootFsDiffTar.
+	rootFsDiffTar = "rootfs-diff.tar"
 )
 
 func init() {
@@ -110,7 +118,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
-	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
@@ -125,10 +133,11 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 
 	shim := &shim{
-		bundle:  bundle,
-		client:  conn,
-		address: address,
-		version: params.Version,
+		bundle:    bundle,
+		client:    conn,
+		address:   address,
+		version:   int(params.Version),
+		bootstrap: params,
 	}
 
 	return shim, nil
@@ -144,9 +153,16 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
 	}
 
-	if _, err := rt.Get(ctx, id); err != nil {
-		// Task was never started or was already successfully deleted
-		// No need to publish events
+	s, err := rt.Get(ctx, id)
+	if err != nil {
+		// Task was never started, or its record has already been removed.
+		// No need to publish events.
+		return
+	}
+
+	// If the task delete already succeeded, the shim itself has delivered the
+	// exit and delete events. No need to publish duplicates.
+	if s.(taskDeleteState).taskDeleteResult() != nil {
 		return
 	}
 
@@ -179,6 +195,41 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	})
 }
 
+// cleanupShimTask reaps a shim task we have given up on, after a failed start or
+// when loading a bundle left behind by a previous containerd. An unresponsive
+// shim must not block the caller — on the load path that would stall containerd
+// startup — so each call is bounded, and detached from the caller's context,
+// which by then may be cancelled or out of budget.
+//
+// A failed delete returns before shutting the shim down and closing its client,
+// so both are done here. It also leaves the bundle in place (only a successful
+// delete removes it), so callers that own one must remove it on error. The shim
+// map is untouched: callers reach this having already removed the task, or never
+// added it.
+func cleanupShimTask(ctx context.Context, st *shimTask) error {
+	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+	defer cancel()
+
+	_, err := st.delete(dctx, func(context.Context, string) {})
+	if err == nil {
+		return nil
+	}
+
+	// Shutting down needs a context with time left on it. Check the deadline
+	// rather than the error: a timeout only survives as context.DeadlineExceeded
+	// over GRPC. Over TTRPC it arrives as the raw context error, which carries no
+	// GRPC status, so errgrpc.ToNative flattens it into errdefs.ErrUnknown.
+	if dctx.Err() != nil {
+		dctx, cancel = timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
+		defer cancel()
+	}
+
+	st.Shutdown(dctx)
+	st.Close()
+
+	return err
+}
+
 // CurrentShimVersion is the latest shim version supported by containerd (e.g. TaskService v3).
 const CurrentShimVersion = 3
 
@@ -202,6 +253,18 @@ type ShimInstance interface {
 	Endpoint() (string, int)
 }
 
+// shimCapabilities is implemented by shim instances that retain what the shim
+// advertised when it started.
+//
+// This is a separate interface rather than a method on [ShimInstance] so that
+// external implementations of ShimInstance keep compiling; a shim instance
+// that does not implement it is treated as having advertised nothing.
+type shimCapabilities interface {
+	// BootstrapResult returns the result the shim returned when it started,
+	// carrying the extensions it advertised. It may be nil.
+	BootstrapResult() *bootapi.BootstrapResult
+}
+
 type clientVersionDowngrader interface {
 	// Downgrade is to lower shim's client version.
 	//
@@ -219,25 +282,46 @@ type clientVersionDowngrader interface {
 	Downgrade() error
 }
 
-func parseStartResponse(response []byte) (client.BootstrapParams, error) {
-	var params client.BootstrapParams
+// taskDeleteState caches the result of a successful task delete on the shim
+// instance, so that a Delete retried after a failed shutdown can still return
+// the original exit.
+type taskDeleteState interface {
+	recordTaskDeleteResult(*runtime.Exit)
+	taskDeleteResult() *runtime.Exit
+}
 
-	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
+func parseStartResponse(response []byte) (*bootapi.BootstrapResult, error) {
+	var result bootapi.BootstrapResult
+
+	if err := proto.Unmarshal(response, &result); err == nil {
+		return &result, nil
+	}
+
+	// Fallback to legacy parsing for backward compatibility with legacy shims that return the address as a plain string or JSON.
+	response = bytes.TrimSpace(response)
+
+	// Decode into the whole message rather than a subset of its fields. A
+	// bundle's bootstrap.json is written with encoding/json and read back
+	// through here, so a field that is not decoded is silently lost on reload.
+	params := &bootapi.BootstrapResult{}
+	if err := json.Unmarshal(response, params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
-		params.Address = string(response)
-		params.Protocol = "ttrpc"
-		params.Version = 2
+		params = &bootapi.BootstrapResult{
+			Address:  string(response),
+			Protocol: "ttrpc",
+			Version:  2,
+		}
 	}
 
 	if params.Version > CurrentShimVersion {
-		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
+		return nil, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
 	return params, nil
 }
 
 // writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
-func writeBootstrapParams(path string, params client.BootstrapParams) error {
+func writeBootstrapParams(path string, params *bootapi.BootstrapResult) error {
 	path, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -262,23 +346,27 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 	return f.Close()
 }
 
-func readBootstrapParams(path string) (client.BootstrapParams, error) {
+func readBootstrapParams(path string) (*bootapi.BootstrapResult, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return client.BootstrapParams{}, err
+		return nil, err
 	}
 
 	return parseStartResponse(data)
 }
 
-// makeConnection creates a new TTRPC or GRPC connection object from address.
-// address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+// makeConnection creates a new TTRPC or GRPC connection using the address and
+// protocol from params. Legacy plain-string or JSON bootstrap responses are
+// normalized by parseStartResponse before calling this function.
+// The dialer parameter controls connection behavior: use AnonDialer for newly
+// started shims (retries if pipe doesn't exist yet) or AnonReconnectDialer for
+// reconnecting to already-running shims (fails fast if pipe is missing).
+func makeConnection(ctx context.Context, id string, params *bootapi.BootstrapResult, onClose func(), dialer func(string, time.Duration) (net.Conn, error)) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
@@ -287,7 +375,7 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 
 	switch strings.ToLower(params.Protocol) {
 	case "ttrpc":
-		conn, err := client.Connect(params.Address, client.AnonReconnectDialer)
+		conn, err := client.Connect(params.Address, dialer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create TTRPC connection: %w", err)
 		}
@@ -393,10 +481,23 @@ type shim struct {
 	client  any
 	address string
 	version int
+	// bootstrap is what the shim advertised when it started. Retained whole
+	// rather than decoded into fields here so that a new capability needs no
+	// further plumbing through the shim instance.
+	bootstrap *bootapi.BootstrapResult
+
+	taskDeleteExit atomic.Pointer[runtime.Exit]
 }
 
 var _ ShimInstance = (*shim)(nil)
 var _ clientVersionDowngrader = (*shim)(nil)
+var _ shimCapabilities = (*shim)(nil)
+var _ taskDeleteState = (*shim)(nil)
+
+// BootstrapResult returns what the shim advertised when it started.
+func (s *shim) BootstrapResult() *bootapi.BootstrapResult {
+	return s.bootstrap
+}
 
 // ID of the shim/task
 func (s *shim) ID() string {
@@ -472,6 +573,25 @@ func (s *shim) Delete(ctx context.Context) error {
 	return errors.Join(result...)
 }
 
+// recordTaskDeleteResult caches the result of a successful task delete. The
+// value is copied both in and out so that neither the caller that recorded it
+// nor a later retry can mutate the cached result.
+func (s *shim) recordTaskDeleteResult(exit *runtime.Exit) {
+	cached := *exit
+	s.taskDeleteExit.Store(&cached)
+}
+
+// taskDeleteResult returns a copy of the cached delete result, or nil if this
+// containerd process has never deleted the task successfully.
+func (s *shim) taskDeleteResult() *runtime.Exit {
+	cached := s.taskDeleteExit.Load()
+	if cached == nil {
+		return nil
+	}
+	exit := *cached
+	return &exit
+}
+
 var _ runtime.Task = &shimTask{}
 
 // shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
@@ -521,7 +641,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 	return response.TaskPid, nil
 }
 
-func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
 	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
@@ -535,6 +655,8 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		}
 	}
 
+	deleteState := s.ShimInstance.(taskDeleteState)
+
 	// NOTE: If the shim has been killed and ttrpc connection has been
 	// closed, the shimErr will not be nil. For this case, the event
 	// subscriber, like moby/moby, might have received the exit or delete
@@ -542,8 +664,8 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// send the exit and delete events again. And the exit status will
 	// depend on result of shimV2.Delete.
 	//
-	// If not, the shim has been delivered the exit and delete events.
-	// So we should remove the record and prevent duplicate events from
+	// If not, the shim has delivered the exit and delete events. Cache the
+	// delete result so a retry can return it and prevent duplicate events from
 	// ttrpc-callback-on-close.
 	//
 	// TODO: It's hard to guarantee that the event is unique and sent only
@@ -551,25 +673,22 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// only one exit event. The moby/moby should handle the duplicate events.
 	//
 	// REF: https://github.com/containerd/containerd/issues/4769
+	var exit *runtime.Exit
 	if shimErr == nil {
-		removeTask(ctx, s.ID())
-	}
-
-	const supportSandboxAPIVersion = 3
-	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
-		sandboxed = false
-	}
-
-	// Don't shutdown sandbox as there may be other containers running.
-	// Let controller decide when to shutdown.
-	if !sandboxed {
-		if err := s.waitShutdown(ctx); err != nil {
-			// FIXME(fuweid):
-			//
-			// If the error is context canceled, should we use context.TODO()
-			// to wait for it?
-			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
+		exit = &runtime.Exit{
+			Status:    response.ExitStatus,
+			Timestamp: protobuf.FromTimestamp(response.ExitedAt),
+			Pid:       response.Pid,
 		}
+		deleteState.recordTaskDeleteResult(exit)
+	}
+
+	// NOTE: Returning here deliberately leaves the shim record, the ttrpc
+	// client and the bundle in place, so that the caller can retry Delete.
+	// The result cached above lets that retry return the original exit, even
+	// though the shim reports NotFound for the task by then.
+	if err := s.waitShutdown(ctx); err != nil {
+		return nil, fmt.Errorf("failed to invoke shutdown: %w", err)
 	}
 
 	if err := s.ShimInstance.Delete(ctx); err != nil {
@@ -580,15 +699,15 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// this seems dirty but it cleans up the API across runtimes, tasks, and the service
 	removeTask(ctx, s.ID())
 
-	if shimErr != nil {
+	if exit == nil {
+		// An earlier attempt already deleted the task in the shim, so shimErr
+		// is NotFound. Return the exit recorded by that attempt instead.
+		exit = deleteState.taskDeleteResult()
+	}
+	if exit == nil {
 		return nil, shimErr
 	}
-
-	return &runtime.Exit{
-		Status:    response.ExitStatus,
-		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
-		Pid:       response.Pid,
-	}, nil
+	return exit, nil
 }
 
 func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
@@ -623,7 +742,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	if opts.RestoreFromPath {
 		// Unpack rootfs-diff.tar if it exists.
 		// This needs to happen between the 'Create()' from above and before the 'Start()' from below.
-		rootfsDiff := filepath.Join(opts.Checkpoint, "..", crmetadata.RootFsDiffTar)
+		rootfsDiff := filepath.Join(opts.Checkpoint, "..", rootFsDiffTar)
 
 		_, err = os.Stat(rootfsDiff)
 		if err == nil {
@@ -835,9 +954,6 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		if errdefs.IsDeadlineExceeded(err) {
-			return runtime.State{}, err
-		}
 		if !errors.Is(err, ttrpc.ErrClosed) {
 			return runtime.State{}, errgrpc.ToNative(err)
 		}
