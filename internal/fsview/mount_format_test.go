@@ -166,3 +166,54 @@ func TestFormatMountUnsupportedType(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 }
+
+// TestFormatMountUnsupportedTemplate verifies that unsupported template
+// expressions return ErrNotImplemented for both upperdir and lowerdir,
+// allowing callers to fall back to mounting the filesystem.
+func TestFormatMountUnsupportedTemplate(t *testing.T) {
+	tests := []struct {
+		name      string
+		option    string
+		preceding []mount.Mount
+	}{
+		{
+			name:   "upperdir",
+			option: `upperdir={{ mount 0 | printf "%s" }}`,
+		},
+		{
+			name:   "lowerdir",
+			option: `lowerdir={{ mount 0 | printf "%s" }}`,
+		},
+		{
+			name:   "unsupported action after unviewable mount",
+			option: `upperdir={{ mount 0 }}{{ target 1 }}`,
+			preceding: []mount.Mount{
+				{Type: "ext4", Source: "/dev/sda1"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			preceding := tc.preceding
+			if preceding == nil {
+				preceding = []mount.Mount{
+					{Type: "bind", Source: t.TempDir()},
+				}
+			}
+
+			mounts := append(preceding, mount.Mount{
+				Type:    "format/overlay",
+				Source:  "overlay",
+				Options: []string{tc.option},
+			})
+
+			view, err := fsview.FSMounts(mounts)
+			if view != nil {
+				require.NoError(t, view.Close())
+			}
+			require.ErrorIs(t, err, errdefs.ErrNotImplemented)
+			require.ErrorContains(t, err, "unsupported mount template expression")
+		})
+	}
+}
