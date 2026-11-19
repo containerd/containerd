@@ -18,8 +18,10 @@ package server
 
 import (
 	"context"
+	"io"
 	"iter"
 	"os"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -27,9 +29,11 @@ import (
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -217,4 +221,70 @@ func TestLoadPluginsRejectsMalformedProxyDefaultTimeout(t *testing.T) {
 	if !strings.Contains(err.Error(), "default_timeout") {
 		t.Fatalf("error does not name the offending key: %v", err)
 	}
+}
+
+// A relative blobs path must fail daemon startup. As above, LoadPlugins returns
+// before it reaches the global plugin registry.
+func TestLoadPluginsRejectsRelativeProxyBlobs(t *testing.T) {
+	cfg := &srvconfig.Config{
+		ProxyPlugins: map[string]srvconfig.ProxyPlugin{
+			"customcontent": {
+				Type:    "content",
+				Address: "/run/mycontent.sock",
+				Exports: map[string]string{"blobs": "content/blobs"},
+			},
+		},
+	}
+	_, err := LoadPlugins(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("LoadPlugins accepted a relative blobs path")
+	}
+	if !strings.Contains(err.Error(), "blobs") {
+		t.Fatalf("error does not name the offending key: %v", err)
+	}
+}
+
+func TestCheckLocalBlobs(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tc := range []struct {
+		name  string
+		blobs string
+		warn  bool
+	}{
+		{name: "Directory", blobs: dir},
+		{name: "Missing", blobs: filepath.Join(dir, "missing"), warn: true},
+		{name: "File", blobs: file, warn: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			hook := &warnHook{}
+			logger.AddHook(hook)
+			ctx := log.WithLogger(context.Background(), logrus.NewEntry(logger))
+
+			if err := checkLocalBlobs(ctx, "customcontent", tc.blobs); err != nil {
+				t.Fatalf("checkLocalBlobs(%q) = %v, want nil", tc.blobs, err)
+			}
+			if hook.warned != tc.warn {
+				t.Errorf("checkLocalBlobs(%q) warned = %v, want %v", tc.blobs, hook.warned, tc.warn)
+			}
+		})
+	}
+}
+
+// warnHook records whether a warning was logged.
+type warnHook struct {
+	warned bool
+}
+
+func (h *warnHook) Levels() []logrus.Level { return []logrus.Level{logrus.WarnLevel} }
+
+func (h *warnHook) Fire(*logrus.Entry) error {
+	h.warned = true
+	return nil
 }

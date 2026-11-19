@@ -207,7 +207,6 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 		return "", fmt.Errorf("failed to get reader: %w", err)
 	}
 	defer ra.Close()
-	sr := io.NewSectionReader(ra, 0, uncompressedDesc.Size)
 
 	// The UUID is derived from the uncompressed digest (diffID), the key the
 	// layer content cache uses, so the blob does not depend on how the source
@@ -222,10 +221,10 @@ func ConvertLayerToErofs(ctx context.Context, cs content.Store, desc ocispec.Des
 		}
 		mkfsArgs = append(mkfsArgs, copts.mkfsExtraOpts...)
 		mkfsArgs = erofsutils.AddDefaultMkfsOpts(mkfsArgs)
-		if err := erofsutils.MkfsConvertTar(ctx, sr, outPath, u.String(), mkfsArgs); err != nil {
+		if err := erofsutils.MkfsConvertTar(ctx, content.NewReader(ra), outPath, u.String(), mkfsArgs); err != nil {
 			return "", fmt.Errorf("failed to convert to EROFS: %w", err)
 		}
-	} else if err := erofsutils.ConvertTarErofs(ctx, sr, outPath, u.String()); err != nil {
+	} else if err := erofsutils.ConvertTarErofs(ctx, content.NewReader(ra), outPath, u.String()); err != nil {
 		return "", fmt.Errorf("failed to convert to EROFS: %w", err)
 	}
 	log.G(ctx).Debugf("converted %s to EROFS", desc.Digest)
