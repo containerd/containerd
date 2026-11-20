@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -205,62 +206,51 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
-	// `bin_dir` was removed in favor of `bin_dirs` in config version 4.
-	// Rename it in place for configs already using the CRIServicePlugin
-	// layout; the legacy GRPCPlugin layout is handled by migrateConfig below.
-	migrateCNIBinDir(pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"])
+	// v3 configs already use the split CRI runtime section.
+	runtimePlugin := string(plugins.CRIServicePlugin) + ".runtime"
+	dst, _ := pluginConfigs[runtimePlugin].(map[string]any)
+	if cni, ok := dst["cni"].(map[string]any); ok {
+		if binDir, ok := cni["bin_dir"].(string); ok {
+			if binDir != "" {
+				cni["bin_dirs"] = migratedCNIBinDirs(cni, binDir)
+			}
+			delete(cni, "bin_dir")
+		}
+	}
 
 	src, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"].(map[string]any)
 	if !ok {
 		return nil
 	}
-	dst, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]any)
-	if !ok {
+	if dst == nil {
 		dst = make(map[string]any)
 	}
 	migrateConfig(dst, src)
-	pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = dst
+	pluginConfigs[runtimePlugin] = dst
 	return nil
 }
 
-// migrateCNIBinDir renames the deprecated `cni.bin_dir` field of a plugin
-// config to `bin_dirs` in place, dropping the old field. It is a no-op for
-// plugin configs without the field.
-func migrateCNIBinDir(pluginConfig any) {
-	dst, ok := pluginConfig.(map[string]any)
-	if !ok {
-		return
+// The old runtime used bin_dir when bin_dirs was empty or held the platform
+// default. Preserve other values, including invalid ones, for the decoder.
+func migratedCNIBinDirs(cni map[string]any, binDir string) any {
+	dirs := cni["bin_dirs"]
+	if cniBinDirsEqual(dirs, nil) || cniBinDirsEqual(dirs, criconfig.DefaultRuntimeConfig().CniConfig.NetworkPluginBinDirs) {
+		return []string{binDir}
 	}
-	cni, ok := dst["cni"].(map[string]any)
-	if !ok {
-		return
-	}
-	if binDir, ok := cni["bin_dir"].(string); ok {
-		setCNIBinDirsIfUnset(cni, binDir)
-		delete(cni, "bin_dir")
-	}
+	return dirs
 }
 
-// setCNIBinDirsIfUnset sets `bin_dirs` from a legacy `bin_dir` value, unless
-// `bin_dirs` is already set or `bin_dir` is empty.
-//
-// Plugin configs loaded from TOML decode arrays as []any, while configs built
-// in code may use []string, so both representations are handled.
-func setCNIBinDirsIfUnset(cniConf map[string]any, binDir string) {
-	if binDir == "" {
-		return
-	}
-	switch binDirs := cniConf["bin_dirs"].(type) {
+func cniBinDirsEqual(value any, want []string) bool {
+	switch dirs := value.(type) {
+	case nil:
+		return len(want) == 0
 	case []string:
-		if len(binDirs) > 0 {
-			return
-		}
-	case []any:
-		if len(binDirs) > 0 {
-			return
-		}
+		return slices.Equal(dirs, want)
+	case []any: // Arrays decoded from TOML.
+		return slices.EqualFunc(dirs, want, func(v any, dir string) bool { return v == dir })
+	default:
+		return false
 	}
-	cniConf["bin_dirs"] = []string{binDir}
 }
 
 func migrateConfig(dst, src map[string]any) {
@@ -306,9 +296,11 @@ func migrateConfig(dst, src map[string]any) {
 		if !ok {
 			newCniConf = map[string]any{}
 		}
-		// Copy plain fields first, so an explicit `bin_dirs` in src is in
-		// place before the deprecated `bin_dir` is considered: the result
-		// must not depend on map iteration order when src sets both.
+		// Resolve the old section's two fields together, before merging them.
+		// A populated list in the runtime section is authoritative.
+		if binDir, _ := cniConf["bin_dir"].(string); binDir != "" && cniBinDirsEqual(newCniConf["bin_dirs"], nil) {
+			newCniConf["bin_dirs"] = migratedCNIBinDirs(cniConf, binDir)
+		}
 		for k, v := range cniConf {
 			if k == "bin_dir" {
 				continue
@@ -316,10 +308,6 @@ func migrateConfig(dst, src map[string]any) {
 			if _, ok := newCniConf[k]; !ok {
 				newCniConf[k] = v
 			}
-		}
-		// migrate `bin_dir` to `bin_dirs` only if `bin_dirs` is not already set
-		if binDir, ok := cniConf["bin_dir"].(string); ok {
-			setCNIBinDirsIfUnset(newCniConf, binDir)
 		}
 		dst["cni"] = newCniConf
 	}

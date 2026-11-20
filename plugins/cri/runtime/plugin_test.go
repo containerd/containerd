@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
@@ -83,204 +84,94 @@ func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	require.Equal(t, cniBinDir, cniBinDirs[0])
 }
 
-// TestCRIRuntimePluginConfigMigrationBinDir ensures the removed `cni.bin_dir`
-// field is renamed in place for configs already using the CRIServicePlugin
-// layout (config version 3) instead of being dropped as an unknown key when
-// loading config version 4.
 func TestCRIRuntimePluginConfigMigrationBinDir(t *testing.T) {
 	const runtimePlugin = string(plugins.CRIServicePlugin) + ".runtime"
-
-	for _, tc := range []struct {
-		name     string
-		cni      map[string]any
-		expected any
+	const legacyPlugin = string(plugins.GRPCPlugin) + ".cri"
+	const legacyDir = "/legacy/bin"
+	custom := []string{"/a/bin", "/b/bin"}
+	defaults := criconfig.DefaultRuntimeConfig().CniConfig.NetworkPluginBinDirs
+	for _, layout := range []struct {
+		plugin  string
+		version int
 	}{
-		{
-			name: "bin_dir renamed to bin_dirs",
-			cni: map[string]any{
-				"bin_dir": "/opt/cni/bin",
-			},
-			expected: []string{"/opt/cni/bin"},
-		},
-		{
-			name: "bin_dirs takes precedence over bin_dir",
-			cni: map[string]any{
-				"bin_dir":  "/opt/cni/bin",
-				"bin_dirs": []string{"/custom/cni/bin"},
-			},
-			expected: []string{"/custom/cni/bin"},
-		},
-		{
-			// TOML decodes arrays as []any rather than []string.
-			name: "bin_dirs decoded as []any takes precedence over bin_dir",
-			cni: map[string]any{
-				"bin_dir":  "/opt/cni/bin",
-				"bin_dirs": []any{"/custom/cni/bin", "/other/cni/bin"},
-			},
-			expected: []any{"/custom/cni/bin", "/other/cni/bin"},
-		},
-		{
-			name: "empty bin_dirs is replaced by bin_dir",
-			cni: map[string]any{
-				"bin_dir":  "/opt/cni/bin",
-				"bin_dirs": []any{},
-			},
-			expected: []string{"/opt/cni/bin"},
-		},
-		{
-			name: "empty bin_dir is dropped without setting bin_dirs",
-			cni: map[string]any{
-				"bin_dir": "",
-			},
-			expected: nil,
-		},
-		{
-			name: "empty bin_dir keeps bin_dirs",
-			cni: map[string]any{
-				"bin_dir":  "",
-				"bin_dirs": []any{"/custom/cni/bin"},
-			},
-			expected: []any{"/custom/cni/bin"},
-		},
+		{runtimePlugin, 3},
+		{legacyPlugin, 2},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			pluginConfigs := map[string]any{
-				runtimePlugin: map[string]any{
-					"cni": tc.cni,
-				},
-			}
-			require.NoError(t, configMigration(context.Background(), 3, pluginConfigs))
-
-			runtimeConf, ok := pluginConfigs[runtimePlugin].(map[string]any)
-			require.True(t, ok)
-
-			cni, ok := runtimeConf["cni"].(map[string]any)
-			require.True(t, ok)
-			assert.NotContains(t, cni, "bin_dir")
-			if tc.expected == nil {
-				assert.NotContains(t, cni, "bin_dirs")
-			} else {
-				assert.Equal(t, tc.expected, cni["bin_dirs"])
-			}
-		})
-	}
-}
-
-// TestCRIRuntimePluginConfigMigrationBinDirTOML runs the migration on plugin
-// configs decoded from real TOML, which is how the config loader produces
-// them (arrays are []any).
-func TestCRIRuntimePluginConfigMigrationBinDirTOML(t *testing.T) {
-	const runtimePlugin = string(plugins.CRIServicePlugin) + ".runtime"
-
-	for _, tc := range []struct {
-		name     string
-		toml     string
-		expected []any
-	}{
-		{
-			name: "bin_dir only",
-			toml: `
-[cni]
-bin_dir = "/single/bin"
-`,
-			expected: []any{"/single/bin"},
-		},
-		{
-			name: "bin_dir and bin_dirs",
-			toml: `
-[cni]
-bin_dir = "/single/bin"
-bin_dirs = ["/a/bin", "/b/bin"]
-`,
-			expected: []any{"/a/bin", "/b/bin"},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var runtimeConf map[string]any
-			require.NoError(t, toml.Unmarshal([]byte(tc.toml), &runtimeConf))
-			pluginConfigs := map[string]any{runtimePlugin: runtimeConf}
-
-			require.NoError(t, configMigration(context.Background(), 3, pluginConfigs))
-
-			cni, ok := runtimeConf["cni"].(map[string]any)
-			require.True(t, ok)
-			assert.NotContains(t, cni, "bin_dir")
-
-			// Normalize the []string produced by the rename to compare
-			// against the []any produced by the TOML decoder.
-			var got []any
-			switch v := cni["bin_dirs"].(type) {
-			case []string:
-				for _, d := range v {
-					got = append(got, d)
+		for _, tc := range []struct {
+			name    string
+			fields  map[string]any
+			want    []string
+			wantErr bool
+		}{
+			{name: "legacy only", fields: map[string]any{"bin_dir": legacyDir}, want: []string{legacyDir}},
+			{name: "custom list", fields: map[string]any{"bin_dir": legacyDir, "bin_dirs": custom}, want: custom},
+			{name: "default list", fields: map[string]any{"bin_dir": legacyDir, "bin_dirs": defaults}, want: []string{legacyDir}},
+			{name: "empty list", fields: map[string]any{"bin_dir": legacyDir, "bin_dirs": []string{}}, want: []string{legacyDir}},
+			{name: "empty legacy", fields: map[string]any{"bin_dir": ""}},
+			{name: "empty legacy and list", fields: map[string]any{"bin_dir": "", "bin_dirs": custom}, want: custom},
+			{name: "new field only", fields: map[string]any{"bin_dirs": custom}, want: custom},
+			{name: "invalid list", fields: map[string]any{"bin_dir": legacyDir, "bin_dirs": "/typo"}, wantErr: true},
+			{name: "invalid list element", fields: map[string]any{"bin_dir": legacyDir, "bin_dirs": []int{1}}, wantErr: true},
+		} {
+			t.Run(layout.plugin+"/"+tc.name, func(t *testing.T) {
+				// Loading a real TOML array into a plugin map produces []any.
+				data, err := toml.Marshal(map[string]any{"cni": tc.fields})
+				require.NoError(t, err)
+				var pluginConf map[string]any
+				require.NoError(t, toml.Unmarshal(data, &pluginConf))
+				configs := map[string]any{layout.plugin: pluginConf}
+				require.NoError(t, configMigration(t.Context(), layout.version, configs))
+				migrated := configs[runtimePlugin].(map[string]any)
+				cni := migrated["cni"].(map[string]any)
+				require.NotContains(t, cni, "bin_dir")
+				if tc.want == nil && !tc.wantErr {
+					require.NotContains(t, cni, "bin_dirs")
 				}
-			case []any:
-				got = v
-			}
-			assert.Equal(t, tc.expected, got)
-		})
+
+				data, err = toml.Marshal(migrated)
+				require.NoError(t, err)
+				var config criconfig.RuntimeConfig
+				err = toml.Unmarshal(data, &config)
+				if tc.wantErr {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+				require.Equal(t, tc.want, config.CniConfig.NetworkPluginBinDirs)
+			})
+		}
 	}
 }
 
-// TestCRIRuntimePluginConfigMigrationLegacyBinDir covers the legacy
-// io.containerd.grpc.v1.cri layout sharing the same `bin_dir` handling.
-func TestCRIRuntimePluginConfigMigrationLegacyBinDir(t *testing.T) {
+func TestCRIRuntimePluginConfigMigrationBinDirPrecedence(t *testing.T) {
 	const runtimePlugin = string(plugins.CRIServicePlugin) + ".runtime"
-
+	const legacyPlugin = string(plugins.GRPCPlugin) + ".cri"
+	defaults := criconfig.DefaultRuntimeConfig().CniConfig.NetworkPluginBinDirs
 	for _, tc := range []struct {
 		name          string
-		legacyDir     string
-		legacyBinDirs any
-		existing      any
-		expected      any
+		runtimeCNI    map[string]any
+		legacyBinDirs []string
+		want          any
 	}{
-		{
-			name:      "bin_dir migrated",
-			legacyDir: "/legacy/bin",
-			expected:  []string{"/legacy/bin"},
-		},
-		{
-			name:      "existing []any bin_dirs is kept",
-			legacyDir: "/legacy/bin",
-			existing:  []any{"/custom/bin"},
-			expected:  []any{"/custom/bin"},
-		},
-		{
-			name:          "legacy bin_dir does not clobber legacy bin_dirs",
-			legacyDir:     "/legacy/bin",
-			legacyBinDirs: []any{"/legacy/a", "/legacy/b"},
-			expected:      []any{"/legacy/a", "/legacy/b"},
-		},
-		{
-			name:      "empty bin_dir is ignored",
-			legacyDir: "",
-			expected:  nil,
-		},
+		{name: "runtime custom list", runtimeCNI: map[string]any{"bin_dirs": []any{"/custom"}}, want: []any{"/custom"}},
+		{name: "runtime default list", runtimeCNI: map[string]any{"bin_dirs": defaults}, want: defaults},
+		{name: "empty runtime list", runtimeCNI: map[string]any{"bin_dirs": []string{}}, want: []string{"/legacy"}},
+		{name: "empty runtime list and custom legacy list", runtimeCNI: map[string]any{"bin_dirs": []string{}}, legacyBinDirs: []string{"/custom"}, want: []string{"/custom"}},
+		{name: "runtime legacy and typed defaults", runtimeCNI: map[string]any{"bin_dir": "/runtime", "bin_dirs": defaults}, want: []string{"/runtime"}},
+		{name: "runtime legacy and typed custom list", runtimeCNI: map[string]any{"bin_dir": "/runtime", "bin_dirs": []string{"/custom"}}, want: []string{"/custom"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			srcCni := map[string]any{"bin_dir": tc.legacyDir}
+			legacyCNI := map[string]any{"bin_dir": "/legacy"}
 			if tc.legacyBinDirs != nil {
-				srcCni["bin_dirs"] = tc.legacyBinDirs
+				legacyCNI["bin_dirs"] = tc.legacyBinDirs
 			}
-			runtimeCni := map[string]any{}
-			if tc.existing != nil {
-				runtimeCni["bin_dirs"] = tc.existing
+			configs := map[string]any{
+				legacyPlugin:  map[string]any{"cni": legacyCNI},
+				runtimePlugin: map[string]any{"cni": tc.runtimeCNI},
 			}
-			pluginConfigs := map[string]any{
-				string(plugins.GRPCPlugin) + ".cri": map[string]any{
-					"cni": srcCni,
-				},
-				runtimePlugin: map[string]any{"cni": runtimeCni},
-			}
-			require.NoError(t, configMigration(context.Background(), 2, pluginConfigs))
-
-			cni := pluginConfigs[runtimePlugin].(map[string]any)["cni"].(map[string]any)
-			assert.NotContains(t, cni, "bin_dir")
-			if tc.expected == nil {
-				assert.NotContains(t, cni, "bin_dirs")
-			} else {
-				assert.Equal(t, tc.expected, cni["bin_dirs"])
-			}
+			require.NoError(t, configMigration(t.Context(), 2, configs))
+			require.NotContains(t, tc.runtimeCNI, "bin_dir")
+			require.Equal(t, tc.want, tc.runtimeCNI["bin_dirs"])
 		})
 	}
 }
