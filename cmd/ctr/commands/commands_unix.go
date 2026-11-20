@@ -50,6 +50,9 @@ func init() {
 	}, &cli.Uint64Flag{
 		Name:  "cpu-period",
 		Usage: "Limit CPU CFS period",
+	}, &cli.Uint64Flag{
+		Name:  "cpu-burst",
+		Usage: "Limit CPU CFS burst quota",
 	}, &cli.StringFlag{
 		Name:  "rootfs-propagation",
 		Usage: "Set the propagation of the container rootfs",

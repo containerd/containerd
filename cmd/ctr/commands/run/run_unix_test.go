@@ -21,7 +21,27 @@ package run
 import (
 	"context"
 	"testing"
+
+	"github.com/urfave/cli/v3"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 )
+
+// TestCPUBurstFlagDefined guards against the cpu-burst flag being read by
+// the container opts builder without being defined in ContainerFlags,
+// which made `ctr run --cpu-burst` fail with an undefined-flag error.
+func TestCPUBurstFlagDefined(t *testing.T) {
+	cmd := &cli.Command{
+		Name:  "test",
+		Flags: commands.ContainerFlags,
+		Action: func(context.Context, *cli.Command) error {
+			return nil
+		},
+	}
+	if err := cmd.Run(context.Background(), []string{"test", "--cpu-burst", "1000"}); err != nil {
+		t.Fatalf("failed to parse --cpu-burst: %v", err)
+	}
+}
 
 func TestDetectGPUVendor(t *testing.T) {
 	ctx := context.Background()
