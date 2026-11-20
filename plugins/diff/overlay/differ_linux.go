@@ -77,6 +77,11 @@ func getUpperDir(mounts []mount.Mount) string {
 			}
 			upper = strings.TrimPrefix(option, "upperdir=")
 		}
+		// The raw upperdir has host ownership, not the ID-mapped mount view.
+		// Use the walking differ if either mapping is present.
+		if strings.HasPrefix(option, "uidmap=") || strings.HasPrefix(option, "gidmap=") {
+			return ""
+		}
 		if strings.HasPrefix(option, "metacopy=") && option != "metacopy=off" {
 			return ""
 		}
@@ -97,6 +102,11 @@ func overlayLowerMatches(lower, upper []mount.Mount) bool {
 	m := lower[0]
 	if m.Target != "" && m.Target != "/" {
 		return false
+	}
+	for _, option := range m.Options {
+		if strings.HasPrefix(option, "uidmap=") || strings.HasPrefix(option, "gidmap=") {
+			return false
+		}
 	}
 	var upperLayers string
 	for _, option := range upper[0].Options {
