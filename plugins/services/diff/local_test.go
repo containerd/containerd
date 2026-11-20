@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/mount"
 	corediff "github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
