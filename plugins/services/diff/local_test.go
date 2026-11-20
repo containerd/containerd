@@ -25,7 +25,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type testDiffer struct{}
+type testDiffer struct{ name string }
 
 func (*testDiffer) Compare(context.Context, []mount.Mount, []mount.Mount, ...corediff.Opt) (ocispec.Descriptor, error) {
 	return ocispec.Descriptor{}, nil
@@ -36,43 +36,43 @@ func (*testDiffer) Apply(context.Context, ocispec.Descriptor, []mount.Mount, ...
 }
 
 func TestOrderDiffersOptionalOverlay(t *testing.T) {
-	walking := &testDiffer{}
-	overlay := &testDiffer{}
+	walking := &testDiffer{name: "walking"}
+	overlay := &testDiffer{name: "overlay"}
 	tests := []struct {
-		name string
+		name      string
 		available map[string]interface{}
-		order []string
-		want []differ
+		order     []string
+		want      []differ
 		wantError bool
 	}{
 		{
-			name: "overlay unavailable but walking fallback available",
+			name:      "overlay unavailable but walking fallback available",
 			available: map[string]interface{}{"walking": walking},
-			order: []string{"overlay", "walking"},
-			want: []differ{walking},
+			order:     []string{"overlay", "walking"},
+			want:      []differ{walking},
 		},
 		{
-			name: "both configured differs loaded",
+			name:      "both configured differs loaded",
 			available: map[string]interface{}{"overlay": overlay, "walking": walking},
-			order: []string{"overlay", "walking"},
-			want: []differ{overlay, walking},
+			order:     []string{"overlay", "walking"},
+			want:      []differ{overlay, walking},
 		},
 		{
-			name: "walking unavailable",
+			name:      "walking unavailable",
 			available: map[string]interface{}{"overlay": overlay},
-			order: []string{"overlay", "walking"},
+			order:     []string{"overlay", "walking"},
 			wantError: true,
 		},
 		{
-			name: "overlay unavailable without fallback",
+			name:      "overlay unavailable without fallback",
 			available: map[string]interface{}{"walking": walking},
-			order: []string{"overlay"},
+			order:     []string{"overlay"},
 			wantError: true,
 		},
 		{
-			name: "wrong overlay implementation",
+			name:      "wrong overlay implementation",
 			available: map[string]interface{}{"overlay": struct{}{}, "walking": walking},
-			order: []string{"overlay", "walking"},
+			order:     []string{"overlay", "walking"},
 			wantError: true,
 		},
 	}
