@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -83,6 +84,57 @@ func getUpperDir(mounts []mount.Mount) string {
 	return upper
 }
 
+// overlayLowerMatches proves that the requested lower view is exactly the
+// overlay's lower layer. An overlay upperdir is not a diff against an arbitrary
+// base, so ambiguous mounts must fall back to the walking differ.
+func overlayLowerMatches(lower, upper []mount.Mount) bool {
+	if len(lower) != 1 || len(upper) != 1 {
+		return false
+	}
+	m := lower[0]
+	if m.Target != "" && m.Target != "/" {
+		return false
+	}
+	var upperLayers string
+	for _, option := range upper[0].Options {
+		if strings.HasPrefix(option, "lowerdir=") {
+			if upperLayers != "" {
+				return false
+			}
+			upperLayers = strings.TrimPrefix(option, "lowerdir=")
+		}
+	}
+	if upperLayers == "" {
+		return false
+	}
+	switch m.Type {
+	case "bind":
+		// Single bind-mounted lower directory, with no secondary layers.
+		if strings.Contains(upperLayers, ":") || m.Source == "" {
+			return false
+		}
+		return filepath.Clean(m.Source) == filepath.Clean(upperLayers)
+	case "overlay":
+		// Only a read-only overlay is eligible: an upperdir on this mount
+		// could contribute additional data not described by lowerdir.
+		var layers string
+		for _, option := range m.Options {
+			if strings.HasPrefix(option, "upperdir=") || strings.ContainsAny(option, ",\\") {
+				return false
+			}
+			if strings.HasPrefix(option, "lowerdir=") {
+				if layers != "" {
+					return false
+				}
+				layers = strings.TrimPrefix(option, "lowerdir=")
+			}
+		}
+		return layers != "" && layers == upperLayers
+	default:
+		return false
+	}
+}
+
 // The metacopy module parameter is effective even when the mount does not
 // explicitly set metacopy. A raw upperdir omits the data of metacopy files,
 // so use the walking differ unless metacopy is disabled.
@@ -118,8 +170,8 @@ func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir s
 // surface the error directly to the caller.
 func (s *overlayDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
 	upperDir := getUpperDir(upper)
-	if upperDir == "" || !metacopyDisabled() {
-		return emptyDesc, fmt.Errorf("upper mounts are not overlay-backed: %w", errdefs.ErrNotImplemented)
+	if upperDir == "" || !metacopyDisabled() || !overlayLowerMatches(lower, upper) {
+		return emptyDesc, fmt.Errorf("overlay fast path is not safe for these mounts: %w", errdefs.ErrNotImplemented)
 	}
 
 	var config diff.Config
