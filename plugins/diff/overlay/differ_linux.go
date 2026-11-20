@@ -80,6 +80,9 @@ func getUpperDir(mounts []mount.Mount) string {
 		if strings.HasPrefix(option, "metacopy=") && option != "metacopy=off" {
 			return ""
 		}
+		if strings.HasPrefix(option, "redirect_dir=") && option != "redirect_dir=off" {
+			return ""
+		}
 	}
 	return upper
 }
@@ -135,12 +138,24 @@ func overlayLowerMatches(lower, upper []mount.Mount) bool {
 	}
 }
 
-// The metacopy module parameter is effective even when the mount does not
-// explicitly set metacopy. A raw upperdir omits the data of metacopy files,
-// so use the walking differ unless metacopy is disabled.
-func metacopyDisabled() bool {
-	value, err := os.ReadFile("/sys/module/overlay/parameters/metacopy")
-	return err == nil && strings.EqualFold(strings.TrimSpace(string(value)), "N")
+// Both metacopy and redirect_dir can be enabled by module parameters even
+// when absent from the mount options. Raw upperdirs cannot represent file
+// data in metacopy files or the inherited children of redirected directories.
+// Fail closed when the module parameters cannot be read.
+func overlayFastPathFeaturesDisabled() bool {
+	for _, feature := range []string{"metacopy", "redirect_dir"} {
+		value, err := os.ReadFile("/sys/module/overlay/parameters/" + feature)
+		if err != nil || !strings.EqualFold(strings.TrimSpace(string(value)), "N") {
+			return false
+		}
+	}
+	return true
+}
+
+// finalizeCompressedDiff must check Close because compressors may buffer
+// bytes until finalization. Preserve the write error if both operations fail.
+func finalizeCompressedDiff(compressed io.WriteCloser, writeErr error) error {
+	return errors.Join(writeErr, compressed.Close())
 }
 
 // writeDiff writes the layer diff from an overlay upper directory to w.
@@ -170,7 +185,7 @@ func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir s
 // surface the error directly to the caller.
 func (s *overlayDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
 	upperDir := getUpperDir(upper)
-	if upperDir == "" || !metacopyDisabled() || !overlayLowerMatches(lower, upper) {
+	if upperDir == "" || !overlayFastPathFeaturesDisabled() || !overlayLowerMatches(lower, upper) {
 		return emptyDesc, fmt.Errorf("overlay fast path is not safe for these mounts: %w", errdefs.ErrNotImplemented)
 	}
 
@@ -264,8 +279,8 @@ func (s *overlayDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				return emptyDesc, fmt.Errorf("failed to get compressed stream: %w", errOpen)
 			}
 		}
-		errOpen = writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperDir, changeWriterOpts)
-		compressed.Close()
+		errOpen = finalizeCompressedDiff(compressed,
+			writeDiff(ctx, io.MultiWriter(compressed, dgstr.Hash()), lower, upperDir, changeWriterOpts))
 		if errOpen != nil {
 			return emptyDesc, fmt.Errorf("failed to write compressed diff: %w", errOpen)
 		}
