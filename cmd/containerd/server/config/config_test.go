@@ -634,6 +634,52 @@ version = 3
 	assert.Equal(t, []any{"a"}, runc["pod_annotations"])
 }
 
+// TestMergePluginConfig covers value merging for slices of any element type:
+// TOML decoding produces []any, but config migrations may replace them with
+// typed slices (for example []string), which must merge the same way.
+func TestMergePluginConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		a, b     any
+		expected any
+	}{
+		{
+			name:     "typed slices append",
+			a:        []string{"x"},
+			b:        []string{"y"},
+			expected: []string{"x", "y"},
+		},
+		{
+			name:     "duplicates removed",
+			a:        []any{"x"},
+			b:        []any{"x", "y"},
+			expected: []any{"x", "y"},
+		},
+		{
+			name:     "different slice types replace",
+			a:        []string{"x"},
+			b:        []any{"y"},
+			expected: []any{"y"},
+		},
+		{
+			name:     "maps deep merge",
+			a:        map[string]any{"k": []any{"x"}},
+			b:        map[string]any{"k": []any{"y"}, "j": 1},
+			expected: map[string]any{"k": []any{"x", "y"}, "j": 1},
+		},
+		{
+			name:     "scalars replaced",
+			a:        "x",
+			b:        "y",
+			expected: "y",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, mergePluginConfig(tc.a, tc.b))
+		})
+	}
+}
+
 func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) *Config {
 	tempDir := t.TempDir()
 	var result Config

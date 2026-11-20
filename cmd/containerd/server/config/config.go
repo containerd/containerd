@@ -645,29 +645,30 @@ func mergePluginConfigs(a, b map[string]any) map[string]any {
 }
 
 // mergePluginConfig merges two plugin config values following the rules of
-// mergePluginConfigs.
+// mergePluginConfigs. Slices of any element type are merged, since config
+// migrations may replace values decoded from TOML (always []any) with typed
+// slices.
 func mergePluginConfig(a, b any) any {
-	switch av := a.(type) {
-	case map[string]any:
+	if av, ok := a.(map[string]any); ok {
 		if bv, ok := b.(map[string]any); ok {
 			return mergePluginConfigs(av, bv)
 		}
-	case []any:
-		if bv, ok := b.([]any); ok {
-			for _, v := range bv {
-				found := false
-				for _, d := range av {
-					if reflect.DeepEqual(d, v) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					av = append(av, v)
+	}
+	av, bv := reflect.ValueOf(a), reflect.ValueOf(b)
+	if av.IsValid() && bv.IsValid() && av.Kind() == reflect.Slice && bv.Kind() == reflect.Slice && av.Type() == bv.Type() {
+		for i := 0; i < bv.Len(); i++ {
+			found := false
+			for j := 0; j < av.Len(); j++ {
+				if reflect.DeepEqual(av.Index(j).Interface(), bv.Index(i).Interface()) {
+					found = true
+					break
 				}
 			}
-			return av
+			if !found {
+				av = reflect.Append(av, bv.Index(i))
+			}
 		}
+		return av.Interface()
 	}
 	return b
 }
