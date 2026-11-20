@@ -306,19 +306,20 @@ func migrateConfig(dst, src map[string]any) {
 		if !ok {
 			newCniConf = map[string]any{}
 		}
+		// Copy plain fields first, so an explicit `bin_dirs` in src is in
+		// place before the deprecated `bin_dir` is considered: the result
+		// must not depend on map iteration order when src sets both.
 		for k, v := range cniConf {
-			switch k {
-			case "bin_dir":
-				// migrate `bin_dir` to `bin_dirs` only if `bin_dirs`
-				// is not already set
-				if binDir, ok := v.(string); ok {
-					setCNIBinDirsIfUnset(newCniConf, binDir)
-				}
-			default:
-				if _, ok := newCniConf[k]; !ok {
-					newCniConf[k] = v
-				}
+			if k == "bin_dir" {
+				continue
 			}
+			if _, ok := newCniConf[k]; !ok {
+				newCniConf[k] = v
+			}
+		}
+		// migrate `bin_dir` to `bin_dirs` only if `bin_dirs` is not already set
+		if binDir, ok := cniConf["bin_dir"].(string); ok {
+			setCNIBinDirsIfUnset(newCniConf, binDir)
 		}
 		dst["cni"] = newCniConf
 	}

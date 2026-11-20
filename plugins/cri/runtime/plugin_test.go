@@ -228,10 +228,11 @@ func TestCRIRuntimePluginConfigMigrationLegacyBinDir(t *testing.T) {
 	const runtimePlugin = string(plugins.CRIServicePlugin) + ".runtime"
 
 	for _, tc := range []struct {
-		name      string
-		legacyDir string
-		existing  any
-		expected  any
+		name          string
+		legacyDir     string
+		legacyBinDirs any
+		existing      any
+		expected      any
 	}{
 		{
 			name:      "bin_dir migrated",
@@ -245,19 +246,29 @@ func TestCRIRuntimePluginConfigMigrationLegacyBinDir(t *testing.T) {
 			expected:  []any{"/custom/bin"},
 		},
 		{
+			name:          "legacy bin_dir does not clobber legacy bin_dirs",
+			legacyDir:     "/legacy/bin",
+			legacyBinDirs: []any{"/legacy/a", "/legacy/b"},
+			expected:      []any{"/legacy/a", "/legacy/b"},
+		},
+		{
 			name:      "empty bin_dir is ignored",
 			legacyDir: "",
 			expected:  nil,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			srcCni := map[string]any{"bin_dir": tc.legacyDir}
+			if tc.legacyBinDirs != nil {
+				srcCni["bin_dirs"] = tc.legacyBinDirs
+			}
 			runtimeCni := map[string]any{}
 			if tc.existing != nil {
 				runtimeCni["bin_dirs"] = tc.existing
 			}
 			pluginConfigs := map[string]any{
 				string(plugins.GRPCPlugin) + ".cri": map[string]any{
-					"cni": map[string]any{"bin_dir": tc.legacyDir},
+					"cni": srcCni,
 				},
 				runtimePlugin: map[string]any{"cni": runtimeCni},
 			}
