@@ -188,6 +188,9 @@ documentation.
 This allows to split the main configuration file and keep some sections
 separately (for example vendors may keep a custom runtime configuration in a
 separate file without modifying the main `config.toml`).
+Import paths containing `*` are expanded as glob patterns. Patterns with no
+matches are skipped. Paths without `*` are opened literally and must exist,
+even when they contain `?` or brackets.
 Imported files will overwrite simple fields like `int` or
 `string` (if not empty) and will append `array` and `map` fields.
 Imported files are also versioned, and the version can't be higher than
