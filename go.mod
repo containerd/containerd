@@ -77,7 +77,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0
 	go.opentelemetry.io/otel/sdk v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
-	golang.org/x/mod v0.42.0 //gosocialcheck:trusted
+	golang.org/x/mod v0.43.0 //gosocialcheck:trusted
 	golang.org/x/sync v0.25.0 //gosocialcheck:trusted
 	golang.org/x/sys v0.50.0 //gosocialcheck:trusted
 	golang.org/x/time v0.16.0 //gosocialcheck:trusted
