@@ -17,6 +17,8 @@
 package overlay
 
 import (
+	"errors"
+	"io"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
@@ -168,6 +170,22 @@ func TestGetUpperDir(t *testing.T) {
 			expected: "",
 		},
 		{
+			name: "redirect directory enabled",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Options: []string{"upperdir=/upper", "redirect_dir=on"},
+			}},
+			expected: "",
+		},
+		{
+			name: "redirect directory disabled",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Options: []string{"upperdir=/upper", "redirect_dir=off"},
+			}},
+			expected: "/upper",
+		},
+		{
 			name: "duplicate upperdir options",
 			mounts: []mount.Mount{{
 				Type: "overlay",
@@ -243,6 +261,45 @@ func TestOverlayLowerMatches(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := overlayLowerMatches(tt.lower, tt.upper); got != tt.want {
 				t.Fatalf("overlayLowerMatches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+
+// errorCloser verifies that an error from compressor Close is not discarded.
+type errorCloser struct {
+	io.Writer
+	closeErr error
+	closed   bool
+}
+
+func (c *errorCloser) Close() error {
+	c.closed = true
+	return c.closeErr
+}
+
+func TestFinalizeCompressedDiff(t *testing.T) {
+	writeErr := errors.New("write failed")
+	closeErr := errors.New("close failed")
+	for _, tt := range []struct {
+		name     string
+		writeErr error
+		closeErr error
+	}{
+		{name: "success"},
+		{name: "write error", writeErr: writeErr},
+		{name: "close error", closeErr: closeErr},
+		{name: "both errors", writeErr: writeErr, closeErr: closeErr},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			stream := &errorCloser{Writer: io.Discard, closeErr: tt.closeErr}
+			err := finalizeCompressedDiff(stream, tt.writeErr)
+			if !stream.closed {
+				t.Fatal("compressor was not closed")
+			}
+			if !errors.Is(err, tt.writeErr) || !errors.Is(err, tt.closeErr) {
+				t.Fatalf("finalizeCompressedDiff() = %v, want both %v and %v", err, tt.writeErr, tt.closeErr)
 			}
 		})
 	}
