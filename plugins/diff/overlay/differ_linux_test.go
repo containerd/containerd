@@ -193,6 +193,23 @@ func TestGetUpperDir(t *testing.T) {
 			}},
 			expected: "",
 		},
+		{
+			name: "idmapped upper mount",
+			mounts: []mount.Mount{{
+				Type:    "overlay",
+				Options: []string{"lowerdir=/lower", "upperdir=/upper", "uidmap=0:100000:65536"},
+			}},
+			expected: "",
+		},
+		{
+			name: "gidmapped upper mount",
+			mounts: []mount.Mount{{
+				Type:    "overlay",
+				Options: []string{"lowerdir=/lower", "upperdir=/upper", "gidmap=0:100000:65536"},
+			}},
+			expected: "",
+		},
+
 	}
 
 	for _, tt := range tests {
@@ -256,6 +273,17 @@ func TestOverlayLowerMatches(t *testing.T) {
 			lower: []mount.Mount{{Type: "bind", Source: "/layers/one"}},
 			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one:/layers/two", "upperdir=/layers/three"}}},
 		},
+		{
+			name:  "idmapped bind lower",
+			lower: []mount.Mount{{Type: "bind", Source: "/layers/one", Options: []string{"uidmap=0:100000:65536"}}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/two"}}},
+		},
+		{
+			name:  "gidmapped overlay lower",
+			lower: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "gidmap=0:100000:65536"}}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/two"}}},
+		},
+
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
