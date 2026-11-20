@@ -565,7 +565,7 @@ func TestMergingPluginsWithTwoCriRuntimeWithPodAnnotationsDropInConfigs(t *testi
   [containerd.runtimes]
     [containerd.runtimes.runc]
       cni_conf_dir = '/bar'
-      pod_annotations = ['d', 'e', 'f']
+      pod_annotations = ['a', 'b', 'c', 'd', 'e', 'f']
       runtime_type = 'io.containerd.runc.v2'
 `
 	testMergeConfig(t, []string{runc1, runc2}, expected, "io.containerd.grpc.v1.cri")
@@ -576,13 +576,65 @@ func TestMergingPluginsWithTwoCriRuntimeWithPodAnnotationsDropInConfigs(t *testi
   [containerd.runtimes]
     [containerd.runtimes.runc]
       cni_conf_dir = '/foo'
-      pod_annotations = ['a', 'b', 'c']
+      pod_annotations = ['d', 'e', 'f', 'a', 'b', 'c']
       runtime_type = 'io.containerd.runc.v2'
 `
 	testMergeConfig(t, []string{runc2, runc1}, expected, "io.containerd.grpc.v1.cri")
 }
 
-func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) {
+// TestMergingPluginsWithNestedArraysAndMaps ensures arrays nested inside
+// plugin configs follow the documented import merge behavior (appended,
+// with duplicates removed) instead of replacing the array of the config
+// being merged into, and that nested maps keep merging by key.
+// See https://github.com/containerd/containerd/issues/14607.
+func TestMergingPluginsWithNestedArraysAndMaps(t *testing.T) {
+	base := `
+version = 3
+[[plugins."io.containerd.transfer.v1.local".unpack_config]]
+  platform = "linux/amd64"
+  snapshotter = "overlayfs"
+[[plugins."io.containerd.transfer.v1.local".unpack_config]]
+  platform = "linux/arm64"
+  snapshotter = "native"
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
+`
+	dropIn := `
+version = 3
+[[plugins."io.containerd.transfer.v1.local".unpack_config]]
+  platform = "linux/amd64"
+  snapshotter = "overlayfs"
+[[plugins."io.containerd.transfer.v1.local".unpack_config]]
+  platform = "linux/s390x"
+  snapshotter = "devmapper"
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
+  pod_annotations = ["a"]
+`
+	expected := `
+[[unpack_config]]
+  platform = 'linux/amd64'
+  snapshotter = 'overlayfs'
+
+[[unpack_config]]
+  platform = 'linux/arm64'
+  snapshotter = 'native'
+
+[[unpack_config]]
+  platform = 'linux/s390x'
+  snapshotter = 'devmapper'
+`
+	result := testMergeConfig(t, []string{base, dropIn}, expected, "io.containerd.transfer.v1.local")
+
+	// Nested maps merge by key and scalar fields are overridden.
+	runc := result.Plugins["io.containerd.grpc.v1.cri"].(map[string]any)["containerd"].(map[string]any)["runtimes"].(map[string]any)["runc"].(map[string]any)
+	assert.Equal(t, "io.containerd.runc.v2", runc["runtime_type"])
+	assert.Equal(t, []any{"a"}, runc["pod_annotations"])
+}
+
+func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) *Config {
 	tempDir := t.TempDir()
 	var result Config
 
@@ -610,6 +662,7 @@ func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlug
 		panic(err)
 	}
 	assert.Equal(t, strings.TrimLeft(expected, "\n"), buf.String())
+	return &result
 }
 
 func TestServiceMigrate(t *testing.T) {

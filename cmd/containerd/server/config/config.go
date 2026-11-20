@@ -603,12 +603,20 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 // []{"1"}      []{}        []{"1"}
 // []{"1", "2"} []{"1"}     []{"1","2"}
 // []{}         []{"2"}     []{"2"}
-// Maps merged by keys, but values are replaced entirely.
+// Maps merged by keys, but values are replaced entirely, except for plugin
+// configs, whose nested maps and arrays follow the same rules (see
+// mergePluginConfigs).
 func mergeConfig(to, from *Config) error {
+	// mergo replaces interface values wholesale, so the plugin configs
+	// (map[string]any) must be merged separately before the struct merge
+	// replaces them, following the same rules as the typed fields.
+	plugins := mergePluginConfigs(to.Plugins, from.Plugins)
+
 	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithTransformers(sliceTransformer{}))
 	if err != nil {
 		return err
 	}
+	to.Plugins = plugins
 
 	// Replace entire sections instead of merging map's values.
 	maps.Copy(to.StreamProcessors, from.StreamProcessors)
@@ -618,6 +626,50 @@ func mergeConfig(to, from *Config) error {
 	maps.Copy(to.Timeouts, from.Timeouts)
 
 	return nil
+}
+
+// mergePluginConfigs returns the deep merge of plugin configurations a and
+// b, where b wins on conflicts: maps are merged by key, arrays append
+// elements of b not already present (mirroring sliceTransformer), and all
+// other values are taken from b.
+func mergePluginConfigs(a, b map[string]any) map[string]any {
+	out := make(map[string]any, len(a)+len(b))
+	maps.Copy(out, a)
+	for k, v := range b {
+		if av, ok := out[k]; ok {
+			v = mergePluginConfig(av, v)
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// mergePluginConfig merges two plugin config values following the rules of
+// mergePluginConfigs.
+func mergePluginConfig(a, b any) any {
+	switch av := a.(type) {
+	case map[string]any:
+		if bv, ok := b.(map[string]any); ok {
+			return mergePluginConfigs(av, bv)
+		}
+	case []any:
+		if bv, ok := b.([]any); ok {
+			for _, v := range bv {
+				found := false
+				for _, d := range av {
+					if reflect.DeepEqual(d, v) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					av = append(av, v)
+				}
+			}
+			return av
+		}
+	}
+	return b
 }
 
 type sliceTransformer struct{}
