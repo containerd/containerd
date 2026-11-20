@@ -119,3 +119,36 @@ func TestDiffDirChangesDirectoryOwnership(t *testing.T) {
 		t.Fatalf("applied directory owner = %d, want %d", got, owner)
 	}
 }
+
+func TestDiffDirChangesFileReplacedByDirectory(t *testing.T) {
+	base, upper, target := t.TempDir(), t.TempDir(), t.TempDir()
+	for _, root := range []string{base, target} {
+		if err := os.WriteFile(filepath.Join(root, "entry"), []byte("old content"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(upper, "entry"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(upper, "entry", "child"), []byte("new content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	cw := archive.NewChangeWriter(&buf, upper)
+	if err := fs.DiffDirChanges(context.Background(), base, upper, fs.DiffSourceOverlayFS, cw.HandleChange); err != nil {
+		t.Fatal(err)
+	}
+	if err := cw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := archive.Apply(context.Background(), target, bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(target, "entry", "child"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "new content" {
+		t.Fatalf("applied child = %q, want new content", data)
+	}
+}
