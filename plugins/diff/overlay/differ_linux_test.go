@@ -89,7 +89,7 @@ func TestGetUpperDir(t *testing.T) {
 					},
 				},
 			},
-			expected: "/data/upper",
+			expected: "",
 		},
 		{
 			name: "multiple mounts with non-overlay last",
@@ -123,6 +123,57 @@ func TestGetUpperDir(t *testing.T) {
 				},
 			},
 			expected: "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs",
+		},
+
+		{
+			name: "overlay targeted at subdirectory",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Target: "/subdir",
+				Options: []string{"upperdir=/upper"},
+			}},
+			expected: "",
+		},
+		{
+			name: "overlay targeted at root",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Target: "/",
+				Options: []string{"upperdir=/upper"},
+			}},
+			expected: "/upper",
+		},
+		{
+			name: "comma-joined overlay options",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Options: []string{"upperdir=/upper,workdir=/work"},
+			}},
+			expected: "",
+		},
+		{
+			name: "kernel escaped overlay path",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Options: []string{`upperdir=/hello\\040world`},
+			}},
+			expected: "",
+		},
+		{
+			name: "metacopy enabled",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Options: []string{"upperdir=/upper", "metacopy=on"},
+			}},
+			expected: "",
+		},
+		{
+			name: "duplicate upperdir options",
+			mounts: []mount.Mount{{
+				Type: "overlay",
+				Options: []string{"upperdir=/a", "upperdir=/b"},
+			}},
+			expected: "",
 		},
 	}
 
