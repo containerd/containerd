@@ -19,6 +19,7 @@
 package plugin
 
 import (
+	"errors"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -26,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/diff/apply"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/diff/overlay"
 )
@@ -36,10 +38,18 @@ func init() {
 		ID:   "overlay",
 		Requires: []plugin.Type{
 			plugins.MetadataPlugin,
+			plugins.MountManagerPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
+				return nil, err
+			}
+
+			var mm mount.Manager
+			if mountsI, err := ic.GetSingle(plugins.MountManagerPlugin); err == nil {
+				mm = mountsI.(mount.Manager)
+			} else if !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
 
@@ -51,7 +61,7 @@ func init() {
 
 			return diffPlugin{
 				Comparer: overlay.NewOverlayDiff(cs),
-				Applier:  apply.NewFileSystemApplier(cs),
+				Applier:  apply.NewFileSystemApplierWithMountManager(cs, mm),
 			}, nil
 		},
 	})
