@@ -188,6 +188,7 @@ documentation.
 This allows to split the main configuration file and keep some sections
 separately (for example vendors may keep a custom runtime configuration in a
 separate file without modifying the main `config.toml`).
+Explicitly listed files must exist. Glob patterns that match no files are skipped.
 Imported files will overwrite simple fields like `int` or
 `string` (if not empty) and will append `array` and `map` fields.
 Imported files are also versioned, and the version can't be higher than
