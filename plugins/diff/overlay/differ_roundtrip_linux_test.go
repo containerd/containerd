@@ -22,6 +22,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 	"time"
 
@@ -114,7 +115,7 @@ func TestDiffDirChangesDirectoryOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := st.Sys().(*unix.Stat_t).Uid; int(got) != owner {
+	if got := st.Sys().(*syscall.Stat_t).Uid; int(got) != owner {
 		t.Fatalf("applied directory owner = %d, want %d", got, owner)
 	}
 }
