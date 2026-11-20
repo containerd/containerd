@@ -58,12 +58,12 @@ func TestWithContext(t *testing.T) {
 
 	start := time.Now()
 	ctx, cancel := WithContext(context.Background(), key)
+	end := time.Now()
 	defer cancel()
 
 	deadline, ok := ctx.Deadline()
 	require.True(t, ok, "context should have a deadline")
-	assert.False(t, deadline.Before(start.Add(d)), "deadline should not be earlier than start+%v", d)
-	assert.False(t, deadline.After(start.Add(d+5*time.Second)), "deadline should not be later than start+%v", d+5*time.Second)
+	assert.WithinRange(t, deadline, start.Add(d), end.Add(d))
 }
 
 func TestAll(t *testing.T) {

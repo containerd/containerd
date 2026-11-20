@@ -18,6 +18,7 @@ package deprecation
 
 import (
 	"go/ast"
+	"go/build"
 	"go/constant"
 	"go/importer"
 	"go/parser"
@@ -31,92 +32,58 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// declaredWarnings returns every constant of type Warning declared in
-// deprecation.go, keyed by constant name. The source file is parsed and
-// type-checked so that a newly added Warning constant is picked up
-// automatically instead of relying on a hand-maintained list.
-func declaredWarnings(t *testing.T) map[string]Warning {
-	t.Helper()
-
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "deprecation.go", nil, 0)
+// TestWarningsAreRegistered checks every Warning constant in the package's
+// non-test source files for the current platform.
+func TestWarningsAreRegistered(t *testing.T) {
+	source, err := build.Default.ImportDir(".", 0)
 	require.NoError(t, err)
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, name := range slices.Concat(source.GoFiles, source.CgoFiles) {
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		require.NoError(t, err)
+		files = append(files, f)
+	}
 
 	conf := types.Config{Importer: importer.ForCompiler(fset, "source", nil)}
-	pkg, err := conf.Check("deprecation", fset, []*ast.File{f}, nil)
+	pkg, err := conf.Check("deprecation", fset, files, nil)
 	require.NoError(t, err)
-
-	warnings := map[string]Warning{}
-	for _, name := range pkg.Scope().Names() {
-		c, ok := pkg.Scope().Lookup(name).(*types.Const)
-		if !ok {
-			continue
-		}
-		named, ok := c.Type().(*types.Named)
-		if !ok || named.Obj().Name() != "Warning" {
-			continue
-		}
-		warnings[name] = Warning(constant.StringVal(c.Val()))
-	}
-	require.NotEmpty(t, warnings, "no Warning constants found in deprecation.go")
-	return warnings
-}
-
-func TestWarningsAreRegistered(t *testing.T) {
-	declared := declaredWarnings(t)
-
+	scope := pkg.Scope()
+	warningType := scope.Lookup("Warning").Type()
 	seen := map[Warning]string{}
-	for name, w := range declared {
+	for _, name := range scope.Names() {
+		c, ok := scope.Lookup(name).(*types.Const)
+		if !ok || !types.Identical(c.Type(), warningType) {
+			continue
+		}
+		w := Warning(constant.StringVal(c.Val()))
+		if other, ok := seen[w]; ok {
+			t.Errorf("%s and %s share warning ID %q", name, other, w)
+		}
+		seen[w] = name
 		t.Run(name, func(t *testing.T) {
-			assert.True(t, Valid(w), "Warning %s (%q) has no entry in messages", name, w)
-			assert.True(t, strings.HasPrefix(string(w), Prefix), "Warning %s (%q) should carry the standard prefix %q", name, w, Prefix)
-			assert.Greater(t, len(strings.TrimPrefix(string(w), Prefix)), 0, "Warning %s has an empty id after the prefix", name)
-			if other, dup := seen[w]; dup {
-				t.Errorf("Warning %s and %s share the same id %q", name, other, w)
-			}
-			seen[w] = name
+			id, ok := strings.CutPrefix(string(w), Prefix)
+			assert.True(t, ok, "warning %q must start with %q", w, Prefix)
+			assert.NotEmpty(t, id)
+			assert.True(t, Valid(w))
+			message, ok := Message(w)
+			assert.True(t, ok)
+			assert.NotEmpty(t, message)
 		})
 	}
-
-	// Every entry in messages must correspond to a declared constant.
-	values := make([]Warning, 0, len(declared))
-	for _, w := range declared {
-		values = append(values, w)
-	}
+	require.NotEmpty(t, seen)
 	for w := range messages {
-		assert.True(t, slices.Contains(values, w), "messages has an entry %q with no matching Warning constant", w)
+		assert.Contains(t, seen, w, "message has no matching Warning constant")
 	}
 }
 
-func TestValid(t *testing.T) {
-	for name, w := range declaredWarnings(t) {
-		t.Run(name, func(t *testing.T) {
-			assert.True(t, Valid(w))
-		})
-	}
-
-	for _, w := range []Warning{
-		"",
-		Prefix,
-		Prefix + "does-not-exist",
-		"cri-registry-mirrors", // known id without the standard prefix
-	} {
+func TestUnknownWarnings(t *testing.T) {
+	for _, w := range []Warning{"", Prefix, Prefix + "does-not-exist", "cri-registry-mirrors"} {
 		t.Run("invalid:"+string(w), func(t *testing.T) {
 			assert.False(t, Valid(w))
+			message, ok := Message(w)
+			assert.False(t, ok)
+			assert.Empty(t, message)
 		})
 	}
-}
-
-func TestMessage(t *testing.T) {
-	for name, w := range declaredWarnings(t) {
-		t.Run(name, func(t *testing.T) {
-			msg, ok := Message(w)
-			assert.True(t, ok, "Warning %s should have a message", name)
-			assert.NotEmpty(t, msg, "message for %s should not be empty", name)
-		})
-	}
-
-	msg, ok := Message(Prefix + "does-not-exist")
-	assert.False(t, ok)
-	assert.Empty(t, msg)
 }
