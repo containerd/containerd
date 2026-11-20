@@ -84,28 +84,27 @@ func init() {
 	})
 }
 
-
-/// orderDiffers accepts an unavailable overlay optimization if walking is
-/// configured as a fallback. Some Linux builds and plugin configurations do
-/// not load the overlay plugin; the diff service must still initialize.
+// orderDiffers accepts an unavailable overlay optimization if walking is
+// configured as a fallback. Some Linux builds and plugin configurations do
+// not load the overlay plugin; the diff service must still initialize.
 func orderDiffers(available map[string]interface{}, names []string) ([]differ, error) {
- 	ordered := make([]differ, 0, len(names))
- 	for _, name := range names {
- 		instance, ok := available[name]
- 		if !ok {
- 			if name == "overlay" && slices.Contains(names, "walking") {
- 				continue
- 			}
- 			return nil, fmt.Errorf("needed differ not loaded: %s", name)
- 		}
- 		implementation, ok := instance.(differ)
- 		if !ok {
- 			return nil, fmt.Errorf("differ does not implement Comparer and Applier interface: %s", name)
- 		}
- 		ordered = append(ordered, implementation)
- 	}
- 	return ordered, nil
- }
+	ordered := make([]differ, 0, len(names))
+	for _, name := range names {
+		instance, ok := available[name]
+		if !ok {
+			if name == "overlay" && slices.Contains(names, "walking") {
+				continue
+			}
+			return nil, fmt.Errorf("needed differ not loaded: %s", name)
+		}
+		implementation, ok := instance.(differ)
+		if !ok {
+			return nil, fmt.Errorf("differ does not implement Comparer and Applier interface: %s", name)
+		}
+		ordered = append(ordered, implementation)
+	}
+	return ordered, nil
+}
 
 type local struct {
 	differs []differ
