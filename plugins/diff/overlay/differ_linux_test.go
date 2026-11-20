@@ -298,8 +298,10 @@ func TestFinalizeCompressedDiff(t *testing.T) {
 			if !stream.closed {
 				t.Fatal("compressor was not closed")
 			}
-			if !errors.Is(err, tt.writeErr) || !errors.Is(err, tt.closeErr) {
-				t.Fatalf("finalizeCompressedDiff() = %v, want both %v and %v", err, tt.writeErr, tt.closeErr)
+			if (tt.writeErr == nil && tt.closeErr == nil && err != nil) ||
+				(tt.writeErr != nil && !errors.Is(err, tt.writeErr)) ||
+				(tt.closeErr != nil && !errors.Is(err, tt.closeErr)) {
+				t.Fatalf("finalizeCompressedDiff() = %v, expected write=%v close=%v", err, tt.writeErr, tt.closeErr)
 			}
 		})
 	}
