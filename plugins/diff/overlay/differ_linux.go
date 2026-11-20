@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -50,23 +51,44 @@ func uniqueRef() string {
 	return fmt.Sprintf("%d-%s", t.UnixNano(), base64.URLEncoding.EncodeToString(b[:]))
 }
 
-// getUpperDir extracts the upperdir path from overlay mount options.
-// Returns an empty string if the last mount is not an overlay mount or
-// if no upperdir option is present (e.g. read-only overlay mounts).
+// getUpperDir only accepts a single overlay mount of the whole root.
+// Multi-mount layouts or mounts at subdirectory targets need the walking
+// differ, because an upperdir alone does not describe the whole tree.
 func getUpperDir(mounts []mount.Mount) string {
-	if len(mounts) == 0 {
+	if len(mounts) != 1 || mounts[0].Type != "overlay" {
 		return ""
 	}
-	m := mounts[len(mounts)-1]
-	if m.Type != "overlay" {
+	m := mounts[0]
+	if m.Target != "" && m.Target != "/" {
 		return ""
 	}
-	for _, o := range m.Options {
-		if strings.HasPrefix(o, "upperdir=") {
-			return strings.TrimPrefix(o, "upperdir=")
+
+	var upper string
+	for _, option := range m.Options {
+		// A comma-joined or kernel-escaped option cannot be safely used as
+		// a filesystem path without decoding. Fall back instead.
+		if strings.ContainsAny(option, ",\\") {
+			return ""
+		}
+		if strings.HasPrefix(option, "upperdir=") {
+			if upper != "" {
+				return ""
+			}
+			upper = strings.TrimPrefix(option, "upperdir=")
+		}
+		if strings.HasPrefix(option, "metacopy=") && option != "metacopy=off" {
+			return ""
 		}
 	}
-	return ""
+	return upper
+}
+
+// The metacopy module parameter is effective even when the mount does not
+// explicitly set metacopy. A raw upperdir omits the data of metacopy files,
+// so use the walking differ unless metacopy is disabled.
+func metacopyDisabled() bool {
+	value, err := os.ReadFile("/sys/module/overlay/parameters/metacopy")
+	return err == nil && strings.EqualFold(strings.TrimSpace(string(value)), "N")
 }
 
 // writeDiff writes the layer diff from an overlay upper directory to w.
@@ -96,7 +118,7 @@ func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir s
 // surface the error directly to the caller.
 func (s *overlayDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
 	upperDir := getUpperDir(upper)
-	if upperDir == "" {
+	if upperDir == "" || !metacopyDisabled() {
 		return emptyDesc, fmt.Errorf("upper mounts are not overlay-backed: %w", errdefs.ErrNotImplemented)
 	}
 
