@@ -178,6 +178,9 @@ func (m *Mount) mount(target string) (err error) {
 			source = loFile.Name()
 		}
 		if err := mountAt(chdir, source, target, m.Type, uintptr(oflags), dataInStr); err != nil {
+			if opt.losetup {
+				return fmt.Errorf("mounting loop backing file %q: %w", m.Source, err)
+			}
 			return err
 		}
 	}

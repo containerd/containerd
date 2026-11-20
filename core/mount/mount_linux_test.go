@@ -141,6 +141,26 @@ func TestFUSEHelper(t *testing.T) {
 	}
 }
 
+func TestLoopMountErrorIncludesBackingFile(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	image := filepath.Join(t.TempDir(), "filesystem.img")
+	require.NoError(t, os.WriteFile(image, make([]byte, 4096), 0o600))
+	target := t.TempDir()
+	m := Mount{
+		Type:    "containerd-test-fs",
+		Source:  image,
+		Options: []string{"loop", "ro"},
+	}
+	err := m.Mount(target)
+	if err == nil {
+		require.NoError(t, UnmountAll(target, 0))
+	}
+	require.ErrorIs(t, err, unix.ENODEV)
+	require.ErrorContains(t, err, "mounting loop backing file")
+	require.ErrorContains(t, err, image)
+}
+
 func TestMountAt(t *testing.T) {
 	testutil.RequiresRoot(t)
 
