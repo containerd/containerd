@@ -141,39 +141,23 @@ func TestFUSEHelper(t *testing.T) {
 	}
 }
 
-func TestReadOnlyExt4LoopJournalRecovery(t *testing.T) {
+func TestLoopMountErrorIncludesBackingFile(t *testing.T) {
 	testutil.RequiresRoot(t)
-	for _, tool := range []string{"mkfs.ext4", "debugfs"} {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s unavailable: %v", tool, err)
-		}
-	}
 
-	image := filepath.Join(t.TempDir(), "ext4.img")
-	out, err := exec.Command("mkfs.ext4", "-q", "-F", image, "16M").CombinedOutput()
-	require.NoError(t, err, "%s", out)
-
+	image := filepath.Join(t.TempDir(), "filesystem.img")
+	require.NoError(t, os.WriteFile(image, make([]byte, 4096), 0o600))
 	target := t.TempDir()
 	m := Mount{
-		Type:    "ext4",
+		Type:    "containerd-test-fs",
 		Source:  image,
 		Options: []string{"loop", "ro"},
 	}
-	require.NoError(t, m.Mount(target), "clean ext4 image should mount read-only")
-	require.NoError(t, UnmountAll(target, 0))
-
-	// Mark the test image as needing journal replay without keeping a writable
-	// loop device mounted or depending on a race with unmount.
-	out, err = exec.Command("debugfs", "-w", "-R", "feature needs_recovery", image).CombinedOutput()
-	require.NoError(t, err, "%s", out)
-	require.Contains(t, string(out), "needs_recovery")
-
-	err = m.Mount(target)
+	err := m.Mount(target)
 	if err == nil {
 		require.NoError(t, UnmountAll(target, 0))
 	}
-	require.ErrorIs(t, err, unix.EROFS)
-	require.ErrorContains(t, err, "ext4 journal may need recovery")
+	require.ErrorIs(t, err, unix.ENODEV)
+	require.ErrorContains(t, err, "mounting loop backing file")
 	require.ErrorContains(t, err, image)
 }
 

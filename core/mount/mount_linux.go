@@ -178,8 +178,8 @@ func (m *Mount) mount(target string) (err error) {
 			source = loFile.Name()
 		}
 		if err := mountAt(chdir, source, target, m.Type, uintptr(oflags), dataInStr); err != nil {
-			if loopParams.Readonly && m.Type == "ext4" && errors.Is(err, unix.EROFS) {
-				return fmt.Errorf("ext4 journal may need recovery on read-only loop backing file %q (check the kernel log): %w", m.Source, err)
+			if opt.losetup {
+				return fmt.Errorf("mounting loop backing file %q: %w", m.Source, err)
 			}
 			return err
 		}
