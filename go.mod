@@ -48,10 +48,10 @@ require (
 	github.com/klauspost/compress v1.20.3
 	github.com/mdlayher/vsock v1.4.0
 	github.com/moby/locker v1.0.1 //gosocialcheck:trusted
-	github.com/moby/sys/mountinfo v0.7.2 //gosocialcheck:trusted
+	github.com/moby/sys/mountinfo v0.7.3 //gosocialcheck:trusted
 	github.com/moby/sys/signal v0.7.1 //gosocialcheck:trusted
 	github.com/moby/sys/symlink v0.3.0 //gosocialcheck:trusted
-	github.com/moby/sys/user v0.4.1 //gosocialcheck:trusted
+	github.com/moby/sys/user v0.5.0 //gosocialcheck:trusted
 	github.com/moby/sys/userns v0.2.1 //gosocialcheck:trusted
 	github.com/opencontainers/go-digest v1.0.0 //gosocialcheck:trusted
 	github.com/opencontainers/image-spec v1.1.1 //gosocialcheck:trusted
