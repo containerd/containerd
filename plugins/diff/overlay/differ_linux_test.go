@@ -187,6 +187,67 @@ func TestGetUpperDir(t *testing.T) {
 	}
 }
 
+
+// TestOverlayLowerMatches verifies that an overlay upperdir is never used as
+// a diff against a different base snapshot.
+func TestOverlayLowerMatches(t *testing.T) {
+	tests := []struct {
+		name  string
+		lower []mount.Mount
+		upper []mount.Mount
+		want  bool
+	}{
+		{
+			name:  "matching bind lower",
+			lower: []mount.Mount{{Type: "bind", Source: "/layers/one"}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/two"}}},
+			want:  true,
+		},
+		{
+			name:  "unrelated bind lower",
+			lower: []mount.Mount{{Type: "bind", Source: "/different"}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/two"}}},
+		},
+		{
+			name:  "matching readonly overlay",
+			lower: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one:/layers/two"}}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one:/layers/two", "upperdir=/layers/three"}}},
+			want:  true,
+		},
+		{
+			name:  "different overlay lower stack",
+			lower: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/other"}}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/three"}}},
+		},
+		{
+			name:  "mutable overlay lower",
+			lower: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/other"}}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/three"}}},
+		},
+		{
+			name:  "empty base",
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/two"}}},
+		},
+		{
+			name:  "subdirectory bind",
+			lower: []mount.Mount{{Type: "bind", Source: "/layers/one", Target: "/subdir"}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one", "upperdir=/layers/two"}}},
+		},
+		{
+			name:  "multi-layer upper versus bind lower",
+			lower: []mount.Mount{{Type: "bind", Source: "/layers/one"}},
+			upper: []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/layers/one:/layers/two", "upperdir=/layers/three"}}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := overlayLowerMatches(tt.lower, tt.upper); got != tt.want {
+				t.Fatalf("overlayLowerMatches() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 // BenchmarkGetUpperDir measures the cost of parsing overlay mount options
 // to extract the upperdir. This is called on every Compare invocation.
 func BenchmarkGetUpperDir(b *testing.B) {
