@@ -201,6 +201,13 @@ func withOverlayWhiteoutFallback(upperDir string, handle fs.ChangeFunc) fs.Chang
 		if err != nil {
 			return err
 		}
+		// Continuity may interpret either trusted or user.overlay.opaque,
+		// regardless of the mount's xattr namespace. A marker in the
+		// inactive namespace can wrongly delete inherited files. Delegate
+		// opaque directories to the mounted-view walking differ.
+		if kind == fs.ChangeKindDelete && filepath.Base(path) == ".wh..opq" {
+			return fmt.Errorf("overlay opaque directory %q requires walking differ: %w", path, errdefs.ErrNotImplemented)
+		}
 		if info != nil && info.Mode().IsRegular() {
 			whiteout, checkErr := hasOverlayXattrWhiteout(filepath.Join(upperDir, path))
 			if checkErr != nil {
