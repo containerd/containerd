@@ -17,6 +17,7 @@
 package overlay
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -26,9 +27,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/continuity/sysx"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
@@ -243,6 +246,83 @@ func hasOverlayRootOpacity(upperDir string) (bool, error) {
 	return false, nil
 }
 
+// requireSafeUpperDir checks metadata that continuity's DiffDirChanges does
+// not compare. This walks only the upperdir; if a change cannot be represented
+// safely, the service retries with the generic walking differ.
+func requireSafeUpperDir(ctx context.Context, lowerRoot, upperDir string) error {
+	return filepath.Walk(upperDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		relative, err := filepath.Rel(upperDir, path)
+		if err != nil {
+			return err
+		}
+		lowerPath := filepath.Join(lowerRoot, relative)
+		lowerInfo, err := os.Lstat(lowerPath)
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		// os.Stat in the recorded continuity dependency follows lower
+		// symlinks, including dangling links and directory ancestors.
+		// This can misclassify a whiteout or read outside the lower tree.
+		if lowerInfo.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("lower symlink %q needs walking differ: %w", relative, errdefs.ErrNotImplemented)
+		}
+
+		if info.IsDir() && !lowerInfo.IsDir() {
+			// A file-to-directory replacement makes continuity's later
+			// base lookups return ENOTDIR on nested files.
+			return fmt.Errorf("lower non-directory %q needs walking differ: %w", relative, errdefs.ErrNotImplemented)
+		}
+		if !info.IsDir() || !lowerInfo.IsDir() {
+			return nil
+		}
+
+		upperStat, upperOK := info.Sys().(*syscall.Stat_t)
+		lowerStat, lowerOK := lowerInfo.Sys().(*syscall.Stat_t)
+		if !upperOK || !lowerOK || upperStat.Uid != lowerStat.Uid || upperStat.Gid != lowerStat.Gid {
+			// Otherwise a directory-only ownership change is skipped
+			// when size, mode and mtime happen to match.
+			return fmt.Errorf("directory ownership %q needs walking differ: %w", relative, errdefs.ErrNotImplemented)
+		}
+
+		// The fast directory comparison also ignores security.capability.
+		// If the xattr differs, let the walking differ emit the change.
+		upperCap, upperErr := directoryCapability(path)
+		lowerCap, lowerErr := directoryCapability(lowerPath)
+		if upperErr != nil || lowerErr != nil || !bytes.Equal(upperCap, lowerCap) {
+			return fmt.Errorf("directory capability %q needs walking differ: %w", relative, errdefs.ErrNotImplemented)
+		}
+		return nil
+	})
+}
+
+func directoryCapability(path string) ([]byte, error) {
+	value, err := sysx.LGetxattr(path, "security.capability")
+	if errors.Is(err, unix.ENODATA) || errors.Is(err, unix.ENOTSUP) {
+		return nil, nil
+	}
+	return value, err
+}
+
+func withCancellation(ctx context.Context, handle fs.ChangeFunc) fs.ChangeFunc {
+	return func(kind fs.ChangeKind, path string, info os.FileInfo, err error) error {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		return handle(kind, path, info, err)
+	}
+}
+
 // writeDiff writes the layer diff from an overlay upper directory to w.
 // It uses fs.DiffDirChanges with DiffSourceOverlayFS to walk only the upperdir
 // instead of traversing both the lower and upper directory trees. This avoids
@@ -256,8 +336,12 @@ func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir s
 		return fmt.Errorf("opaque overlay upperdir root requires walking differ: %w", errdefs.ErrNotImplemented)
 	}
 	return mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
+		if err := requireSafeUpperDir(ctx, lowerRoot, upperDir); err != nil {
+			return err
+		}
 		cw := archive.NewChangeWriter(w, upperDir, opts...)
-		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS, withOverlayWhiteoutFallback(upperDir, cw.HandleChange))
+		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS,
+			withCancellation(ctx, withOverlayWhiteoutFallback(upperDir, cw.HandleChange)))
 		if err != nil {
 			return fmt.Errorf("failed to create diff tar stream: %w", err)
 		}
