@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/containerd/log"
 	"golang.org/x/sync/errgroup"
@@ -207,9 +206,9 @@ func DiffDirChanges(ctx context.Context, baseDir, diffDir string, source DiffSou
 				return err
 			}
 
-			_, err = os.Lstat(filepath.Join(baseDir, path))
+			_, err = os.Stat(filepath.Join(baseDir, path))
 			if err != nil {
-				if !os.IsNotExist(err) && !errors.Is(err, syscall.ENOTDIR) {
+				if !os.IsNotExist(err) {
 					return err
 				}
 				deletedFile = false
@@ -224,8 +223,8 @@ func DiffDirChanges(ctx context.Context, baseDir, diffDir string, source DiffSou
 			kind = ChangeKindAdd
 
 			// ...Unless it already existed in a baseDir, in which case, it's a modification
-			stat, err := os.Lstat(filepath.Join(baseDir, path))
-			if err != nil && !os.IsNotExist(err) && !errors.Is(err, syscall.ENOTDIR) {
+			stat, err := os.Stat(filepath.Join(baseDir, path))
+			if err != nil && !os.IsNotExist(err) {
 				return err
 			}
 			if err == nil {
@@ -234,11 +233,7 @@ func DiffDirChanges(ctx context.Context, baseDir, diffDir string, source DiffSou
 				// However, if it's a directory, maybe it wasn't actually modified.
 				// If you modify /foo/bar/baz, then /foo will be part of the changed files only because it's the parent of bar
 				if stat.IsDir() && f.IsDir() {
-					sameOwnership, err := compareSysStat(f.Sys(), stat.Sys())
-						if err != nil {
-							return err
-						}
-						if sameOwnership && f.Size() == stat.Size() && f.Mode() == stat.Mode() && sameFsTime(f.ModTime(), stat.ModTime()) {
+					if f.Size() == stat.Size() && f.Mode() == stat.Mode() && sameFsTime(f.ModTime(), stat.ModTime()) {
 						// Both directories are the same, don't record the change
 						return nil
 					}
