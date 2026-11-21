@@ -497,6 +497,51 @@ func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {
 	pods := podSandboxesToNRI(domains.listPodSandboxes())
 	containers := containersToNRI(domains.listContainers())
 
+	// The state map is only in memory. After a restart of the runtime, the
+	// map has no entry for the pods that exist. No record shows if the
+	// plugins got StopPodSandbox for these pods. Each pod without an entry
+	// is in one of these cases:
+	//
+	//	sandbox task | containers         | stop hook sent before | state
+	//	-------------+--------------------+-----------------------+--------
+	//	running      | any                | no                    | Running
+	//	not running  | created or running | no                    | Running
+	//	not running  | exited, or none    | not known             | Running
+	//
+	// The first two rows are always correct. CRI stops the containers of a
+	// pod, then the sandbox task, and then calls the StopPodSandbox hook.
+	//
+	// The last row contains these cases:
+	//   - CRI stopped the pod before the restart. The plugins got the hook.
+	//   - The sandbox task stopped without a CRI request.
+	//   - A reboot of the node occurred.
+	//   - The runtime stopped before it called the hook.
+	// Only a record on disk can show which case occurred. No such record
+	// exists.
+	//
+	// The last row gets Running for these reasons:
+	//   - The hook sends the CRI StopPodSandbox request to the plugins.
+	//   - CRI says that this request is idempotent and can occur more than
+	//     one time.
+	//   - CRI says that the kubelet sends it a minimum of one time before
+	//     RemovePodSandbox.
+	//   - A pod with no sandbox task can have resources that this request
+	//     releases.
+	// Thus a second hook agrees with the CRI rules. If the runtime does not
+	// send the hook, the plugins get RemovePodSandbox with no StopPodSandbox
+	// before it. Plugins must accept a second StopPodSandbox for a pod that
+	// CRI stopped before the restart.
+	//
+	// All rows give the same state. Thus this code does not read the sandbox
+	// state. The code does not change a state that is in the map. Thus a
+	// plugin that connects later does not cause a second StopPodSandbox for
+	// a pod that is Stopped.
+	for _, pod := range pods {
+		if l.getState(pod.GetId()) == Removed {
+			l.setState(pod.GetId(), Running)
+		}
+	}
+
 	for _, ctr := range containers {
 		switch ctr.GetState() {
 		case nri.ContainerState_CONTAINER_CREATED:
