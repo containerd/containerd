@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -80,6 +81,11 @@ func getUpperDir(mounts []mount.Mount) string {
 		// The raw upperdir has host ownership, not the ID-mapped mount view.
 		// Use the walking differ if either mapping is present.
 		if strings.HasPrefix(option, "uidmap=") || strings.HasPrefix(option, "gidmap=") {
+			return ""
+		}
+		// The continuity fast path does not understand user.overlay whiteouts.
+		// A userxattr mount must use the walking differ.
+		if option == "userxattr" || strings.HasPrefix(option, "userxattr=") {
 			return ""
 		}
 		if strings.HasPrefix(option, "metacopy=") && option != "metacopy=off" {
@@ -168,6 +174,46 @@ func finalizeCompressedDiff(compressed io.WriteCloser, writeErr error) error {
 	return errors.Join(writeErr, compressed.Close())
 }
 
+// hasOverlayXattrWhiteout recognizes the alternate overlayfs whiteout
+// representation: an empty regular file with an overlay.whiteout xattr.
+// DiffDirChanges only recognizes character-device whiteouts, and exporting
+// such a file directly would produce an incorrect image layer.
+func hasOverlayXattrWhiteout(path string) (bool, error) {
+	for _, name := range []string{"user.overlay.whiteout", "trusted.overlay.whiteout"} {
+		// A zero-length xattr is a valid whiteout: only its presence matters.
+		_, err := unix.Lgetxattr(path, name, nil)
+		switch {
+		case err == nil:
+			return true, nil
+		case errors.Is(err, unix.ENODATA), errors.Is(err, unix.ENOTSUP):
+			continue
+		default:
+			// If the xattr cannot be inspected, fall back rather than
+			// potentially exporting a whiteout as an ordinary file.
+			return false, err
+		}
+	}
+	return false, nil
+}
+
+func withOverlayWhiteoutFallback(upperDir string, handle fs.ChangeFunc) fs.ChangeFunc {
+	return func(kind fs.ChangeKind, path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info != nil && info.Mode().IsRegular() {
+			whiteout, checkErr := hasOverlayXattrWhiteout(filepath.Join(upperDir, path))
+			if checkErr != nil {
+				return fmt.Errorf("cannot inspect overlay whiteout %q: %v: %w", path, checkErr, errdefs.ErrNotImplemented)
+			}
+			if whiteout {
+				return fmt.Errorf("overlay xattr whiteout %q requires walking differ: %w", path, errdefs.ErrNotImplemented)
+			}
+		}
+		return handle(kind, path, info, nil)
+	}
+}
+
 // writeDiff writes the layer diff from an overlay upper directory to w.
 // It uses fs.DiffDirChanges with DiffSourceOverlayFS to walk only the upperdir
 // instead of traversing both the lower and upper directory trees. This avoids
@@ -175,7 +221,7 @@ func finalizeCompressedDiff(compressed io.WriteCloser, writeErr error) error {
 func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir string, opts []archive.ChangeWriterOpt) error {
 	return mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		cw := archive.NewChangeWriter(w, upperDir, opts...)
-		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS, cw.HandleChange)
+		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS, withOverlayWhiteoutFallback(upperDir, cw.HandleChange))
 		if err != nil {
 			return fmt.Errorf("failed to create diff tar stream: %w", err)
 		}
