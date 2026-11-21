@@ -921,3 +921,76 @@ func TestPusherAuthorizeFailureUnblocksWrite(t *testing.T) {
 	}
 	require.NoError(t, w.Close())
 }
+
+// Close() before any Write() must release the upload request body, otherwise
+// the request (and its connection goroutines) leak.
+func TestPusherCloseBeforeWrite(t *testing.T) {
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	reg.uploadable = true
+	putSeen := make(chan struct{})
+	bodyDone := make(chan struct{})
+	reg.putHandlerFunc = func(w http.ResponseWriter, r *http.Request) bool {
+		close(putSeen)
+		_, _ = io.Copy(io.Discard, r.Body)
+		close(bodyDone)
+		w.WriteHeader(http.StatusBadRequest)
+		return true
+	}
+
+	ct := []byte("layer-content")
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    digest.FromBytes(ct),
+		Size:      int64(len(ct)),
+	}
+
+	w, err := p.push(ctx, desc, remotes.MakeRefKey(ctx, desc), false)
+	require.NoError(t, err)
+
+	select {
+	case <-putSeen:
+	case <-time.After(5 * time.Second):
+		t.Fatal("PUT request never reached the registry")
+	}
+
+	require.NoError(t, w.Close())
+
+	select {
+	case <-bodyDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("upload request body was not closed by Close()")
+	}
+}
+
+// A pipe handed over after Close() must be closed, not left in pipeC. With
+// done closed and pipeC empty, both cases of the select in setPipe are ready
+// and Go picks one at random, so the loop covers the done case and the
+// re-check after the send.
+func TestPushWriterSetPipeAfterClose(t *testing.T) {
+	for range 100 {
+		pw := newPushWriter(nil, "ref", digest.FromString("x"), NewInMemoryTracker(), false)
+		require.NoError(t, pw.Close())
+
+		pr, pwr := io.Pipe()
+		defer pr.Close()
+		pw.setPipe(pwr)
+
+		readErr := make(chan error, 1)
+		go func() {
+			_, err := pr.Read(make([]byte, 1))
+			readErr <- err
+		}()
+		select {
+		case err := <-readErr:
+			require.ErrorIs(t, err, io.ErrClosedPipe)
+		case <-time.After(5 * time.Second):
+			t.Fatal("pipe handed to setPipe after Close() was not closed")
+		}
+		require.Empty(t, pw.pipeC)
+	}
+}

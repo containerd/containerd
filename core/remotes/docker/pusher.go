@@ -401,7 +401,20 @@ func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker S
 func (pw *pushWriter) setPipe(p *io.PipeWriter) {
 	select {
 	case <-pw.done:
+		p.CloseWithError(io.ErrClosedPipe)
+		return
 	case pw.pipeC <- p:
+	}
+	// Both cases above can be ready, so Close() may have run already and
+	// missed p. Take it back and close it so the request body is released.
+	select {
+	case <-pw.done:
+		select {
+		case p := <-pw.pipeC:
+			p.CloseWithError(io.ErrClosedPipe)
+		default:
+		}
+	default:
 	}
 }
 
@@ -489,6 +502,13 @@ func (pw *pushWriter) Close() error {
 	pw.closeOnce.Do(func() {
 		close(pw.done)
 	})
+	if pw.pipe == nil {
+		// No Write() happened, so the pipe is still waiting in pipeC.
+		select {
+		case pw.pipe = <-pw.pipeC:
+		default:
+		}
+	}
 	if pw.pipe != nil {
 		status, err := pw.tracker.GetStatus(pw.ref)
 		if err == nil && !status.Committed {
