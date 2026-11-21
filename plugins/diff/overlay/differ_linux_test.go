@@ -17,6 +17,7 @@
 package overlay
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -360,6 +361,39 @@ func TestOverlayOpaqueMarkerUsesWalkingFallback(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("regular deletion was not forwarded")
+	}
+}
+
+// Opacity on the upperdir root is invisible to DiffDirChanges because it
+// skips the root. An opaque root can mask inherited lower-layer entries, so
+// a raw upperdir diff must defer to the mounted-view walking differ.
+func TestOverlayRootOpacityRequiresWalkingFallback(t *testing.T) {
+	upper := t.TempDir()
+	if err := unix.Lsetxattr(upper, "user.overlay.opaque", []byte("y"), 0); err != nil {
+		t.Skipf("filesystem does not support setting overlay xattr: %v", err)
+	}
+	var result bytes.Buffer
+	err := writeDiff(context.Background(), &result, nil, upper, nil)
+	if !errdefs.IsNotImplemented(err) {
+		t.Fatalf("expected root opacity to require walking fallback, got %v", err)
+	}
+	if result.Len() != 0 {
+		t.Fatalf("wrote %d bytes before detecting opaque upperdir root", result.Len())
+	}
+}
+
+// A read-only lower overlay with userxattr cannot be matched to the raw
+// upperdir's lower stack merely by matching paths: xattr namespaces matter.
+func TestOverlayLowerMatchesRejectsUserXattr(t *testing.T) {
+	upper := []mount.Mount{{Type: "overlay", Options: []string{"lowerdir=/lower", "upperdir=/upper"}}}
+	for _, lower := range []mount.Mount{
+		{Type: "bind", Source: "/lower", Options: []string{"ro", "userxattr"}},
+		{Type: "overlay", Options: []string{"lowerdir=/lower", "userxattr"}},
+		{Type: "overlay", Options: []string{"lowerdir=/lower", "userxattr=on"}},
+	} {
+		if overlayLowerMatches([]mount.Mount{lower}, upper) {
+			t.Fatalf("userxattr lower mount unexpectedly accepted: %+v", lower)
+		}
 	}
 }
 
