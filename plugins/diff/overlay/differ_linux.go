@@ -314,6 +314,21 @@ func directoryCapability(path string) ([]byte, error) {
 	return value, err
 }
 
+// contextWriter propagates cancellation through the archive writer, including
+// while writing a large file. ChangeWriter's internal file copier otherwise
+// uses context.TODO() and cannot observe cancellation during a file copy.
+type contextWriter struct {
+	ctx    context.Context
+	writer io.Writer
+}
+
+func (w contextWriter) Write(p []byte) (int, error) {
+	if err := w.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return w.writer.Write(p)
+}
+
 func withCancellation(ctx context.Context, handle fs.ChangeFunc) fs.ChangeFunc {
 	return func(kind fs.ChangeKind, path string, info os.FileInfo, err error) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
@@ -324,9 +339,9 @@ func withCancellation(ctx context.Context, handle fs.ChangeFunc) fs.ChangeFunc {
 }
 
 // writeDiff writes the layer diff from an overlay upper directory to w.
-// It uses fs.DiffDirChanges with DiffSourceOverlayFS to walk only the upperdir
-// instead of traversing both the lower and upper directory trees. This avoids
-// reading the (potentially large) lower layers entirely.
+// A safety preflight and fs.DiffDirChanges each walk the upperdir, but neither
+// traverses the entire lower tree. The bounded extra upperdir walk avoids
+// archiving filesystem changes that continuity cannot safely represent.
 func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir string, opts []archive.ChangeWriterOpt) error {
 	opaque, err := hasOverlayRootOpacity(upperDir)
 	if err != nil {
@@ -339,7 +354,7 @@ func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir s
 		if err := requireSafeUpperDir(ctx, lowerRoot, upperDir); err != nil {
 			return err
 		}
-		cw := archive.NewChangeWriter(w, upperDir, opts...)
+		cw := archive.NewChangeWriter(contextWriter{ctx: ctx, writer: w}, upperDir, opts...)
 		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS,
 			withCancellation(ctx, withOverlayWhiteoutFallback(upperDir, cw.HandleChange)))
 		if err != nil {
