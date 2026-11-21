@@ -110,7 +110,10 @@ func overlayLowerMatches(lower, upper []mount.Mount) bool {
 		return false
 	}
 	for _, option := range m.Options {
-		if strings.HasPrefix(option, "uidmap=") || strings.HasPrefix(option, "gidmap=") {
+		if strings.HasPrefix(option, "uidmap=") || strings.HasPrefix(option, "gidmap=") ||
+			option == "userxattr" || strings.HasPrefix(option, "userxattr=") {
+			// Lower and upper must use the same whiteout namespace.
+			// The raw-upperdir differ cannot prove this for userxattr mounts.
 			return false
 		}
 	}
@@ -221,11 +224,37 @@ func withOverlayWhiteoutFallback(upperDir string, handle fs.ChangeFunc) fs.Chang
 	}
 }
 
+// hasOverlayRootOpacity detects opacity on the root of an upperdir. The
+// continuity fast path skips the root directory, so it cannot emit an OCI
+// opaque marker or the inherited-file deletions for a root-level opaque xattr.
+// Be conservative if the attribute cannot be inspected.
+func hasOverlayRootOpacity(upperDir string) (bool, error) {
+	for _, name := range []string{"trusted.overlay.opaque", "user.overlay.opaque"} {
+		_, err := unix.Lgetxattr(upperDir, name, nil)
+		switch {
+		case err == nil:
+			return true, nil
+		case errors.Is(err, unix.ENODATA), errors.Is(err, unix.ENOTSUP):
+			continue
+		default:
+			return false, err
+		}
+	}
+	return false, nil
+}
+
 // writeDiff writes the layer diff from an overlay upper directory to w.
 // It uses fs.DiffDirChanges with DiffSourceOverlayFS to walk only the upperdir
 // instead of traversing both the lower and upper directory trees. This avoids
 // reading the (potentially large) lower layers entirely.
 func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperDir string, opts []archive.ChangeWriterOpt) error {
+	opaque, err := hasOverlayRootOpacity(upperDir)
+	if err != nil {
+		return fmt.Errorf("cannot inspect overlay upperdir root opacity: %v: %w", err, errdefs.ErrNotImplemented)
+	}
+	if opaque {
+		return fmt.Errorf("opaque overlay upperdir root requires walking differ: %w", errdefs.ErrNotImplemented)
+	}
 	return mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		cw := archive.NewChangeWriter(w, upperDir, opts...)
 		err := fs.DiffDirChanges(ctx, lowerRoot, upperDir, fs.DiffSourceOverlayFS, withOverlayWhiteoutFallback(upperDir, cw.HandleChange))
