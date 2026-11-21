@@ -17,9 +17,16 @@
 package overlay
 
 import (
+	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
 )
@@ -194,6 +201,14 @@ func TestGetUpperDir(t *testing.T) {
 			expected: "",
 		},
 		{
+			name: "overlay with userxattr whiteouts",
+			mounts: []mount.Mount{{
+				Type:    "overlay",
+				Options: []string{"lowerdir=/lower", "upperdir=/upper", "userxattr"},
+			}},
+			expected: "",
+		},
+		{
 			name: "idmapped upper mount",
 			mounts: []mount.Mount{{
 				Type:    "overlay",
@@ -294,6 +309,36 @@ func TestOverlayLowerMatches(t *testing.T) {
 	}
 }
 
+
+// Regular-file whiteouts with an overlay.whiteout xattr are not converted
+// by continuity's DiffDirChanges. Use the walking differ rather than archive
+// them as ordinary files.
+func TestOverlayXattrWhiteoutUsesWalkingFallback(t *testing.T) {
+	lower, upper := t.TempDir(), t.TempDir()
+	path := filepath.Join(upper, "gone")
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := unix.Lsetxattr(path, "user.overlay.whiteout", nil, 0); err != nil {
+		if errors.Is(err, unix.ENOTSUP) || errors.Is(err, unix.EPERM) || errors.Is(err, unix.EACCES) {
+			t.Skipf("overlay whiteout xattrs not supported: %v", err)
+		}
+		t.Fatal(err)
+	}
+
+	changes := 0
+	err := fs.DiffDirChanges(context.Background(), lower, upper, fs.DiffSourceOverlayFS,
+		withOverlayWhiteoutFallback(upper, func(fs.ChangeKind, string, os.FileInfo, error) error {
+			changes++
+			return nil
+		}))
+	if !errdefs.IsNotImplemented(err) {
+		t.Fatalf("expected walking fallback for an xattr whiteout, got %v", err)
+	}
+	if changes != 0 {
+		t.Fatalf("received %d changes before rejecting the xattr whiteout, want 0", changes)
+	}
+}
 
 // errorCloser verifies that an error from compressor Close is not discarded.
 type errorCloser struct {
