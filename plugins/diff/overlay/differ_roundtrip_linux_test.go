@@ -75,6 +75,19 @@ func TestDanglingSymlinkWhiteoutUsesWalkingFallback(t *testing.T) {
 	}
 }
 
+// A stale overlay whiteout with no corresponding lower path must not be
+// archived as an added device node. The mounted-view differ is authoritative.
+func TestOrphanOverlayWhiteoutUsesWalkingFallback(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("creating overlay character-device whiteouts requires root")
+	}
+	lower, upper := t.TempDir(), t.TempDir()
+	if err := unix.Mknod(filepath.Join(upper, "orphan"), unix.S_IFCHR|0600, 0); err != nil {
+		t.Skipf("creating overlay whiteout not permitted: %v", err)
+	}
+	assertWalkingFallback(t, lower, upper)
+}
+
 // A lower symlink must not be followed into an unrelated path when an upper
 // entry replaces it (including when replacing a symlink by a directory).
 func TestSymlinkReplacementUsesWalkingFallback(t *testing.T) {
