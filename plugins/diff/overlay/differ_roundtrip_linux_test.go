@@ -172,4 +172,13 @@ func TestCancelledUpperdirInspection(t *testing.T) {
 	if called {
 		t.Fatal("canceled callback should not write a change")
 	}
+
+	var contents bytes.Buffer
+	writer := contextWriter{ctx: ctx, writer: &contents}
+	if _, err := writer.Write([]byte("must not be written")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected canceled archive writer, got %v", err)
+	}
+	if contents.Len() != 0 {
+		t.Fatalf("archive writer wrote %d bytes after cancellation", contents.Len())
+	}
 }
