@@ -966,3 +966,30 @@ func TestPusherCloseBeforeWrite(t *testing.T) {
 		t.Fatal("upload request body was not closed by Close()")
 	}
 }
+
+// A pipe handed over after Close() must be closed, not left in pipeC. With
+// done closed and pipeC empty, both cases of the select in setPipe are ready
+// and Go picks one at random, so the loop covers the done case and the
+// re-check after the send.
+func TestPushWriterSetPipeAfterClose(t *testing.T) {
+	for range 100 {
+		pw := newPushWriter(nil, "ref", digest.FromString("x"), NewInMemoryTracker(), false)
+		require.NoError(t, pw.Close())
+
+		pr, pwr := io.Pipe()
+		pw.setPipe(pwr)
+
+		readErr := make(chan error, 1)
+		go func() {
+			_, err := pr.Read(make([]byte, 1))
+			readErr <- err
+		}()
+		select {
+		case err := <-readErr:
+			require.ErrorIs(t, err, io.ErrClosedPipe)
+		case <-time.After(5 * time.Second):
+			t.Fatal("pipe handed to setPipe after Close() was not closed")
+		}
+		require.Empty(t, pw.pipeC)
+	}
+}
