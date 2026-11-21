@@ -497,6 +497,16 @@ func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {
 	pods := podSandboxesToNRI(domains.listPodSandboxes())
 	containers := containersToNRI(domains.listContainers())
 
+	for _, pod := range pods {
+		// Seed untracked sandboxes (e.g. recovered across a runtime restart) as
+		// Running so subsequent StopPodSandbox and RemovePodSandbox hooks run.
+		// Preserve state already tracked by this runtime instance (such as
+		// Stopped) so connecting plugins do not re-trigger StopPodSandbox.
+		if l.getState(pod.GetId()) == Removed {
+			l.setState(pod.GetId(), Running)
+		}
+	}
+
 	for _, ctr := range containers {
 		switch ctr.GetState() {
 		case nri.ContainerState_CONTAINER_CREATED:
