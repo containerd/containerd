@@ -340,6 +340,29 @@ func TestOverlayXattrWhiteoutUsesWalkingFallback(t *testing.T) {
 	}
 }
 
+// The continuity differ reads both opaque xattr namespaces, but only the
+// overlay mount knows which namespace is authoritative. Fall back to the
+// walking differ rather than exporting a possibly spurious deletion.
+func TestOverlayOpaqueMarkerUsesWalkingFallback(t *testing.T) {
+	called := false
+	wrapped := withOverlayWhiteoutFallback(t.TempDir(), func(fs.ChangeKind, string, os.FileInfo, error) error {
+		called = true
+		return nil
+	})
+	if err := wrapped(fs.ChangeKindDelete, "/dir/.wh..opq", nil, nil); !errdefs.IsNotImplemented(err) {
+		t.Fatalf("opaque directory marker should trigger walking fallback: %v", err)
+	}
+	if called {
+		t.Fatal("opaque marker unexpectedly reached change writer")
+	}
+	if err := wrapped(fs.ChangeKindDelete, "/dir/gone", nil, nil); err != nil {
+		t.Fatalf("regular deletion unexpectedly rejected: %v", err)
+	}
+	if !called {
+		t.Fatal("regular deletion was not forwarded")
+	}
+}
+
 // errorCloser verifies that an error from compressor Close is not discarded.
 type errorCloser struct {
 	io.Writer
