@@ -265,6 +265,14 @@ func requireSafeUpperDir(ctx context.Context, lowerRoot, upperDir string) error 
 		lowerPath := filepath.Join(lowerRoot, relative)
 		lowerInfo, err := os.Lstat(lowerPath)
 		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+			// A character device with major/minor 0/0 is an overlay
+			// whiteout, not an added device node. Without a matching
+			// lower entry continuity would archive it as a device.
+			if info.Mode()&os.ModeCharDevice != 0 {
+				if stat, ok := info.Sys().(*syscall.Stat_t); ok && stat.Rdev == 0 {
+					return fmt.Errorf("orphan overlay whiteout %q needs walking differ: %w", relative, errdefs.ErrNotImplemented)
+				}
+			}
 			return nil
 		}
 		if err != nil {
