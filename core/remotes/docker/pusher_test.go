@@ -977,6 +977,7 @@ func TestPushWriterSetPipeAfterClose(t *testing.T) {
 		require.NoError(t, pw.Close())
 
 		pr, pwr := io.Pipe()
+		defer pr.Close()
 		pw.setPipe(pwr)
 
 		readErr := make(chan error, 1)
