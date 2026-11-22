@@ -183,11 +183,6 @@ func (hrs *httpReadSeeker) reader() (io.Reader, error) {
 			return nil, fmt.Errorf("httpReadSeeker: failed open: %w", err)
 		}
 
-		if hrs.rc != nil {
-			if err := hrs.rc.Close(); err != nil {
-				log.L.WithError(err).Error("httpReadSeeker: failed to close ReadCloser")
-			}
-		}
 		hrs.rc = rc
 	} else {
 		// There is an edge case here where offset == size of the content. If
