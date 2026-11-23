@@ -58,6 +58,13 @@ containerd has a single built in transfer plugin which implements most basic tra
 
 ## Diagram
 
+<!-- Regenerate from the repository root with:
+npx --yes --package=@mermaid-js/mermaid-cli@12.2.0 mmdc -i docs/transfer-pull.mmd -o docs/transfer-pull.svg -b white
+printf '\n' >> docs/transfer-pull.svg
+-->
+
+![Image pull components and connections](transfer-pull.svg)
+
 An image pull through the local transfer service follows these steps.
 
 1. The client sends a pull request to the transfer service. To receive progress

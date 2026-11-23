@@ -1,0 +1,52 @@
+---
+config:
+  htmlLabels: false
+---
+flowchart TD
+%% Copyright The containerd Authors.
+
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+
+%%     http://www.apache.org/licenses/LICENSE-2.0
+
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+
+subgraph containerd Client
+  Client(Client)
+end
+subgraph containerd
+  subgraph Service
+    Streaming(Streaming Service)
+    Transfer(Transfer Service)
+  end
+  subgraph Transfer objects
+    RS(Registry Source)
+    ISD(Image Store Destination)
+  end
+  subgraph Backend
+    R(Resolver)
+    CS(ContentStore)
+    IS(Image Store)
+    S(Snapshotter)
+  end
+end
+Reg(((Remote Registry)))
+
+Client-- Create Stream --> Streaming
+Client-- Pull via Transfer --> Transfer
+Transfer-- Get Stream --> Streaming
+Transfer-- Progress via Stream--> Client
+Transfer-->RS
+Transfer-->ISD
+Transfer-->CS
+RS-->R
+ISD-->IS
+R-->Reg
+ISD-->CS
+ISD-->S
