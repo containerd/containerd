@@ -58,45 +58,19 @@ containerd has a single built in transfer plugin which implements most basic tra
 
 ## Diagram
 
-Pull Components
+An image pull through the local transfer service follows these steps.
 
-```mermaid
-flowchart TD
-subgraph containerd Client
-  Client(Client)
-end
-subgraph containerd
-  subgraph Service
-    Streaming(Streaming Service)
-    Transfer(Transfer Service)
-  end
-  subgraph Transfer objects
-    RS(Registry Source)
-    ISD(Image Store Destination)
-  end
-  subgraph Backend
-    R(Resolver)
-    CS(ContentStore)
-    IS(Image Store)
-    S(Snapshotter)
-  end
-end
-Reg(((Remote Registry)))
-
-Client-- Create Stream --> Streaming
-Client-- Pull via Transfer --> Transfer
-Transfer-- Get Stream --> Streaming
-Transfer-- Progress via Stream--> Client
-Transfer-->RS
-Transfer-->ISD
-Transfer-->CS
-RS-->R
-ISD-->IS
-R-->Reg
-ISD-->CS
-ISD-->S
-
-```
+1. The client sends a pull request to the transfer service. To receive progress
+   updates, it first opens a stream with the streaming service and includes the
+   stream ID in the request.
+2. If the request includes a stream ID, the transfer service looks up the
+   stream and sends progress updates through it.
+3. The registry source uses a resolver to locate and fetch the image from the
+   remote registry. The transfer service writes the fetched content to the
+   content store.
+4. When unpacking is requested, the transfer service unpacks the layers from
+   the content store through the snapshotter. The image store destination then
+   records the image in the image store.
 
 ## Streaming
 
