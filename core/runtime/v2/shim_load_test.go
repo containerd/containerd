@@ -21,14 +21,17 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/events/exchange"
 	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 )
 
@@ -298,4 +301,25 @@ func TestSaveShimBinaryPath(t *testing.T) {
 		_, err = os.Stat(filepath.Join(dir, shimBinaryOverrideFile))
 		require.Equal(t, override, err == nil)
 	}
+}
+
+func TestLoadShimKeepsBundleWhenBinaryUnresolved(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("uses the unix shim log")
+	}
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	bundle := &Bundle{ID: "id", Path: t.TempDir(), Namespace: "test"}
+	stale := filepath.Join(t.TempDir(), "gone", shimbinary.BinaryName("io.containerd.runc.v2"))
+	require.NoError(t, os.WriteFile(filepath.Join(bundle.Path, shimBinaryPathFile), []byte(stale), 0o600))
+
+	m := &ShimManager{
+		containers:   fakeContainerStore{err: errdefs.ErrNotFound},
+		sandboxStore: fakeSandboxStore{err: errdefs.ErrNotFound},
+		shims:        runtimeapi.NewNSMap[ShimInstance](),
+		events:       exchange.NewExchange(),
+	}
+	err := m.loadShim(ctx, bundle)
+	// It got as far as connecting, which fails here for lack of a shim.
+	require.ErrorContains(t, err, "unable to load shim")
+	require.DirExists(t, bundle.Path)
 }

@@ -160,11 +160,13 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	}
 
 	_, oerr := os.Stat(filepath.Join(bundle.Path, shimBinaryOverrideFile))
+	recorded := runtime
 	runtime, err := m.resolveRuntimeWithFallback(ctx, runtime, id, oerr == nil)
 	if err != nil {
-		bundle.Delete()
-
-		return fmt.Errorf("failed to resolve runtime path: %w", err)
+		// Reconnecting to a running shim does not need its binary, only the
+		// delete of a dead one does, so keep the recorded path and try anyway.
+		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to resolve shim binary path, trying to reconnect anyway")
+		runtime = recorded
 	}
 
 	binaryCall := shimBinary(bundle,
