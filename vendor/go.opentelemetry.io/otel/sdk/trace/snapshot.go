@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package trace
 
 import (
 	"time"
@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// snapshot is an record of a spans state at a particular checkpointed time.
+// snapshot is a record of a span's state at a particular checkpointed time.
 // It is used as a read-only representation of that state.
 type snapshot struct {
 	name                  string
@@ -35,7 +35,7 @@ type snapshot struct {
 
 var _ ReadOnlySpan = snapshot{}
 
-func (s snapshot) private() {}
+func (snapshot) private() {}
 
 // Name returns the name of the span.
 func (s snapshot) Name() string {

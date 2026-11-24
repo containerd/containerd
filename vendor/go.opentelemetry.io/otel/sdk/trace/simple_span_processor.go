@@ -1,14 +1,18 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package trace // import "go.opentelemetry.io/otel/sdk/trace"
+package trace
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/internal/global"
+	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // simpleSpanProcessor is a SpanProcessor that synchronously sends all
@@ -17,6 +21,8 @@ type simpleSpanProcessor struct {
 	exporterMu sync.Mutex
 	exporter   SpanExporter
 	stopOnce   sync.Once
+
+	inst *observ.SSP
 }
 
 var _ SpanProcessor = (*simpleSpanProcessor)(nil)
@@ -33,18 +39,42 @@ func NewSimpleSpanProcessor(exporter SpanExporter) SpanProcessor {
 	ssp := &simpleSpanProcessor{
 		exporter: exporter,
 	}
+
+	var err error
+	ssp.inst, err = observ.NewSSP(nextSimpleProcessorID())
+	if err != nil {
+		otel.Handle(err)
+	}
+
 	global.Warn("SimpleSpanProcessor is not recommended for production use, consider using BatchSpanProcessor instead.")
 
 	return ssp
 }
 
+var simpleProcessorIDCounter atomic.Int64
+
+// nextSimpleProcessorID returns an identifier for this simple span processor,
+// starting with 0 and incrementing by 1 each time it is called.
+func nextSimpleProcessorID() int64 {
+	return simpleProcessorIDCounter.Add(1) - 1
+}
+
 // OnStart does nothing.
-func (ssp *simpleSpanProcessor) OnStart(context.Context, ReadWriteSpan) {}
+func (*simpleSpanProcessor) OnStart(context.Context, ReadWriteSpan) {}
 
 // OnEnd immediately exports a ReadOnlySpan.
 func (ssp *simpleSpanProcessor) OnEnd(s ReadOnlySpan) {
 	ssp.exporterMu.Lock()
 	defer ssp.exporterMu.Unlock()
+
+	if ssp.inst != nil {
+		// Add the span to the context to ensure the metric is recorded
+		// with the correct span context. Record the span as processed before
+		// invoking the exporter so the count is unaffected by the export
+		// outcome.
+		ctx := trace.ContextWithSpanContext(context.Background(), s.SpanContext())
+		ssp.inst.SpanProcessed(ctx)
+	}
 
 	if ssp.exporter != nil && s.SpanContext().TraceFlags().IsSampled() {
 		if err := ssp.exporter.ExportSpans(context.Background(), []ReadOnlySpan{s}); err != nil {
@@ -58,7 +88,7 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 	var err error
 	ssp.stopOnce.Do(func() {
 		stopFunc := func(exp SpanExporter) (<-chan error, func()) {
-			done := make(chan error)
+			done := make(chan error, 1)
 			return done, func() { done <- exp.Shutdown(ctx) }
 		}
 
@@ -74,10 +104,15 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 		// span would need to be exported. Meaning, OnEnd would be called and
 		// try acquiring the lock that is held here.
 		ssp.exporterMu.Lock()
-		done, shutdown := stopFunc(ssp.exporter)
+		exp := ssp.exporter
 		ssp.exporter = nil
 		ssp.exporterMu.Unlock()
 
+		if exp == nil {
+			return
+		}
+
+		done, shutdown := stopFunc(exp)
 		go shutdown()
 
 		// Wait for the exporter to shut down or the deadline to expire.
@@ -104,18 +139,25 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 }
 
 // ForceFlush does nothing as there is no data to flush.
-func (ssp *simpleSpanProcessor) ForceFlush(context.Context) error {
+func (*simpleSpanProcessor) ForceFlush(context.Context) error {
 	return nil
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent
 // this Span Processor.
-func (ssp *simpleSpanProcessor) MarshalLog() interface{} {
+func (ssp *simpleSpanProcessor) MarshalLog() any {
+	// Shutdown clears exporter under exporterMu.
+	// Copy it while holding the same lock so MarshalLog
+	// can run concurrently without racing with Shutdown.
+	ssp.exporterMu.Lock()
+	exp := ssp.exporter
+	ssp.exporterMu.Unlock()
+
 	return struct {
 		Type     string
-		Exporter SpanExporter
+		Exporter string
 	}{
 		Type:     "SimpleSpanProcessor",
-		Exporter: ssp.exporter,
+		Exporter: fmt.Sprintf("%T", exp),
 	}
 }

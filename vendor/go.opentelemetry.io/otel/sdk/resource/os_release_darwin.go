@@ -1,10 +1,11 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package resource // import "go.opentelemetry.io/otel/sdk/resource"
+package resource
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -63,7 +64,7 @@ func parsePlistFile(file io.Reader) (map[string]string, error) {
 	}
 
 	if len(v.Dict.Key) != len(v.Dict.String) {
-		return nil, fmt.Errorf("the number of <key> and <string> elements doesn't match")
+		return nil, errors.New("the number of <key> and <string> elements doesn't match")
 	}
 
 	properties := make(map[string]string, len(v.Dict.Key))

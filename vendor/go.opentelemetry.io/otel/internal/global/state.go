@@ -1,23 +1,21 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package global // import "go.opentelemetry.io/otel/internal/global"
+package global
 
 import (
 	"errors"
 	"sync"
 	"sync/atomic"
 
+	"go.opentelemetry.io/otel/internal/errorhandler"
+	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type (
-	errorHandlerHolder struct {
-		eh ErrorHandler
-	}
-
 	tracerProviderHolder struct {
 		tp trace.TracerProvider
 	}
@@ -29,18 +27,22 @@ type (
 	meterProviderHolder struct {
 		mp metric.MeterProvider
 	}
+
+	loggerProviderHolder struct {
+		provider log.LoggerProvider
+	}
 )
 
 var (
-	globalErrorHandler  = defaultErrorHandler()
-	globalTracer        = defaultTracerValue()
-	globalPropagators   = defaultPropagatorsValue()
-	globalMeterProvider = defaultMeterProvider()
+	globalTracer         = defaultTracerValue()
+	globalPropagators    = defaultPropagatorsValue()
+	globalMeterProvider  = defaultMeterProvider()
+	globalLoggerProvider = defaultLoggerProvider()
 
-	delegateErrorHandlerOnce      sync.Once
 	delegateTraceOnce             sync.Once
 	delegateTextMapPropagatorOnce sync.Once
 	delegateMeterOnce             sync.Once
+	delegateLoggerOnce            sync.Once
 )
 
 // GetErrorHandler returns the global ErrorHandler instance.
@@ -53,7 +55,7 @@ var (
 // Subsequent calls to SetErrorHandler after the first will not forward errors
 // to the new ErrorHandler for prior returned instances.
 func GetErrorHandler() ErrorHandler {
-	return globalErrorHandler.Load().(errorHandlerHolder).eh
+	return errorhandler.GetErrorHandler()
 }
 
 // SetErrorHandler sets the global ErrorHandler to h.
@@ -63,26 +65,7 @@ func GetErrorHandler() ErrorHandler {
 // ErrorHandler. Subsequent calls will set the global ErrorHandler, but not
 // delegate errors to h.
 func SetErrorHandler(h ErrorHandler) {
-	current := GetErrorHandler()
-
-	if _, cOk := current.(*ErrDelegator); cOk {
-		if _, ehOk := h.(*ErrDelegator); ehOk && current == h {
-			// Do not assign to the delegate of the default ErrDelegator to be
-			// itself.
-			Error(
-				errors.New("no ErrorHandler delegate configured"),
-				"ErrorHandler remains its current value.",
-			)
-			return
-		}
-	}
-
-	delegateErrorHandlerOnce.Do(func() {
-		if def, ok := current.(*ErrDelegator); ok {
-			def.setDelegate(h)
-		}
-	})
-	globalErrorHandler.Store(errorHandlerHolder{eh: h})
+	errorhandler.SetErrorHandler(h)
 }
 
 // TracerProvider is the internal implementation for global.TracerProvider.
@@ -174,10 +157,30 @@ func SetMeterProvider(mp metric.MeterProvider) {
 	globalMeterProvider.Store(meterProviderHolder{mp: mp})
 }
 
-func defaultErrorHandler() *atomic.Value {
-	v := &atomic.Value{}
-	v.Store(errorHandlerHolder{eh: &ErrDelegator{}})
-	return v
+// LoggerProvider is the internal implementation for global.LoggerProvider.
+func LoggerProvider() log.LoggerProvider {
+	return globalLoggerProvider.Load().(loggerProviderHolder).provider
+}
+
+// SetLoggerProvider is the internal implementation for global.SetLoggerProvider.
+func SetLoggerProvider(provider log.LoggerProvider) {
+	current := LoggerProvider()
+	if _, cOk := current.(*loggerProvider); cOk {
+		if _, lpOk := provider.(*loggerProvider); lpOk && current == provider {
+			Error(
+				errors.New("no delegate configured in logger provider"),
+				"Setting logger provider to its current value. No delegate will be configured",
+			)
+			return
+		}
+	}
+
+	delegateLoggerOnce.Do(func() {
+		if def, ok := current.(*loggerProvider); ok {
+			def.setDelegate(provider)
+		}
+	})
+	globalLoggerProvider.Store(loggerProviderHolder{provider: provider})
 }
 
 func defaultTracerValue() *atomic.Value {
@@ -195,5 +198,11 @@ func defaultPropagatorsValue() *atomic.Value {
 func defaultMeterProvider() *atomic.Value {
 	v := &atomic.Value{}
 	v.Store(meterProviderHolder{mp: &meterProvider{}})
+	return v
+}
+
+func defaultLoggerProvider() *atomic.Value {
+	v := &atomic.Value{}
+	v.Store(loggerProviderHolder{provider: &loggerProvider{}})
 	return v
 }
