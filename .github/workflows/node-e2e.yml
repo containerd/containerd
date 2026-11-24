@@ -1,20 +1,25 @@
 name: E2E
 on:
   workflow_call:
-    inputs:
-      k8s_version:
-        description: 'Kubernetes branch or tag to test against'
-        required: false
-        default: 'master'
-        type: string
 permissions:
   contents: read
 
 jobs:
   node-e2e-k8s:
-    name: Kubernetes Node
+    name: Kubernetes Node (${{ matrix.k8s_version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # Supported Kubernetes releases plus the development branch.
+        k8s_version: [release-1.35, release-1.36, release-1.37, master]
+        include:
+          # release-1.35 lacks kubernetes/kubernetes#135604 (CRI stats for
+          # resource metrics and the Summary API when PodAndContainerStatsFromCRI=true).
+          # Skip the affected tests until it is cherry-picked to release-1.35.
+          - k8s_version: release-1.35
+            extra_skip: '|ResourceMetricsAPI|ContainerMetrics|Summary API'
     steps:
       - name: Clean up disk space
         run: |
@@ -46,7 +51,7 @@ jobs:
         with:
           repository: kubernetes/kubernetes
           path: src/k8s.io/kubernetes
-          ref: ${{ inputs.k8s_version }}
+          ref: ${{ matrix.k8s_version }}
           fetch-depth: 0
 
       - name: Install Go
@@ -123,7 +128,7 @@ jobs:
         run: |
           sudo make test-e2e-node \
             FOCUS='\[NodeConformance\]|\[Feature:.+\]|\[Feature\]' \
-            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Alpha\]' \
+            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Alpha\]${{ matrix.extra_skip }}' \
             TEST_ARGS='--feature-gates=PodAndContainerStatsFromCRI=true --kubelet-flags="--cgroup-driver=systemd --cgroups-per-qos=true --cgroup-root=/ --runtime-cgroups=/system.slice/containerd.service --feature-gates=PodAndContainerStatsFromCRI=true"'
 
       - name: Collect Logs on Failure
@@ -143,5 +148,5 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-logs
+          name: e2e-logs-${{ matrix.k8s_version }}
           path: ./_artifacts/
