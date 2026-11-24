@@ -770,6 +770,7 @@ func TestResolveCgroupnsMode(t *testing.T) {
 		desc           string
 		privileged     bool
 		cgroupnsOpts   *runtime.CgroupNamespace
+		usernsOpts     *runtime.UserNamespace
 		unifiedCgroups bool
 		want           runtime.NamespaceMode
 		wantErr        bool
@@ -813,6 +814,34 @@ func TestResolveCgroupnsMode(t *testing.T) {
 			want:           runtime.NamespaceMode_NODE,
 		},
 		{
+			desc:           "NODE: with user namespaces",
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_NODE},
+			usernsOpts:     &runtime.UserNamespace{Mode: runtime.NamespaceMode_POD},
+			unifiedCgroups: true,
+			wantErr:        true,
+		},
+		{
+			desc:           "CONTAINER: with user namespaces",
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_CONTAINER},
+			usernsOpts:     &runtime.UserNamespace{Mode: runtime.NamespaceMode_POD},
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_CONTAINER,
+		},
+		{
+			desc:           "NODE: with NODE user namespace mode",
+			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_NODE},
+			usernsOpts:     &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE},
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_NODE,
+		},
+		{
+			desc:           "default: privileged with user namespaces",
+			privileged:     true,
+			usernsOpts:     &runtime.UserNamespace{Mode: runtime.NamespaceMode_POD},
+			unifiedCgroups: true,
+			want:           runtime.NamespaceMode_NODE,
+		},
+		{
 			desc:           "POD is unsupported",
 			cgroupnsOpts:   &runtime.CgroupNamespace{Mode: runtime.NamespaceMode_POD},
 			unifiedCgroups: true,
@@ -827,8 +856,11 @@ func TestResolveCgroupnsMode(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			securityContext := &runtime.LinuxContainerSecurityContext{
-				Privileged:       tc.privileged,
-				NamespaceOptions: &runtime.NamespaceOption{CgroupnsOptions: tc.cgroupnsOpts},
+				Privileged: tc.privileged,
+				NamespaceOptions: &runtime.NamespaceOption{
+					CgroupnsOptions: tc.cgroupnsOpts,
+					UsernsOptions:   tc.usernsOpts,
+				},
 			}
 			got, err := resolveCgroupnsMode(securityContext, tc.unifiedCgroups)
 			if tc.wantErr {

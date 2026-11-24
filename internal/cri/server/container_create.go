@@ -1321,9 +1321,12 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 //
 // When CgroupnsOptions is specified, its mode is used as is (KEP-5714).
 // Only CONTAINER and NODE are supported.
+// NODE cannot be used with user namespaces, consistently with kube-apiserver,
+// which rejects `hostCgroupNamespace: true` when `hostUsers` is false.
 // https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/5714-cgroupns/README.md
 func resolveCgroupnsMode(securityContext *runtime.LinuxContainerSecurityContext, unifiedCgroups bool) (runtime.NamespaceMode, error) {
-	cgroupnsOpts := securityContext.GetNamespaceOptions().GetCgroupnsOptions()
+	nsOpts := securityContext.GetNamespaceOptions()
+	cgroupnsOpts := nsOpts.GetCgroupnsOptions()
 	if cgroupnsOpts == nil {
 		if unifiedCgroups && !securityContext.GetPrivileged() {
 			return runtime.NamespaceMode_CONTAINER, nil
@@ -1331,7 +1334,13 @@ func resolveCgroupnsMode(securityContext *runtime.LinuxContainerSecurityContext,
 		return runtime.NamespaceMode_NODE, nil
 	}
 	switch mode := cgroupnsOpts.GetMode(); mode {
-	case runtime.NamespaceMode_CONTAINER, runtime.NamespaceMode_NODE:
+	case runtime.NamespaceMode_CONTAINER:
+		return mode, nil
+	case runtime.NamespaceMode_NODE:
+		// Note that the zero value of NamespaceMode is POD, while a nil UsernsOptions means NODE.
+		if usernsOpts := nsOpts.GetUsernsOptions(); usernsOpts != nil && usernsOpts.GetMode() == runtime.NamespaceMode_POD {
+			return 0, errors.New("cgroup namespace mode NODE cannot be used with user namespaces")
+		}
 		return mode, nil
 	default:
 		return 0, fmt.Errorf("unsupported cgroup namespace mode: %s", mode)
