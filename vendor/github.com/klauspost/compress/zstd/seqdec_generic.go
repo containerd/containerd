@@ -1,5 +1,4 @@
-//go:build !amd64 || appengine || !gc || noasm
-// +build !amd64 appengine !gc noasm
+//go:build (!amd64 && !arm64) || appengine || !gc || noasm
 
 package zstd
 
@@ -29,7 +28,7 @@ func (s *sequenceDecs) decode(seqs []seqVals) error {
 	}
 	for i := range seqs {
 		var ll, mo, ml int
-		if len(br.in) > 4+((maxOffsetBits+16+16)>>3) {
+		if br.cursor > 4+((maxOffsetBits+16+16)>>3) {
 			// inlined function:
 			// ll, mo, ml = s.nextFast(br, llState, mlState, ofState)
 

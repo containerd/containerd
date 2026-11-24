@@ -69,6 +69,10 @@ var (
 // No CRC value is being generated and not all CRC values of the Snappy stream are checked.
 // However, it provides really fast recompression of Snappy streams.
 // The converter can be reused to avoid allocations, even after errors.
+//
+// Deprecated: Decode the stream with s2.NewReader, which reads Snappy streams,
+// and compress the output with an Encoder. This validates the input and
+// compresses much better.
 type SnappyConverter struct {
 	r     io.Reader
 	err   error
@@ -197,7 +201,7 @@ func (r *SnappyConverter) Convert(in io.Reader, w io.Writer) (int64, error) {
 
 			n, r.err = w.Write(r.block.output)
 			if r.err != nil {
-				return written, err
+				return written, r.err
 			}
 			written += int64(n)
 			continue
@@ -239,7 +243,7 @@ func (r *SnappyConverter) Convert(in io.Reader, w io.Writer) (int64, error) {
 			}
 			n, r.err = w.Write(r.block.output)
 			if r.err != nil {
-				return written, err
+				return written, r.err
 			}
 			written += int64(n)
 			continue
@@ -257,7 +261,7 @@ func (r *SnappyConverter) Convert(in io.Reader, w io.Writer) (int64, error) {
 			if !r.readFull(r.buf[:len(snappyMagicBody)], false) {
 				return written, r.err
 			}
-			for i := 0; i < len(snappyMagicBody); i++ {
+			for i := range len(snappyMagicBody) {
 				if r.buf[i] != snappyMagicBody[i] {
 					println("r.buf[i] != snappyMagicBody[i]", r.buf[i], snappyMagicBody[i], i)
 					r.err = ErrSnappyCorrupt
@@ -334,9 +338,10 @@ func decodeSnappy(blk *blockEnc, src []byte) error {
 
 				return errUnsupportedLiteralLength
 			}
-			//if length > snappyMaxBlockSize-d || uint32(length) > len(src)-s {
-			//	return ErrSnappyCorrupt
-			//}
+			if length > len(src)-s {
+				println("length > len(src)-s", length, len(src)-s)
+				return ErrSnappyCorrupt
+			}
 
 			blk.literals = append(blk.literals, src[s:s+length]...)
 			//println(length, "litLen")
@@ -370,6 +375,14 @@ func decodeSnappy(blk *blockEnc, src []byte) error {
 			}
 			length = 1 + int(src[s-5])>>2
 			offset = uint32(src[s-4]) | uint32(src[s-3])<<8 | uint32(src[s-2])<<16 | uint32(src[s-1])<<24
+		}
+
+		// A zstd match is at least zstdMinMatch bytes. A shorter copy
+		// cannot be represented as a sequence and would underflow the
+		// matchLen computation below, producing an out-of-range match
+		// length code.
+		if length < zstdMinMatch {
+			return ErrSnappyCorrupt
 		}
 
 		if offset <= 0 || blk.size+lits < int(offset) /*|| length > len(blk)-d */ {

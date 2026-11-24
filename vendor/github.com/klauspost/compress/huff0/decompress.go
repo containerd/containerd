@@ -54,6 +54,10 @@ func ReadTable(in []byte, s *Scratch) (s2 *Scratch, remain []byte, err error) {
 		if len(in) < int(iSize) {
 			return s, nil, fmt.Errorf("input too small for table, want %d bytes, have %d", iSize, len(in))
 		}
+		// The low nibble is the weights' FSE tableLog - 5, which the format limits to 6.
+		if in[0]&15+5 > 6 {
+			return s, nil, errors.New("corrupt input: weights tableLog too big")
+		}
 		// FSE compressed weights
 		s.fse.DecompressLimit = 255
 		hw := s.huffWeight[:]
@@ -626,7 +630,7 @@ func (d *Decoder) decompress4X8bit(dst, src []byte) ([]byte, error) {
 
 	var br [4]bitReaderBytes
 	start := 6
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		length := int(src[i*2]) | (int(src[i*2+1]) << 8)
 		if start+length >= len(src) {
 			return nil, errors.New("truncated input (or invalid offset)")
@@ -798,10 +802,7 @@ func (d *Decoder) decompress4X8bit(dst, src []byte) ([]byte, error) {
 	remainBytes := dstEvery - (decoded / 4)
 	for i := range br {
 		offset := dstEvery * i
-		endsAt := offset + remainBytes
-		if endsAt > len(out) {
-			endsAt = len(out)
-		}
+		endsAt := min(offset+remainBytes, len(out))
 		br := &br[i]
 		bitsLeft := br.remaining()
 		for bitsLeft > 0 {
@@ -864,7 +865,7 @@ func (d *Decoder) decompress4X8bit(dst, src []byte) ([]byte, error) {
 func (d *Decoder) decompress4X8bitExactly(dst, src []byte) ([]byte, error) {
 	var br [4]bitReaderBytes
 	start := 6
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		length := int(src[i*2]) | (int(src[i*2+1]) << 8)
 		if start+length >= len(src) {
 			return nil, errors.New("truncated input (or invalid offset)")
@@ -1035,10 +1036,7 @@ func (d *Decoder) decompress4X8bitExactly(dst, src []byte) ([]byte, error) {
 	remainBytes := dstEvery - (decoded / 4)
 	for i := range br {
 		offset := dstEvery * i
-		endsAt := offset + remainBytes
-		if endsAt > len(out) {
-			endsAt = len(out)
-		}
+		endsAt := min(offset+remainBytes, len(out))
 		br := &br[i]
 		bitsLeft := br.remaining()
 		for bitsLeft > 0 {
