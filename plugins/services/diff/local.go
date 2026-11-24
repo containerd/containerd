@@ -19,6 +19,7 @@ package diff
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/errdefs"
@@ -70,17 +71,9 @@ func init() {
 			}
 			syncFs := ic.Config.(*config).SyncFs
 			orderedNames := ic.Config.(*config).Order
-			ordered := make([]differ, len(orderedNames))
-			for i, n := range orderedNames {
-				d, ok := differs[n]
-				if !ok {
-					return nil, fmt.Errorf("needed differ not loaded: %s", n)
-				}
-
-				ordered[i], ok = d.(differ)
-				if !ok {
-					return nil, fmt.Errorf("differ does not implement Comparer and Applier interface: %s", n)
-				}
+			ordered, err := orderDiffers(differs, orderedNames)
+			if err != nil {
+				return nil, err
 			}
 
 			return &local{
@@ -89,6 +82,28 @@ func init() {
 			}, nil
 		},
 	})
+}
+
+// orderDiffers accepts an unavailable overlay optimization if walking is
+// configured as a fallback. Some Linux builds and plugin configurations do
+// not load the overlay plugin; the diff service must still initialize.
+func orderDiffers(available map[string]any, names []string) ([]differ, error) {
+	ordered := make([]differ, 0, len(names))
+	for _, name := range names {
+		instance, ok := available[name]
+		if !ok {
+			if name == "overlay" && slices.Contains(names, "walking") {
+				continue
+			}
+			return nil, fmt.Errorf("needed differ not loaded: %s", name)
+		}
+		implementation, ok := instance.(differ)
+		if !ok {
+			return nil, fmt.Errorf("differ does not implement Comparer and Applier interface: %s", name)
+		}
+		ordered = append(ordered, implementation)
+	}
+	return ordered, nil
 }
 
 type local struct {
