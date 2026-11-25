@@ -5,14 +5,10 @@
 package zstd
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"hash/crc32"
 	"io"
-	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/klauspost/compress/huff0"
@@ -58,11 +54,11 @@ const (
 )
 
 var (
-	huffDecoderPool = sync.Pool{New: func() interface{} {
+	huffDecoderPool = sync.Pool{New: func() any {
 		return &huff0.Scratch{}
 	}}
 
-	fseDecoderPool = sync.Pool{New: func() interface{} {
+	fseDecoderPool = sync.Pool{New: func() any {
 		return &fseDecoder{}
 	}}
 )
@@ -244,9 +240,11 @@ func (b *blockDec) decodeBuf(hist *history) error {
 			b.dst[i] = v
 		}
 		hist.appendKeep(b.dst)
+		hist.decoders.consumeSyncLen(len(b.dst))
 		return nil
 	case blockTypeRaw:
 		hist.appendKeep(b.data)
+		hist.decoders.consumeSyncLen(len(b.data))
 		return nil
 	case blockTypeCompressed:
 		saved := b.dst
@@ -404,8 +402,9 @@ func (b *blockDec) decodeLiterals(in []byte, hist *history) (remain []byte, err 
 			}
 		}
 		var err error
-		// Use our out buffer.
-		huff.MaxDecodedSize = litRegenSize
+		// Decoder.Decompress* uses cap(dst) for the size limit. Do not write
+		// MaxDecodedSize on hist.huffTree: with a trained dictionary that
+		// pointer aliases the shared dict.litEnc and concurrent DecodeAll races.
 		if fourStreams {
 			literals, err = huff.Decoder().Decompress4X(b.literalBuf[:0:litRegenSize], literals)
 		} else {
@@ -490,6 +489,7 @@ func (b *blockDec) decodeCompressed(hist *history) error {
 	}
 	if hist.decoders.nSeqs == 0 {
 		b.dst = append(b.dst, hist.decoders.literals...)
+		hist.decoders.consumeSyncLen(len(hist.decoders.literals))
 		return nil
 	}
 	before := len(hist.decoders.out)
@@ -557,7 +557,7 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 		if compMode&3 != 0 {
 			return errors.New("corrupt block: reserved bits not zero")
 		}
-		for i := uint(0); i < 3; i++ {
+		for i := range uint(3) {
 			mode := seqCompMode((compMode >> (6 - i*2)) & 3)
 			if debugDecoder {
 				println("Table", tableIndex(i), "is", mode)
@@ -648,21 +648,6 @@ func (b *blockDec) prepareSequences(in []byte, hist *history) (err error) {
 		println("initializing sequences:", err)
 		return err
 	}
-	// Extract blocks...
-	if false && hist.dict == nil {
-		fatalErr := func(err error) {
-			if err != nil {
-				panic(err)
-			}
-		}
-		fn := fmt.Sprintf("n-%d-lits-%d-prev-%d-%d-%d-win-%d.blk", hist.decoders.nSeqs, len(hist.decoders.literals), hist.recentOffsets[0], hist.recentOffsets[1], hist.recentOffsets[2], hist.windowSize)
-		var buf bytes.Buffer
-		fatalErr(binary.Write(&buf, binary.LittleEndian, hist.decoders.litLengths.fse))
-		fatalErr(binary.Write(&buf, binary.LittleEndian, hist.decoders.matchLengths.fse))
-		fatalErr(binary.Write(&buf, binary.LittleEndian, hist.decoders.offsets.fse))
-		buf.Write(in)
-		os.WriteFile(filepath.Join("testdata", "seqs", fn), buf.Bytes(), os.ModePerm)
-	}
 
 	return nil
 }
@@ -692,10 +677,6 @@ func (b *blockDec) executeSequences(hist *history) error {
 	hbytes := hist.b
 	if len(hbytes) > hist.windowSize {
 		hbytes = hbytes[len(hbytes)-hist.windowSize:]
-		// We do not need history anymore.
-		if hist.dict != nil {
-			hist.dict.content = nil
-		}
 	}
 	hist.decoders.windowSize = hist.windowSize
 	hist.decoders.out = b.dst[:0]

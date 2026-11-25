@@ -396,7 +396,7 @@ func (s *Scratch) buildCTable() error {
 			if v > largeLimit {
 				s.zeroBits = true
 			}
-			for nbOccurrences := int16(0); nbOccurrences < v; nbOccurrences++ {
+			for range v {
 				tableSymbol[position] = symbol
 				position = (position + step) & tableMask
 				for position > highThreshold {
@@ -659,7 +659,8 @@ func (s *Scratch) validateNorm() (err error) {
 		if v >= 0 {
 			total += int(v)
 		} else {
-			total -= int(v)
+			// -1 takes one cell. Adding -v would let a wrapped -32768 pass.
+			total++
 		}
 	}
 	defer func() {

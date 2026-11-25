@@ -128,12 +128,18 @@ import (
 	reflect "reflect"
 	sync "sync"
 	utf8 "unicode/utf8"
+	unsafe "unsafe"
 )
 
-// `NullValue` is a singleton enumeration to represent the null value for the
-// `Value` type union.
+// Represents a JSON `null`.
 //
-// The JSON representation for `NullValue` is JSON `null`.
+// `NullValue` is a sentinel, using an enum with only one value to represent
+// the null value for the `Value` type union.
+//
+// A field of type `NullValue` with any value other than `0` is considered
+// invalid. Most ProtoJSON serializers will emit a Value with a `null_value` set
+// as a JSON `null` regardless of the integer value, and so will round trip to
+// a `0` value.
 type NullValue int32
 
 const (
@@ -178,21 +184,25 @@ func (NullValue) EnumDescriptor() ([]byte, []int) {
 	return file_google_protobuf_struct_proto_rawDescGZIP(), []int{0}
 }
 
-// `Struct` represents a structured data value, consisting of fields
-// which map to dynamically typed values. In some languages, `Struct`
-// might be supported by a native representation. For example, in
-// scripting languages like JS a struct is represented as an
-// object. The details of that representation are described together
-// with the proto support for the language.
+// Represents a JSON object.
 //
-// The JSON representation for `Struct` is JSON object.
+// An unordered key-value map, intending to perfectly capture the semantics of a
+// JSON object. This enables parsing any arbitrary JSON payload as a message
+// field in ProtoJSON format.
+//
+// This follows RFC 8259 guidelines for interoperable JSON: notably this type
+// cannot represent large Int64 values or `NaN`/`Infinity` numbers,
+// since the JSON format generally does not support those values in its number
+// type.
+//
+// If you do not intend to parse arbitrary JSON into your message, a custom
+// typed message should be preferred instead of using this type.
 type Struct struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unordered map of dynamically typed values.
-	Fields map[string]*Value `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	Fields        map[string]*Value `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // NewStruct constructs a Struct from a general-purpose Go map.
@@ -269,20 +279,17 @@ func (x *Struct) GetFields() map[string]*Value {
 	return nil
 }
 
+// Represents a JSON value.
+//
 // `Value` represents a dynamically typed value which can be either
 // null, a number, a string, a boolean, a recursive struct value, or a
 // list of values. A producer of value is expected to set one of these
-// variants. Absence of any variant indicates an error.
-//
-// The JSON representation for `Value` is JSON value.
+// variants. Absence of any variant is an invalid state.
 type Value struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The kind of value.
 	//
-	// Types that are assignable to Kind:
+	// Types that are valid to be assigned to Kind:
 	//
 	//	*Value_NullValue
 	//	*Value_NumberValue
@@ -290,7 +297,9 @@ type Value struct {
 	//	*Value_BoolValue
 	//	*Value_StructValue
 	//	*Value_ListValue
-	Kind isValue_Kind `protobuf_oneof:"kind"`
+	Kind          isValue_Kind `protobuf_oneof:"kind"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // NewValue constructs a Value from a general-purpose Go interface.
@@ -483,51 +492,63 @@ func (*Value) Descriptor() ([]byte, []int) {
 	return file_google_protobuf_struct_proto_rawDescGZIP(), []int{1}
 }
 
-func (m *Value) GetKind() isValue_Kind {
-	if m != nil {
-		return m.Kind
+func (x *Value) GetKind() isValue_Kind {
+	if x != nil {
+		return x.Kind
 	}
 	return nil
 }
 
 func (x *Value) GetNullValue() NullValue {
-	if x, ok := x.GetKind().(*Value_NullValue); ok {
-		return x.NullValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_NullValue); ok {
+			return x.NullValue
+		}
 	}
 	return NullValue_NULL_VALUE
 }
 
 func (x *Value) GetNumberValue() float64 {
-	if x, ok := x.GetKind().(*Value_NumberValue); ok {
-		return x.NumberValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_NumberValue); ok {
+			return x.NumberValue
+		}
 	}
 	return 0
 }
 
 func (x *Value) GetStringValue() string {
-	if x, ok := x.GetKind().(*Value_StringValue); ok {
-		return x.StringValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_StringValue); ok {
+			return x.StringValue
+		}
 	}
 	return ""
 }
 
 func (x *Value) GetBoolValue() bool {
-	if x, ok := x.GetKind().(*Value_BoolValue); ok {
-		return x.BoolValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_BoolValue); ok {
+			return x.BoolValue
+		}
 	}
 	return false
 }
 
 func (x *Value) GetStructValue() *Struct {
-	if x, ok := x.GetKind().(*Value_StructValue); ok {
-		return x.StructValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_StructValue); ok {
+			return x.StructValue
+		}
 	}
 	return nil
 }
 
 func (x *Value) GetListValue() *ListValue {
-	if x, ok := x.GetKind().(*Value_ListValue); ok {
-		return x.ListValue
+	if x != nil {
+		if x, ok := x.Kind.(*Value_ListValue); ok {
+			return x.ListValue
+		}
 	}
 	return nil
 }
@@ -537,32 +558,35 @@ type isValue_Kind interface {
 }
 
 type Value_NullValue struct {
-	// Represents a null value.
+	// Represents a JSON `null`.
 	NullValue NullValue `protobuf:"varint,1,opt,name=null_value,json=nullValue,proto3,enum=google.protobuf.NullValue,oneof"`
 }
 
 type Value_NumberValue struct {
-	// Represents a double value.
+	// Represents a JSON number. Must not be `NaN`, `Infinity` or
+	// `-Infinity`, since those are not supported in JSON. This also cannot
+	// represent large Int64 values, since JSON format generally does not
+	// support them in its number type.
 	NumberValue float64 `protobuf:"fixed64,2,opt,name=number_value,json=numberValue,proto3,oneof"`
 }
 
 type Value_StringValue struct {
-	// Represents a string value.
+	// Represents a JSON string.
 	StringValue string `protobuf:"bytes,3,opt,name=string_value,json=stringValue,proto3,oneof"`
 }
 
 type Value_BoolValue struct {
-	// Represents a boolean value.
+	// Represents a JSON boolean (`true` or `false` literal in JSON).
 	BoolValue bool `protobuf:"varint,4,opt,name=bool_value,json=boolValue,proto3,oneof"`
 }
 
 type Value_StructValue struct {
-	// Represents a structured value.
+	// Represents a JSON object.
 	StructValue *Struct `protobuf:"bytes,5,opt,name=struct_value,json=structValue,proto3,oneof"`
 }
 
 type Value_ListValue struct {
-	// Represents a repeated `Value`.
+	// Represents a JSON array.
 	ListValue *ListValue `protobuf:"bytes,6,opt,name=list_value,json=listValue,proto3,oneof"`
 }
 
@@ -578,16 +602,13 @@ func (*Value_StructValue) isValue_Kind() {}
 
 func (*Value_ListValue) isValue_Kind() {}
 
-// `ListValue` is a wrapper around a repeated field of values.
-//
-// The JSON representation for `ListValue` is JSON array.
+// Represents a JSON array.
 type ListValue struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Repeated field of dynamically typed values.
-	Values []*Value `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	Values        []*Value `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 // NewList constructs a ListValue from a general-purpose Go slice.
@@ -662,64 +683,40 @@ func (x *ListValue) GetValues() []*Value {
 
 var File_google_protobuf_struct_proto protoreflect.FileDescriptor
 
-var file_google_protobuf_struct_proto_rawDesc = []byte{
-	0x0a, 0x1c, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2f, 0x73, 0x74, 0x72, 0x75, 0x63, 0x74, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12, 0x0f,
-	0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x22,
-	0x98, 0x01, 0x0a, 0x06, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x12, 0x3b, 0x0a, 0x06, 0x66, 0x69,
-	0x65, 0x6c, 0x64, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x23, 0x2e, 0x67, 0x6f, 0x6f,
-	0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x53, 0x74, 0x72,
-	0x75, 0x63, 0x74, 0x2e, 0x46, 0x69, 0x65, 0x6c, 0x64, 0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x52,
-	0x06, 0x66, 0x69, 0x65, 0x6c, 0x64, 0x73, 0x1a, 0x51, 0x0a, 0x0b, 0x46, 0x69, 0x65, 0x6c, 0x64,
-	0x73, 0x45, 0x6e, 0x74, 0x72, 0x79, 0x12, 0x10, 0x0a, 0x03, 0x6b, 0x65, 0x79, 0x18, 0x01, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x03, 0x6b, 0x65, 0x79, 0x12, 0x2c, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75,
-	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
-	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x52,
-	0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02, 0x38, 0x01, 0x22, 0xb2, 0x02, 0x0a, 0x05, 0x56,
-	0x61, 0x6c, 0x75, 0x65, 0x12, 0x3b, 0x0a, 0x0a, 0x6e, 0x75, 0x6c, 0x6c, 0x5f, 0x76, 0x61, 0x6c,
-	0x75, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x1a, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c,
-	0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x4e, 0x75, 0x6c, 0x6c, 0x56,
-	0x61, 0x6c, 0x75, 0x65, 0x48, 0x00, 0x52, 0x09, 0x6e, 0x75, 0x6c, 0x6c, 0x56, 0x61, 0x6c, 0x75,
-	0x65, 0x12, 0x23, 0x0a, 0x0c, 0x6e, 0x75, 0x6d, 0x62, 0x65, 0x72, 0x5f, 0x76, 0x61, 0x6c, 0x75,
-	0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x01, 0x48, 0x00, 0x52, 0x0b, 0x6e, 0x75, 0x6d, 0x62, 0x65,
-	0x72, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x23, 0x0a, 0x0c, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-	0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x0b,
-	0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x1f, 0x0a, 0x0a, 0x62,
-	0x6f, 0x6f, 0x6c, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x08, 0x48,
-	0x00, 0x52, 0x09, 0x62, 0x6f, 0x6f, 0x6c, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x3c, 0x0a, 0x0c,
-	0x73, 0x74, 0x72, 0x75, 0x63, 0x74, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x05, 0x20, 0x01,
-	0x28, 0x0b, 0x32, 0x17, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x62, 0x75, 0x66, 0x2e, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x48, 0x00, 0x52, 0x0b, 0x73,
-	0x74, 0x72, 0x75, 0x63, 0x74, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x3b, 0x0a, 0x0a, 0x6c, 0x69,
-	0x73, 0x74, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x06, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1a,
-	0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66,
-	0x2e, 0x4c, 0x69, 0x73, 0x74, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x48, 0x00, 0x52, 0x09, 0x6c, 0x69,
-	0x73, 0x74, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x42, 0x06, 0x0a, 0x04, 0x6b, 0x69, 0x6e, 0x64, 0x22,
-	0x3b, 0x0a, 0x09, 0x4c, 0x69, 0x73, 0x74, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x2e, 0x0a, 0x06,
-	0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x67,
-	0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x56,
-	0x61, 0x6c, 0x75, 0x65, 0x52, 0x06, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x2a, 0x1b, 0x0a, 0x09,
-	0x4e, 0x75, 0x6c, 0x6c, 0x56, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x0e, 0x0a, 0x0a, 0x4e, 0x55, 0x4c,
-	0x4c, 0x5f, 0x56, 0x41, 0x4c, 0x55, 0x45, 0x10, 0x00, 0x42, 0x7f, 0x0a, 0x13, 0x63, 0x6f, 0x6d,
-	0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66,
-	0x42, 0x0b, 0x53, 0x74, 0x72, 0x75, 0x63, 0x74, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x50, 0x01, 0x5a,
-	0x2f, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x67, 0x6f, 0x6c, 0x61, 0x6e, 0x67, 0x2e, 0x6f,
-	0x72, 0x67, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2f, 0x74, 0x79, 0x70, 0x65,
-	0x73, 0x2f, 0x6b, 0x6e, 0x6f, 0x77, 0x6e, 0x2f, 0x73, 0x74, 0x72, 0x75, 0x63, 0x74, 0x70, 0x62,
-	0xf8, 0x01, 0x01, 0xa2, 0x02, 0x03, 0x47, 0x50, 0x42, 0xaa, 0x02, 0x1e, 0x47, 0x6f, 0x6f, 0x67,
-	0x6c, 0x65, 0x2e, 0x50, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x57, 0x65, 0x6c, 0x6c,
-	0x4b, 0x6e, 0x6f, 0x77, 0x6e, 0x54, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x33,
-}
+const file_google_protobuf_struct_proto_rawDesc = "" +
+	"\n" +
+	"\x1cgoogle/protobuf/struct.proto\x12\x0fgoogle.protobuf\"\x98\x01\n" +
+	"\x06Struct\x12;\n" +
+	"\x06fields\x18\x01 \x03(\v2#.google.protobuf.Struct.FieldsEntryR\x06fields\x1aQ\n" +
+	"\vFieldsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xb2\x02\n" +
+	"\x05Value\x12;\n" +
+	"\n" +
+	"null_value\x18\x01 \x01(\x0e2\x1a.google.protobuf.NullValueH\x00R\tnullValue\x12#\n" +
+	"\fnumber_value\x18\x02 \x01(\x01H\x00R\vnumberValue\x12#\n" +
+	"\fstring_value\x18\x03 \x01(\tH\x00R\vstringValue\x12\x1f\n" +
+	"\n" +
+	"bool_value\x18\x04 \x01(\bH\x00R\tboolValue\x12<\n" +
+	"\fstruct_value\x18\x05 \x01(\v2\x17.google.protobuf.StructH\x00R\vstructValue\x12;\n" +
+	"\n" +
+	"list_value\x18\x06 \x01(\v2\x1a.google.protobuf.ListValueH\x00R\tlistValueB\x06\n" +
+	"\x04kind\";\n" +
+	"\tListValue\x12.\n" +
+	"\x06values\x18\x01 \x03(\v2\x16.google.protobuf.ValueR\x06values*\x1b\n" +
+	"\tNullValue\x12\x0e\n" +
+	"\n" +
+	"NULL_VALUE\x10\x00B\x7f\n" +
+	"\x13com.google.protobufB\vStructProtoP\x01Z/google.golang.org/protobuf/types/known/structpb\xf8\x01\x01\xa2\x02\x03GPB\xaa\x02\x1eGoogle.Protobuf.WellKnownTypesb\x06proto3"
 
 var (
 	file_google_protobuf_struct_proto_rawDescOnce sync.Once
-	file_google_protobuf_struct_proto_rawDescData = file_google_protobuf_struct_proto_rawDesc
+	file_google_protobuf_struct_proto_rawDescData []byte
 )
 
 func file_google_protobuf_struct_proto_rawDescGZIP() []byte {
 	file_google_protobuf_struct_proto_rawDescOnce.Do(func() {
-		file_google_protobuf_struct_proto_rawDescData = protoimpl.X.CompressGZIP(file_google_protobuf_struct_proto_rawDescData)
+		file_google_protobuf_struct_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_google_protobuf_struct_proto_rawDesc), len(file_google_protobuf_struct_proto_rawDesc)))
 	})
 	return file_google_protobuf_struct_proto_rawDescData
 }
@@ -764,7 +761,7 @@ func file_google_protobuf_struct_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_google_protobuf_struct_proto_rawDesc,
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_google_protobuf_struct_proto_rawDesc), len(file_google_protobuf_struct_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   4,
 			NumExtensions: 0,
@@ -776,7 +773,6 @@ func file_google_protobuf_struct_proto_init() {
 		MessageInfos:      file_google_protobuf_struct_proto_msgTypes,
 	}.Build()
 	File_google_protobuf_struct_proto = out.File
-	file_google_protobuf_struct_proto_rawDesc = nil
 	file_google_protobuf_struct_proto_goTypes = nil
 	file_google_protobuf_struct_proto_depIdxs = nil
 }

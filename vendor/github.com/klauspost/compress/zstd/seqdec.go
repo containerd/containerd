@@ -99,6 +99,29 @@ func (s *sequenceDecs) initialize(br *bitReader, hist *history, out []byte) erro
 	return nil
 }
 
+// consumeSyncLen accounts for n bytes of frame output produced outside
+// decodeSync. maxSyncLen bounds how much the frame may still produce and
+// decodeSyncSimple compares it with the output buffer's slack to decide
+// whether the extended 16-byte copies are safe. Blocks with sequences
+// subtracted their output; raw blocks, RLE blocks and compressed blocks
+// holding only literals did not, so a frame that opened with a raw block
+// overstated its remaining size for every block after it and ran the
+// bounds-exact copies for the rest of the frame.
+//
+// Zero means "no bound" and selects the conservative paths, so a block that
+// meets or exceeds the bound lands there; the frame-size checks in
+// runDecoder reject the excess afterwards.
+func (s *sequenceDecs) consumeSyncLen(n int) {
+	if s.maxSyncLen == 0 {
+		return
+	}
+	if uint64(n) >= s.maxSyncLen {
+		s.maxSyncLen = 0
+		return
+	}
+	s.maxSyncLen -= uint64(n)
+}
+
 func (s *sequenceDecs) freeDecoders() {
 	if f := s.litLengths.fse; f != nil && !f.preDefined {
 		fseDecoderPool.Put(f)
@@ -231,10 +254,7 @@ func (s *sequenceDecs) decodeSync(hist []byte) error {
 	llTable, mlTable, ofTable := s.litLengths.fse.dt[:maxTablesize], s.matchLengths.fse.dt[:maxTablesize], s.offsets.fse.dt[:maxTablesize]
 	llState, mlState, ofState := s.litLengths.state.state, s.matchLengths.state.state, s.offsets.state.state
 	out := s.out
-	maxBlockSize := maxCompressedBlockSize
-	if s.windowSize < maxBlockSize {
-		maxBlockSize = s.windowSize
-	}
+	maxBlockSize := min(s.windowSize, maxCompressedBlockSize)
 
 	if debugDecoder {
 		println("decodeSync: decoding", seqs, "sequences", br.remain(), "bits remain on stream")
@@ -245,7 +265,7 @@ func (s *sequenceDecs) decodeSync(hist []byte) error {
 			return io.ErrUnexpectedEOF
 		}
 		var ll, mo, ml int
-		if len(br.in) > 4+((maxOffsetBits+16+16)>>3) {
+		if br.cursor > 4+((maxOffsetBits+16+16)>>3) {
 			// inlined function:
 			// ll, mo, ml = s.nextFast(br, llState, mlState, ofState)
 

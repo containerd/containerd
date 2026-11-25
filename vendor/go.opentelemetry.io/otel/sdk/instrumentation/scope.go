@@ -1,7 +1,9 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package instrumentation // import "go.opentelemetry.io/otel/sdk/instrumentation"
+package instrumentation
+
+import "go.opentelemetry.io/otel/attribute"
 
 // Scope represents the instrumentation scope.
 type Scope struct {
@@ -12,4 +14,6 @@ type Scope struct {
 	Version string
 	// SchemaURL of the telemetry emitted by the scope.
 	SchemaURL string
+	// Attributes of the telemetry emitted by the scope.
+	Attributes attribute.Set
 }

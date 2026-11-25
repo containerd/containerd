@@ -22,9 +22,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/go-jose/go-jose/v4/json"
 )
+
+// MaxSignatures is the maximum number of signatures in a JWS at parse time.
+// Higher values mean more potential work done across untrusted input.
+//
+// If modifying MaxSignatures, do it before any parsing occurs.
+var MaxSignatures = 32
 
 // rawJSONWebSignature represents a raw JWS JSON object. Used for parsing/serializing.
 type rawJSONWebSignature struct {
@@ -75,24 +82,46 @@ type Signature struct {
 	original  *rawSignatureInfo
 }
 
-// ParseSigned parses a signed message in JWS Compact or JWS JSON Serialization.
+// ParseSigned parses a signed message in JWS Compact or JWS JSON Serialization. Validation fails if
+// the JWS is signed with an algorithm that isn't in the provided list of signature algorithms.
+// Applications should decide for themselves which signature algorithms are acceptable. If you're
+// not sure which signature algorithms your application might receive, consult the documentation of
+// the program which provides them or the protocol that you are implementing. You can also try
+// getting an example JWS and decoding it with a tool like https://jwt.io to see what its "alg"
+// header parameter indicates. The signature on the JWS does not get validated during parsing. Call
+// Verify() after parsing to validate the signature and obtain the payload.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#section-7
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
+//
+// Deprecated: call ParseSignedJSON or ParseSignedCompact depending on which serialization you expect.
 func ParseSigned(
 	signature string,
 	signatureAlgorithms []SignatureAlgorithm,
 ) (*JSONWebSignature, error) {
-	signature = stripWhitespace(signature)
-	if strings.HasPrefix(signature, "{") {
+	trimmed := strings.TrimLeftFunc(signature, unicode.IsSpace)
+	if strings.HasPrefix(trimmed, "{") {
 		return ParseSignedJSON(signature, signatureAlgorithms)
 	}
 
-	return parseSignedCompact(signature, nil, signatureAlgorithms)
+	return parseSignedCompact(stripWhitespace(signature), nil, signatureAlgorithms)
 }
 
-// ParseSignedCompact parses a message in JWS Compact Serialization.
+// ParseSignedCompact parses a message in JWS Compact Serialization. Validation fails if the JWS is
+// signed with an algorithm that isn't in the provided list of signature algorithms. Applications
+// should decide for themselves which signature algorithms are acceptable.If you're not sure which
+// signature algorithms your application might receive, consult the documentation of the program
+// which provides them or the protocol that you are implementing. You can also try getting an
+// example JWS and decoding it with a tool like https://jwt.io to see what its "alg" header
+// parameter indicates. The signature on the JWS does not get validated during parsing. Call
+// Verify() after parsing to validate the signature and obtain the payload.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#section-7.1
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
 func ParseSignedCompact(
 	signature string,
 	signatureAlgorithms []SignatureAlgorithm,
@@ -101,6 +130,18 @@ func ParseSignedCompact(
 }
 
 // ParseDetached parses a signed message in compact serialization format with detached payload.
+// Validation fails if the JWS is signed with an algorithm that isn't in the provided list of
+// signature algorithms. Applications should decide for themselves which signature algorithms are
+// acceptable. If you're not sure which signature algorithms your application might receive, consult
+// the documentation of the program which provides them or the protocol that you are implementing.
+// You can also try getting an example JWS and decoding it with a tool like https://jwt.io to see
+// what its "alg" header parameter indicates. The signature on the JWS does not get validated during
+// parsing. Call Verify() after parsing to validate the signature and obtain the payload.
+//
+// https://datatracker.ietf.org/doc/html/rfc7515#appendix-F
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Any non-allowed algorithms will cause parsing to fail.
 func ParseDetached(
 	signature string,
 	payload []byte,
@@ -133,7 +174,11 @@ func (obj JSONWebSignature) computeAuthData(payload []byte, signature *Signature
 		authData.WriteString(signature.original.Protected.base64())
 	} else if signature.protected != nil {
 		protectedHeader = signature.protected
-		authData.WriteString(base64.RawURLEncoding.EncodeToString(mustSerializeJSON(protectedHeader)))
+		serializedProtected, err := json.Marshal(protectedHeader)
+		if err != nil {
+			return nil, err
+		}
+		authData.WriteString(base64.RawURLEncoding.EncodeToString(serializedProtected))
 	}
 
 	needsBase64 := true
@@ -156,13 +201,21 @@ func (obj JSONWebSignature) computeAuthData(payload []byte, signature *Signature
 	return authData.Bytes(), nil
 }
 
-// ParseSignedJSON parses a message in JWS JSON Serialization.
+// ParseSignedJSON parses a message in JWS JSON Serialization. Messages with
+// more than [MaxSignatures] signatures are rejected.
 //
 // https://datatracker.ietf.org/doc/html/rfc7515#section-7.2
+//
+// The signatureAlgorithms parameter contains the allowable algorithms in the "alg" header parameter.
+// It must be non-empty. Non-matching algorithms cause a parse error.
 func ParseSignedJSON(
 	input string,
 	signatureAlgorithms []SignatureAlgorithm,
 ) (*JSONWebSignature, error) {
+	if len(input) == 0 {
+		return nil, errEmptyInput
+	}
+
 	var parsed rawJSONWebSignature
 	err := json.Unmarshal([]byte(input), &parsed)
 	if err != nil {
@@ -181,6 +234,25 @@ func containsSignatureAlgorithm(haystack []SignatureAlgorithm, needle SignatureA
 	return false
 }
 
+// ErrUnexpectedSignatureAlgorithm is returned when the signature algorithm in
+// the JWS header does not match one of the expected algorithms.
+type ErrUnexpectedSignatureAlgorithm struct {
+	// Got is the signature algorithm found in the JWS header.
+	Got      SignatureAlgorithm
+	expected []SignatureAlgorithm
+}
+
+func (e *ErrUnexpectedSignatureAlgorithm) Error() string {
+	return fmt.Sprintf("unexpected signature algorithm %q; expected %q", e.Got, e.expected)
+}
+
+func newErrUnexpectedSignatureAlgorithm(got SignatureAlgorithm, expected []SignatureAlgorithm) error {
+	return &ErrUnexpectedSignatureAlgorithm{
+		Got:      got,
+		expected: expected,
+	}
+}
+
 // sanitized produces a cleaned-up JWS object from the raw JSON.
 func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgorithm) (*JSONWebSignature, error) {
 	if len(signatureAlgorithms) == 0 {
@@ -188,6 +260,9 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 	}
 	if parsed.Payload == nil {
 		return nil, fmt.Errorf("go-jose/go-jose: missing payload in JWS message")
+	}
+	if len(parsed.Signatures) > MaxSignatures {
+		return nil, fmt.Errorf("go-jose/go-jose: too many signatures in JWS; maximum is %d", MaxSignatures)
 	}
 
 	obj := &JSONWebSignature{
@@ -198,13 +273,12 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 	if len(parsed.Signatures) == 0 {
 		// No signatures array, must be flattened serialization
 		signature := Signature{}
-		if parsed.Protected != nil && len(parsed.Protected.bytes()) > 0 {
-			signature.protected = &rawHeader{}
-			err := json.Unmarshal(parsed.Protected.bytes(), signature.protected)
-			if err != nil {
-				return nil, err
-			}
+		prot, err := parseProtectedHeader(parsed.Protected)
+		if err != nil {
+			return nil, err
 		}
+
+		signature.protected = prot
 
 		// Check that there is not a nonce in the unprotected header
 		if parsed.Header != nil && parsed.Header.getNonce() != "" {
@@ -228,16 +302,15 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 			Signature: parsed.Signature,
 		}
 
-		var err error
-		signature.Header, err = signature.mergedHeaders().sanitized()
-		if err != nil {
-			return nil, err
+		mergedHeaders := signature.mergedHeaders()
+		alg := mergedHeaders.getSignatureAlgorithm()
+		if !containsSignatureAlgorithm(signatureAlgorithms, alg) {
+			return nil, newErrUnexpectedSignatureAlgorithm(alg, signatureAlgorithms)
 		}
 
-		alg := SignatureAlgorithm(signature.Header.Algorithm)
-		if !containsSignatureAlgorithm(signatureAlgorithms, alg) {
-			return nil, fmt.Errorf("go-jose/go-jose: unexpected signature algorithm %q; expected %q",
-				alg, signatureAlgorithms)
+		signature.Header, err = mergedHeaders.sanitized()
+		if err != nil {
+			return nil, err
 		}
 
 		if signature.header != nil {
@@ -264,29 +337,29 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 	}
 
 	for i, sig := range parsed.Signatures {
-		if sig.Protected != nil && len(sig.Protected.bytes()) > 0 {
-			obj.Signatures[i].protected = &rawHeader{}
-			err := json.Unmarshal(sig.Protected.bytes(), obj.Signatures[i].protected)
-			if err != nil {
-				return nil, err
-			}
+		prot, err := parseProtectedHeader(sig.Protected)
+		if err != nil {
+			return nil, err
 		}
+
+		obj.Signatures[i].protected = prot
 
 		// Check that there is not a nonce in the unprotected header
 		if sig.Header != nil && sig.Header.getNonce() != "" {
 			return nil, ErrUnprotectedNonce
 		}
 
-		var err error
-		obj.Signatures[i].Header, err = obj.Signatures[i].mergedHeaders().sanitized()
-		if err != nil {
-			return nil, err
+		obj.Signatures[i].header = sig.Header
+
+		mergedHeaders := obj.Signatures[i].mergedHeaders()
+		alg := mergedHeaders.getSignatureAlgorithm()
+		if !containsSignatureAlgorithm(signatureAlgorithms, alg) {
+			return nil, newErrUnexpectedSignatureAlgorithm(alg, signatureAlgorithms)
 		}
 
-		alg := SignatureAlgorithm(obj.Signatures[i].Header.Algorithm)
-		if !containsSignatureAlgorithm(signatureAlgorithms, alg) {
-			return nil, fmt.Errorf("go-jose/go-jose: unexpected signature algorithm %q; expected %q",
-				alg, signatureAlgorithms)
+		obj.Signatures[i].Header, err = mergedHeaders.sanitized()
+		if err != nil {
+			return nil, err
 		}
 
 		if obj.Signatures[i].header != nil {
@@ -314,12 +387,13 @@ func (parsed *rawJSONWebSignature) sanitized(signatureAlgorithms []SignatureAlgo
 		// Copy value of sig
 		original := sig
 
-		obj.Signatures[i].header = sig.Header
 		obj.Signatures[i].original = &original
 	}
 
 	return obj, nil
 }
+
+const tokenDelim = "."
 
 // parseSignedCompact parses a message in compact format.
 func parseSignedCompact(
@@ -327,29 +401,39 @@ func parseSignedCompact(
 	payload []byte,
 	signatureAlgorithms []SignatureAlgorithm,
 ) (*JSONWebSignature, error) {
-	// Three parts is two separators
-	if strings.Count(input, ".") != 2 {
+	if len(input) == 0 {
+		return nil, errEmptyInput
+	}
+
+	protected, s, ok := strings.Cut(input, tokenDelim)
+	if !ok { // no period found
 		return nil, fmt.Errorf("go-jose/go-jose: compact JWS format must have three parts")
 	}
-	parts := strings.SplitN(input, ".", 3)
+	claims, sig, ok := strings.Cut(s, tokenDelim)
+	if !ok { // only one period found
+		return nil, fmt.Errorf("go-jose/go-jose: compact JWS format must have three parts")
+	}
+	if strings.ContainsRune(sig, '.') { // too many periods found
+		return nil, fmt.Errorf("go-jose/go-jose: compact JWS format must have three parts")
+	}
 
-	if parts[1] != "" && payload != nil {
+	if claims != "" && payload != nil {
 		return nil, fmt.Errorf("go-jose/go-jose: payload is not detached")
 	}
 
-	rawProtected, err := base64.RawURLEncoding.DecodeString(parts[0])
+	rawProtected, err := base64.RawURLEncoding.DecodeString(protected)
 	if err != nil {
 		return nil, err
 	}
 
 	if payload == nil {
-		payload, err = base64.RawURLEncoding.DecodeString(parts[1])
+		payload, err = base64.RawURLEncoding.DecodeString(claims)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	signature, err := base64.RawURLEncoding.DecodeString(sig)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +451,10 @@ func (obj JSONWebSignature) compactSerialize(detached bool) (string, error) {
 		return "", ErrNotSupported
 	}
 
-	serializedProtected := mustSerializeJSON(obj.Signatures[0].protected)
+	serializedProtected, err := json.Marshal(obj.Signatures[0].protected)
+	if err != nil {
+		return "", err
+	}
 
 	var payload []byte
 	if !detached {
@@ -392,14 +479,23 @@ func (obj JSONWebSignature) DetachedCompactSerialize() (string, error) {
 }
 
 // FullSerialize serializes an object using the full JSON serialization format.
+//
+// It returns "" if obj cannot be serialized.
 func (obj JSONWebSignature) FullSerialize() string {
 	raw := rawJSONWebSignature{
 		Payload: newBuffer(obj.payload),
 	}
 
+	if len(obj.Signatures) == 0 {
+		return ""
+	}
+
 	if len(obj.Signatures) == 1 {
 		if obj.Signatures[0].protected != nil {
-			serializedProtected := mustSerializeJSON(obj.Signatures[0].protected)
+			serializedProtected, err := json.Marshal(obj.Signatures[0].protected)
+			if err != nil {
+				return ""
+			}
 			raw.Protected = newBuffer(serializedProtected)
 		}
 		raw.Header = obj.Signatures[0].header
@@ -413,10 +509,18 @@ func (obj JSONWebSignature) FullSerialize() string {
 			}
 
 			if signature.protected != nil {
-				raw.Signatures[i].Protected = newBuffer(mustSerializeJSON(signature.protected))
+				serializedProtected, err := json.Marshal(signature.protected)
+				if err != nil {
+					return ""
+				}
+				raw.Signatures[i].Protected = newBuffer(serializedProtected)
 			}
 		}
 	}
 
-	return string(mustSerializeJSON(raw))
+	out, err := json.Marshal(raw)
+	if err != nil {
+		return ""
+	}
+	return string(out)
 }
