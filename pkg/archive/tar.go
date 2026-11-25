@@ -324,7 +324,10 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		if hdr.Typeflag == tar.TypeDir {
 			dirs = append(dirs, hdr)
 		}
-		unpackedPaths[path] = struct{}{}
+		// Parents exist only so this file can be created. The opaque
+		// walk deletes any directory missing from unpackedPaths, and
+		// that delete takes the nested file with it.
+		recordUnpacked(unpackedPaths, root, path)
 	}
 
 	for _, hdr := range dirs {
@@ -338,6 +341,28 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	}
 
 	return size, nil
+}
+
+// recordUnpacked marks path and each parent strictly inside root.
+// An opaque whiteout removes every directory that is not marked.
+func recordUnpacked(unpacked map[string]struct{}, root, path string) {
+	for path != root && withinRoot(root, path) {
+		if _, ok := unpacked[path]; ok {
+			return
+		}
+		unpacked[path] = struct{}{}
+		next := filepath.Dir(path)
+		if next == path {
+			return
+		}
+		path = next
+	}
+}
+
+func withinRoot(root, path string) bool {
+	return len(path) > len(root) &&
+		strings.HasPrefix(path, root) &&
+		path[len(root)] == os.PathSeparator
 }
 
 func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
