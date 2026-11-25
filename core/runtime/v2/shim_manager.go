@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -201,8 +202,37 @@ func (m *ShimManager) Env() []string {
 	return cp
 }
 
-// Start launches a new shim instance
-func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
+// Start launches a new shim instance in a new working directory,
+// <state>/<namespace>/<id>.
+func (m *ShimManager) Start(ctx context.Context, id, state string, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
+	if err := identifiers.Validate(id); err != nil {
+		return nil, fmt.Errorf("invalid task id %s: %w", id, err)
+	}
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(state, ns, id)
+	if err := os.MkdirAll(filepath.Dir(path), 0711); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(path, 0700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, fmt.Errorf("working directory for %s: %w", id, errdefs.ErrAlreadyExists)
+		}
+		return nil, err
+	}
+	defer func() {
+		if retErr != nil {
+			deleteDir(path)
+		}
+	}()
+	return m.start(ctx, id, path, opts)
+}
+
+// start launches a new shim instance in the working directory at path, which
+// the caller owns: for a task it is the bundle.
+func (m *ShimManager) start(ctx context.Context, id, path string, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	shouldInvokeShimBinary := false
 
 	var params = &bootapi.BootstrapResult{}
@@ -248,7 +278,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 					return nil, fmt.Errorf("can't find shim for sandbox %s: %w", opts.SandboxID, err)
 				}
 
-				p, err := restoreBootstrapParams(process.Bundle())
+				p, err := restoreBootstrapParams(process.WorkDir())
 				if err != nil {
 					return nil, fmt.Errorf("failed to get bootstrap "+
 						"params of sandbox %s: %w", opts.SandboxID, err)
@@ -274,26 +304,26 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 
 	if !shouldInvokeShimBinary {
 		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
 			return nil, err
 		}
 
-		if err := writeBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"), params); err != nil {
-			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
+		if err := writeBootstrapParams(filepath.Join(path, "bootstrap.json"), params); err != nil {
+			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", path, err)
 		}
 
 		runtimePath, err := m.resolveRuntimePath(opts.Runtime)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
 		}
-		b := shimBinary(bundle, shimBinaryConfig{
+		b := shimBinary(path, shimBinaryConfig{
 			runtime:      runtimePath,
 			address:      m.containerdAddress,
 			ttrpcAddress: m.containerdTTRPCAddress,
 			socketDir:    m.socketDir,
 			env:          m.env,
 		})
-		shim, err := loadShim(ctx, bundle, func() {
+		shim, err := loadShim(ctx, path, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 			cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
@@ -314,7 +344,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 		return shim, nil
 	}
 
-	shim, err := m.startShim(ctx, bundle, id, opts)
+	shim, err := m.startShim(ctx, path, id, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +374,7 @@ func sandboxShimExtensions(process ShimInstance) []*bootapi.Extension {
 	return sc.BootstrapResult().GetExtensions()
 }
 
-func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, opts runtime.CreateOpts) (*shim, error) {
+func (m *ShimManager) startShim(ctx context.Context, path string, id string, opts runtime.CreateOpts) (*shim, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -361,7 +391,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
 	}
 
-	b := shimBinary(bundle, shimBinaryConfig{
+	b := shimBinary(path, shimBinaryConfig{
 		runtime:      runtimePath,
 		address:      m.containerdAddress,
 		ttrpcAddress: m.containerdTTRPCAddress,

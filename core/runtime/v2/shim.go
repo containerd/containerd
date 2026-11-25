@@ -53,6 +53,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -77,14 +78,16 @@ func init() {
 	timeout.Set(shutdownTimeout, 3*time.Second)
 }
 
-func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstance, retErr error) {
+func loadShim(ctx context.Context, path string, onClose func()) (_ ShimInstance, retErr error) {
+	id := filepath.Base(path)
+	ns, _ := namespaces.Namespace(ctx)
 	shimCtx, cancelShimLog := context.WithCancel(ctx)
 	defer func() {
 		if retErr != nil {
 			cancelShimLog()
 		}
 	}()
-	f, err := openShimLog(shimCtx, bundle, client.AnonReconnectDialer)
+	f, err := openShimLog(shimCtx, id, path, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, fmt.Errorf("open shim log pipe when reload: %w", err)
 	}
@@ -113,12 +116,12 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		f.Close()
 	}
 
-	params, err := restoreBootstrapParams(bundle.Path)
+	params, err := restoreBootstrapParams(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
+		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", id, err)
 	}
 
-	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog, client.AnonReconnectDialer)
+	conn, err := makeConnection(ctx, id, params, onCloseWithShimLog, client.AnonReconnectDialer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
@@ -133,7 +136,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 
 	shim := &shim{
-		bundle:    bundle,
+		id:        id,
+		namespace: ns,
+		path:      path,
 		client:    conn,
 		address:   address,
 		version:   int(params.Version),
@@ -243,6 +248,8 @@ type ShimInstance interface {
 	Namespace() string
 	// Bundle is a file system path to shim's bundle.
 	Bundle() string
+	// WorkDir is a file system path to shim's working directory.
+	WorkDir() string
 	// Client returns the underlying TTRPC or GRPC client object for this shim.
 	// The underlying object can be either *ttrpc.Client or grpc.ClientConnInterface.
 	Client() any
@@ -477,7 +484,10 @@ func (gc *grpcConn) UserOnCloseWait(ctx context.Context) error {
 }
 
 type shim struct {
-	bundle  *Bundle
+	id        string
+	namespace string
+	// path is the shim's working directory.
+	path    string
 	client  any
 	address string
 	version int
@@ -501,7 +511,7 @@ func (s *shim) BootstrapResult() *bootapi.BootstrapResult {
 
 // ID of the shim/task
 func (s *shim) ID() string {
-	return s.bundle.ID
+	return s.id
 }
 
 func (s *shim) Endpoint() (string, int) {
@@ -518,11 +528,15 @@ func (s *shim) Downgrade() error {
 }
 
 func (s *shim) Namespace() string {
-	return s.bundle.Namespace
+	return s.namespace
 }
 
 func (s *shim) Bundle() string {
-	return s.bundle.Path
+	return s.path
+}
+
+func (s *shim) WorkDir() string {
+	return s.path
 }
 
 func (s *shim) Client() any {
@@ -565,7 +579,7 @@ func (s *shim) Delete(ctx context.Context) error {
 		}
 	}
 
-	if err := s.bundle.Delete(); err != nil {
+	if err := deleteDir(s.path); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
 		result = append(result, fmt.Errorf("failed to delete bundle: %w", err))
 	}
@@ -710,14 +724,14 @@ func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Conte
 	return exit, nil
 }
 
-func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
+func (s *shimTask) Create(ctx context.Context, bundle string, opts runtime.CreateOpts) (runtime.Task, error) {
 	topts := opts.TaskOptions
 	if topts == nil || topts.GetValue() == nil {
 		topts = opts.RuntimeOptions
 	}
 	request := &task.CreateTaskRequest{
 		ID:         s.ID(),
-		Bundle:     s.Bundle(),
+		Bundle:     bundle,
 		Stdin:      opts.IO.Stdin,
 		Stdout:     opts.IO.Stdout,
 		Stderr:     opts.IO.Stderr,
@@ -761,7 +775,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 				return nil, fmt.Errorf("failed to decompress archive %s for import: %w", rootfsDiffTar.Name(), err)
 			}
 
-			rootfs := filepath.Join(s.Bundle(), "rootfs")
+			rootfs := filepath.Join(bundle, "rootfs")
 			_, err = archive.Apply(
 				ctx,
 				rootfs,

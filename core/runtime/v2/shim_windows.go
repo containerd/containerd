@@ -63,7 +63,7 @@ func (dpc *deferredPipeConnection) Close() error {
 
 // openShimLog on Windows acts as the client of the log pipe. In this way the
 // containerd daemon can reconnect to the shim log stream if it is restarted.
-func openShimLog(ctx context.Context, bundle *Bundle, dialer func(string, time.Duration) (net.Conn, error)) (io.ReadCloser, error) {
+func openShimLog(ctx context.Context, id, path string, dialer func(string, time.Duration) (net.Conn, error)) (io.ReadCloser, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func openShimLog(ctx context.Context, bundle *Bundle, dialer func(string, time.D
 	}
 	dpc.wg.Go(func() {
 		c, conerr := dialer(
-			fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, bundle.ID),
+			fmt.Sprintf("\\\\.\\pipe\\containerd-shim-%s-%s-log", ns, id),
 			time.Second*10,
 		)
 		if conerr != nil {
