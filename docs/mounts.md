@@ -30,7 +30,7 @@ mounts in the host mount namespace.
 
 Typically snapshotters are limited to mount types which are mountable by
 the host kernel, or in some advanced use cases, a vm guest kernel. The mount
-manager is able to extend the mount types by using a plugable interface to
+manager is able to extend the mount types by using a pluggable interface to
 handle custom mount types.
 
 The interface for a custom mount handler is very simple.

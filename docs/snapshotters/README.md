@@ -33,7 +33,7 @@ Filesystem-specific:
 
 Mounts can optionally specify a target to describe submounts in the container's
 rootfs. For example, if the snapshotter wishes to bind mount to a subdirectory
-ontop of an overlayfs mount, they can return the following mounts:
+on top of an overlayfs mount, they can return the following mounts:
 
 ```json
 [
