@@ -18,7 +18,6 @@ package sandboxes
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -26,7 +25,6 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/urfave/cli/v3"
@@ -50,7 +48,7 @@ var runCommand = &cli.Command{
 	Name:      "run",
 	Aliases:   []string{"create", "c", "r"},
 	Usage:     "Run a new sandbox",
-	ArgsUsage: "[flags] <pod-config.json> <sandbox-id>",
+	ArgsUsage: "[flags] <sandbox-id>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "runtime",
@@ -60,23 +58,13 @@ var runCommand = &cli.Command{
 	},
 	DisableSliceFlagSeparator: true,
 	Action: func(ctx context.Context, cmd *cli.Command) error {
-		if cmd.NArg() != 2 {
+		if cmd.NArg() != 1 {
 			return cli.ShowSubcommandHelp(cmd)
 		}
 		var (
-			id      = cmd.Args().Get(1)
+			id      = cmd.Args().First()
 			runtime = cmd.String("runtime")
 		)
-
-		spec, err := os.ReadFile(cmd.Args().First())
-		if err != nil {
-			return fmt.Errorf("failed to read sandbox config: %w", err)
-		}
-
-		ociSpec := oci.Spec{}
-		if err = json.Unmarshal(spec, &ociSpec); err != nil {
-			return fmt.Errorf("failed to parse sandbox config: %w", err)
-		}
 
 		client, ctx, cancel, err := commands.NewClient(ctx, cmd)
 		if err != nil {
@@ -86,7 +74,6 @@ var runCommand = &cli.Command{
 
 		sandbox, err := client.NewSandbox(ctx, id,
 			containerd.WithSandboxRuntime(runtime, nil),
-			containerd.WithSandboxSpec(&ociSpec),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to create new sandbox: %w", err)

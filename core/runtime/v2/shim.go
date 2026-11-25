@@ -247,6 +247,8 @@ type ShimInstance interface {
 	// Namespace of this shim.
 	Namespace() string
 	// Bundle is a file system path to shim's bundle.
+	//
+	// Deprecated: use WorkDir.
 	Bundle() string
 	// WorkDir is a file system path to shim's working directory.
 	WorkDir() string
@@ -531,6 +533,9 @@ func (s *shim) Namespace() string {
 	return s.namespace
 }
 
+// Bundle is a file system path to shim's bundle.
+//
+// Deprecated: use WorkDir.
 func (s *shim) Bundle() string {
 	return s.path
 }

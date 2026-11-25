@@ -36,6 +36,8 @@ import (
 )
 
 // LoadBundle loads an existing bundle from disk
+//
+// Deprecated: containerd no longer loads shims through a Bundle.
 func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
