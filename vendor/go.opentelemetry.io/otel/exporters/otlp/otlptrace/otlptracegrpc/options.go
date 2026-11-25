@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlptracegrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+package otlptracegrpc
 
 import (
 	"fmt"
@@ -74,9 +74,10 @@ func WithEndpoint(endpoint string) Option {
 	return wrappedOption{otlpconfig.WithEndpoint(endpoint)}
 }
 
-// WithEndpointURL sets the target endpoint URL (scheme, host, port, path)
-// the Exporter will connect to. The provided endpoint URL should resemble
-// "https://example.com:4318/v1/traces".
+// WithEndpointURL sets the target endpoint URL (scheme, host, port) the
+// Exporter will connect to. The provided endpoint URL should resemble
+// "https://example.com:4317". If the URL contains a path, it is ignored by
+// the gRPC client.
 //
 // If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
@@ -90,7 +91,7 @@ func WithEndpoint(endpoint string) Option {
 // If an invalid URL is provided, the default value will be kept.
 //
 // By default, if an environment variable is not set, and this option is not
-// passed, "https://localhost:4317/v1/traces" will be used.
+// passed, "https://localhost:4317" will be used.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpointURL(u string) Option {
@@ -190,6 +191,16 @@ func WithGRPCConn(conn *grpc.ClientConn) Option {
 // If unset, the default timeout will be set to 10 seconds.
 func WithTimeout(duration time.Duration) Option {
 	return wrappedOption{otlpconfig.WithTimeout(duration)}
+}
+
+// WithMaxRequestSize sets the maximum size, in bytes, of a serialized export
+// request, before compression, that the exporter will send.
+//
+// If size is less than or equal to zero, no request-size limit is applied.
+// Disabling the limit is not recommended because it can lead to excessive
+// resource consumption or abuse.
+func WithMaxRequestSize(size int) Option {
+	return wrappedOption{otlpconfig.WithMaxRequestSize(size)}
 }
 
 // WithRetry sets the retry policy for transient retryable errors that may be
