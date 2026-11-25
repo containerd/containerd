@@ -104,8 +104,8 @@ func TestCreateUnixSocketOverDirectory(t *testing.T) {
 	}
 }
 
-// TestCreateUnixSocketDACL verifies that only Builtin Administrators and Local
-// System can reach the socket, which is root-equivalent.
+// TestCreateUnixSocketDACL verifies that only Builtin Administrators, Local
+// System and the process user can reach the socket.
 func TestCreateUnixSocketDACL(t *testing.T) {
 	sockPath := filepath.Join(shortTempDir(t), "test.sock")
 
@@ -129,7 +129,27 @@ func TestCreateUnixSocketDACL(t *testing.T) {
 		t.Errorf("DACL is not protected: control = %#x, sd = %q", control, sd)
 	}
 
-	// Exactly the two ACEs of the SDDL.
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		t.Fatalf("GetTokenUser failed: %v", err)
+	}
+	wantACEs := uint16(2)
+	sids := []string{";;;BA)", ";;;SY)"}
+	if !user.User.Sid.IsWellKnown(windows.WinLocalSystemSid) {
+		wantACEs++
+		// SDDL serialization uses aliases for some well-known SIDs, such
+		// as LS for Local Service and NS for Network Service.
+		userSD, err := windows.SecurityDescriptorFromString("D:(A;;GA;;;" + user.User.Sid.String() + ")")
+		if err != nil {
+			t.Fatalf("SecurityDescriptorFromString failed: %v", err)
+		}
+		// Compare only the trustee: applying the descriptor to a file
+		// maps generic access (GA) to file access (FA).
+		userSDDL := userSD.String()
+		sids = append(sids, userSDDL[strings.LastIndex(userSDDL, ";;;"):])
+	}
+
+	// No ACEs beyond the explicitly granted principals.
 	dacl, _, err := sd.DACL()
 	if err != nil {
 		t.Fatalf("DACL failed: %v", err)
@@ -137,12 +157,25 @@ func TestCreateUnixSocketDACL(t *testing.T) {
 	if dacl == nil {
 		t.Fatal("socket has a NULL DACL, which grants everyone full access")
 	}
-	if dacl.AceCount != 2 {
-		t.Errorf("DACL has %d ACEs, want 2: %q", dacl.AceCount, sd)
+	if dacl.AceCount != wantACEs {
+		t.Errorf("DACL has %d ACEs, want %d: %q", dacl.AceCount, wantACEs, sd)
 	}
-	for _, sid := range []string{";;;BA)", ";;;SY)"} {
+	for _, sid := range sids {
 		if !strings.Contains(sd.String(), sid) {
 			t.Errorf("DACL %q is missing an ACE for %q", sd, sid)
 		}
 	}
+}
+
+// TestCreateUnixSocketNewParent verifies that the process user can traverse
+// newly created parent directories and connect to its own socket.
+func TestCreateUnixSocketNewParent(t *testing.T) {
+	sockPath := filepath.Join(shortTempDir(t), "a", "b", "test.sock")
+	l, err := createUnixSocket(sockPath)
+	if err != nil {
+		t.Fatalf("createUnixSocket(%q) failed: %v", sockPath, err)
+	}
+	defer l.Close()
+
+	checkAccept(t, l, func() (net.Conn, error) { return net.Dial("unix", sockPath) })
 }
