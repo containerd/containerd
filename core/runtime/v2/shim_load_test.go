@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	runtimeapi "github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
@@ -37,6 +38,12 @@ type notFoundContainerStore struct{ containers.Store }
 
 func (notFoundContainerStore) Get(context.Context, string) (containers.Container, error) {
 	return containers.Container{}, errdefs.ErrNotFound
+}
+
+type notFoundSandboxStore struct{ sandbox.Store }
+
+func (notFoundSandboxStore) Get(context.Context, string) (sandbox.Sandbox, error) {
+	return sandbox.Sandbox{}, errdefs.ErrNotFound
 }
 
 func TestShouldCleanupShim(t *testing.T) {
@@ -118,9 +125,10 @@ func TestLoadShimKeepsBundleWhenBinaryMissing(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(bundle.Path, "shim-binary-path"), []byte(gone), 0o600))
 
 	m := &ShimManager{
-		containers: notFoundContainerStore{},
-		shims:      runtimeapi.NewNSMap[ShimInstance](),
-		events:     exchange.NewExchange(),
+		containers:   notFoundContainerStore{},
+		sandboxStore: notFoundSandboxStore{},
+		shims:        runtimeapi.NewNSMap[ShimInstance](),
+		events:       exchange.NewExchange(),
 	}
 	// It gets as far as connecting, which fails for lack of a shim.
 	require.ErrorContains(t, m.loadShim(ctx, bundle), "unable to load shim")

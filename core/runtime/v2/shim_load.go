@@ -164,8 +164,8 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	recorded := runtime
 	runtime, err := m.resolveRuntimePath(recorded)
 	if err != nil {
-		if c, cerr := m.containers.Get(ctx, id); cerr == nil && c.Runtime.Name != recorded {
-			runtime, err = m.resolveRuntimePath(c.Runtime.Name)
+		if name := m.metadataRuntimeName(ctx, id); name != "" && name != recorded {
+			runtime, err = m.resolveRuntimePath(name)
 		}
 	}
 	if err != nil {
@@ -301,4 +301,16 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context, rootDir string) error
 		}
 	}
 	return nil
+}
+
+// metadataRuntimeName returns the runtime name recorded for a container, or
+// for a sandbox when there is no container. It returns "" if neither exists.
+func (m *ShimManager) metadataRuntimeName(ctx context.Context, id string) string {
+	if c, err := m.containers.Get(ctx, id); err == nil {
+		return c.Runtime.Name
+	}
+	if sb, err := m.sandboxStore.Get(ctx, id); err == nil {
+		return sb.Runtime.Name
+	}
+	return ""
 }
