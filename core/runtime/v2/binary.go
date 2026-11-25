@@ -35,14 +35,8 @@ import (
 	"github.com/containerd/log"
 )
 
-const (
-	shimBinaryPathFile     = "shim-binary-path"
-	shimBinaryOverrideFile = "shim-binary-override"
-)
-
 type shimBinaryConfig struct {
 	runtime      string
-	override     bool // runtime is an explicit path, not resolved from a name
 	address      string
 	ttrpcAddress string
 	socketDir    string
@@ -53,7 +47,6 @@ func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
 	return &binary{
 		bundle:                 bundle,
 		runtime:                config.runtime,
-		override:               config.override,
 		containerdAddress:      config.address,
 		containerdTTRPCAddress: config.ttrpcAddress,
 		socketDir:              config.socketDir,
@@ -63,24 +56,11 @@ func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
 
 type binary struct {
 	runtime                string
-	override               bool
 	containerdAddress      string
 	containerdTTRPCAddress string
 	socketDir              string
 	bundle                 *Bundle
 	env                    []string
-}
-
-// saveShimBinaryPath records the shim binary path for restore. An explicit
-// override is marked so that restore never replaces it with another shim.
-func saveShimBinaryPath(bundlePath, runtime string, override bool) error {
-	if err := os.WriteFile(filepath.Join(bundlePath, shimBinaryPathFile), []byte(runtime), 0600); err != nil {
-		return err
-	}
-	if !override {
-		return nil
-	}
-	return os.WriteFile(filepath.Join(bundlePath, shimBinaryOverrideFile), nil, 0600)
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
@@ -142,7 +122,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		f.Close()
 	}
 	// Save runtime binary path for restore.
-	if err := saveShimBinaryPath(b.bundle.Path, b.runtime, b.override); err != nil {
+	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
 		return nil, err
 	}
 
