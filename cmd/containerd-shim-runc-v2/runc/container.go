@@ -327,12 +327,15 @@ func (c *Container) ReserveProcess(id string) (bool, func()) {
 }
 
 // ProcessAdd adds a new process to the container
-func (c *Container) ProcessAdd(process process.Process) {
+func (c *Container) ProcessAdd(p process.Process) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	delete(c.reservedProcess, process.ID())
-	c.processes[process.ID()] = process
+	delete(c.reservedProcess, p.ID())
+	if c.processes == nil {
+		c.processes = make(map[string]process.Process)
+	}
+	c.processes[p.ID()] = p
 }
 
 // ProcessRemove removes the process by id from the container

@@ -325,8 +325,12 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 				ch <- s.runningExecs[container]
 			}
 			s.lifecycleMu.Unlock()
+			// preStart does not remove an exec from s.running. The process
+			// returned with this error is the one already running, and
+			// handleStarted would record its pid a second time.
+		} else {
+			handleStarted(container, p)
 		}
-		handleStarted(container, p)
 		return nil, errgrpc.ToGRPC(err)
 	}
 
