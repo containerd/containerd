@@ -34,16 +34,28 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
-type notFoundContainerStore struct{ containers.Store }
-
-func (notFoundContainerStore) Get(context.Context, string) (containers.Container, error) {
-	return containers.Container{}, errdefs.ErrNotFound
+type fakeContainerStore struct {
+	containers.Store
+	runtime string
 }
 
-type notFoundSandboxStore struct{ sandbox.Store }
+func (s fakeContainerStore) Get(context.Context, string) (containers.Container, error) {
+	if s.runtime == "" {
+		return containers.Container{}, errdefs.ErrNotFound
+	}
+	return containers.Container{Runtime: containers.RuntimeInfo{Name: s.runtime}}, nil
+}
 
-func (notFoundSandboxStore) Get(context.Context, string) (sandbox.Sandbox, error) {
-	return sandbox.Sandbox{}, errdefs.ErrNotFound
+type fakeSandboxStore struct {
+	sandbox.Store
+	runtime string
+}
+
+func (s fakeSandboxStore) Get(context.Context, string) (sandbox.Sandbox, error) {
+	if s.runtime == "" {
+		return sandbox.Sandbox{}, errdefs.ErrNotFound
+	}
+	return sandbox.Sandbox{Runtime: sandbox.RuntimeOpts{Name: s.runtime}}, nil
 }
 
 func TestShouldCleanupShim(t *testing.T) {
@@ -125,12 +137,47 @@ func TestLoadShimKeepsBundleWhenBinaryMissing(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(bundle.Path, "shim-binary-path"), []byte(gone), 0o600))
 
 	m := &ShimManager{
-		containers:   notFoundContainerStore{},
-		sandboxStore: notFoundSandboxStore{},
+		containers:   fakeContainerStore{},
+		sandboxStore: fakeSandboxStore{},
 		shims:        runtimeapi.NewNSMap[ShimInstance](),
 		events:       exchange.NewExchange(),
 	}
 	// It gets as far as connecting, which fails for lack of a shim.
 	require.ErrorContains(t, m.loadShim(ctx, bundle), "unable to load shim")
 	require.DirExists(t, bundle.Path)
+}
+
+func TestResolveLoadRuntime(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	newBinary := func() string {
+		p := filepath.Join(t.TempDir(), "containerd-shim-test")
+		require.NoError(t, os.WriteFile(p, nil, 0o700))
+		return p
+	}
+	recorded, fromContainer, fromSandbox := newBinary(), newBinary(), newBinary()
+	gone := filepath.Join(t.TempDir(), "gone", "containerd-shim-test")
+
+	for _, tc := range []struct {
+		name      string
+		recorded  string
+		container string
+		sandbox   string
+		want      string
+	}{
+		{name: "recorded path exists", recorded: recorded, container: fromContainer, want: recorded},
+		{name: "container name", recorded: gone, container: fromContainer, want: fromContainer},
+		{name: "sandbox name", recorded: gone, sandbox: fromSandbox, want: fromSandbox},
+		{name: "container before sandbox", recorded: gone, container: fromContainer, sandbox: fromSandbox, want: fromContainer},
+		{name: "no metadata", recorded: gone, want: gone},
+		{name: "name cannot be resolved", recorded: gone, container: gone + "2", want: gone},
+		{name: "name equals recorded", recorded: gone, container: gone, want: gone},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := &ShimManager{
+				containers:   fakeContainerStore{runtime: tc.container},
+				sandboxStore: fakeSandboxStore{runtime: tc.sandbox},
+			}
+			require.Equal(t, tc.want, m.resolveLoadRuntime(ctx, "id", tc.recorded))
+		})
+	}
 }

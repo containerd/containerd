@@ -158,20 +158,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		runtime = container.Runtime.Name
 	}
 
-	// Reconnecting to a live shim does not need its binary, only cleaning up a
-	// dead one does. If the recorded path is gone, try the container's runtime
-	// name, else keep the recorded path and still try to connect.
-	recorded := runtime
-	runtime, err := m.resolveRuntimePath(recorded)
-	if err != nil {
-		if name := m.metadataRuntimeName(ctx, id); name != "" && name != recorded {
-			runtime, err = m.resolveRuntimePath(name)
-		}
-	}
-	if err != nil {
-		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to resolve shim binary path, trying to reconnect anyway")
-		runtime = recorded
-	}
+	runtime = m.resolveLoadRuntime(ctx, id, runtime)
 
 	binaryCall := shimBinary(bundle,
 		shimBinaryConfig{
@@ -301,6 +288,24 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context, rootDir string) error
 		}
 	}
 	return nil
+}
+
+// resolveLoadRuntime returns the shim binary to use for a loaded bundle.
+// Reconnecting to a live shim does not need its binary, only cleaning up a
+// dead one does. If the recorded path is gone, try the runtime name from
+// metadata, else keep the recorded path and still try to connect.
+func (m *ShimManager) resolveLoadRuntime(ctx context.Context, id, recorded string) string {
+	runtime, err := m.resolveRuntimePath(recorded)
+	if err != nil {
+		if name := m.metadataRuntimeName(ctx, id); name != "" && name != recorded {
+			runtime, err = m.resolveRuntimePath(name)
+		}
+	}
+	if err != nil {
+		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to resolve shim binary path, trying to reconnect anyway")
+		return recorded
+	}
+	return runtime
 }
 
 // metadataRuntimeName returns the runtime name recorded for a container, or
