@@ -18,9 +18,9 @@ func newIntrospectIntf(h *defaultHandler) *exportedIntf {
 	return newExportedIntf(methods, true)
 }
 
-//NewDefaultHandler returns an instance of the default
-//call handler. This is useful if you want to implement only
-//one of the two handlers but not both.
+// NewDefaultHandler returns an instance of the default
+// call handler. This is useful if you want to implement only
+// one of the two handlers but not both.
 //
 // Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultHandler() *defaultHandler {
@@ -52,9 +52,9 @@ func (h *defaultHandler) introspectPath(path ObjectPath) string {
 		if p != "/" {
 			p += "/"
 		}
-		if strings.HasPrefix(string(obj), p) {
-			node_name := strings.Split(string(obj[len(p):]), "/")[0]
-			subpath[node_name] = struct{}{}
+		if after, ok := strings.CutPrefix(string(obj), p); ok {
+			name, _, _ := strings.Cut(after, "/")
+			subpath[name] = struct{}{}
 		}
 	}
 	for s := range subpath {
@@ -114,18 +114,18 @@ func (h *defaultHandler) DeleteObject(path ObjectPath) {
 }
 
 type exportedMethod struct {
-	reflect.Value
+	fn reflect.Value
 }
 
-func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
-	t := m.Type()
+func (m exportedMethod) Call(args ...any) ([]any, error) {
+	t := m.fn.Type()
 
 	params := make([]reflect.Value, len(args))
 	for i := 0; i < len(args); i++ {
 		params[i] = reflect.ValueOf(args[i]).Elem()
 	}
 
-	ret := m.Value.Call(params)
+	ret := m.fn.Call(params)
 	var err error
 	nilErr := false // The reflection will find almost-nils, let's only pass back clean ones!
 	if t.NumOut() > 0 {
@@ -143,31 +143,31 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 			ret = ret[:t.NumOut()-1]
 		}
 	}
-	out := make([]interface{}, len(ret))
+	out := make([]any, len(ret))
 	for i, val := range ret {
 		out[i] = val.Interface()
 	}
 	if nilErr || err == nil {
-		//concrete type to interface nil is a special case
+		// concrete type to interface nil is a special case
 		return out, nil
 	}
 	return out, err
 }
 
 func (m exportedMethod) NumArguments() int {
-	return m.Value.Type().NumIn()
+	return m.fn.Type().NumIn()
 }
 
-func (m exportedMethod) ArgumentValue(i int) interface{} {
-	return reflect.Zero(m.Type().In(i)).Interface()
+func (m exportedMethod) ArgumentValue(i int) any {
+	return reflect.Zero(m.fn.Type().In(i)).Interface()
 }
 
 func (m exportedMethod) NumReturns() int {
-	return m.Value.Type().NumOut()
+	return m.fn.Type().NumOut()
 }
 
-func (m exportedMethod) ReturnValue(i int) interface{} {
-	return reflect.Zero(m.Type().Out(i)).Interface()
+func (m exportedMethod) ReturnValue(i int) any {
+	return reflect.Zero(m.fn.Type().Out(i)).Interface()
 }
 
 func newExportedObject() *exportedObj {
@@ -215,10 +215,6 @@ func (obj *exportedObj) LookupMethod(name string) (Method, bool) {
 	return nil, false
 }
 
-func (obj *exportedObj) isFallbackInterface() bool {
-	return false
-}
-
 func newExportedIntf(methods map[string]Method, includeSubtree bool) *exportedIntf {
 	return &exportedIntf{
 		methods:        methods,
@@ -242,9 +238,9 @@ func (obj *exportedIntf) isFallbackInterface() bool {
 	return obj.includeSubtree
 }
 
-//NewDefaultSignalHandler returns an instance of the default
-//signal handler. This is useful if you want to implement only
-//one of the two handlers but not both.
+// NewDefaultSignalHandler returns an instance of the default
+// signal handler. This is useful if you want to implement only
+// one of the two handlers but not both.
 //
 // Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultSignalHandler() *defaultSignalHandler {

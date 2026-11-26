@@ -109,16 +109,26 @@ var configCommand = &cli.Command{
 
 func dumpConfig(ctx context.Context, cmd *cli.Command) error {
 	config := defaultConfig()
+	if err := loadConfig(ctx, cmd, config); err != nil {
+		return err
+	}
+	return outputConfig(ctx, config)
+}
 
-	g := registry.Graph(func(*plugin.Registration) bool { return false })
+func loadConfig(ctx context.Context, cmd *cli.Command, config *srvconfig.Config) error {
+	path := cmd.String("config")
+	// Only the implicit top-level config file is optional.
+	if !cmd.IsSet("config") {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return nil
+		}
+	}
+
+	g := registry.Graph(nil)
 	plugins := func() iter.Seq[plugin.Registration] {
 		return slices.Values(g)
 	}
-	if err := srvconfig.LoadConfigWithPlugins(ctx, cmd.String("config"), plugins, config); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	return outputConfig(ctx, config)
+	return srvconfig.LoadConfigWithPlugins(ctx, path, plugins, config)
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {

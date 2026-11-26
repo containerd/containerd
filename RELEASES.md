@@ -140,7 +140,7 @@ to all committers.
 | [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.36) | End of Life    | March 10, 2023                 | September 30, 2026             |                        |
 | [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.13) | LTS            | November 5, 2024               | March 2027*                    | [@samuelkarp](https://github.com/samuelkarp), [@chrishenzie](https://github.com/chrishenzie) |
 | [2.1](https://github.com/containerd/containerd/releases/tag/v2.1.9)  | End of Life    | May 7, 2025                    | July 3, 2026                   |                        |
-| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.9)  | Active         | November 5, 2025               | November 6, 2026               | @containerd/committers |
+| [2.2](https://github.com/containerd/containerd/releases/tag/v2.2.9)  | End of Life    | November 5, 2025               | November 6, 2026               |                        |
 | [2.3](https://github.com/containerd/containerd/releases/tag/v2.3.6)  | LTS            | April 30, 2026                 | April 30, 2028                 | @containerd/committers |
 | [2.4](https://github.com/containerd/containerd/releases/tag/v2.4.1)  | Active         | September 16, 2026             | May 16, 2027                   | @containerd/committers |
 | _[2.5](https://github.com/containerd/containerd/milestone/52)_       | _Planned_      | _January 6, 2027_              | _September 6, 2027_            | @containerd/committers |
@@ -518,7 +518,7 @@ As of containerd 2.0, the Go client API documented in
 [godoc](https://godoc.org/github.com/containerd/containerd/v2/client) is stable.
 Note that because the Go client interfaces with the GRPC API, clients building on top
 of the Go client should remain compatible with future server releases implementing the
-same major GRPC API series. For backwards compatability and as a general rule of thumb,
+same major GRPC API series. For backwards compatibility and as a general rule of thumb,
 it is the client's responsibility to handle not implemented errors returned by the containerd daemon.
 
 Any changes to the Go client API should be detectable at compile time, so upgrading will

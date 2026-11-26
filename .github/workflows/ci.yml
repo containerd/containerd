@@ -109,6 +109,35 @@ jobs:
       - run: script/setup/install-dev-tools
       - run: make check-protos
 
+  #
+  # Dependency checks
+  #
+  # gosocialcheck reports the dependencies which do not appear to be adopted by a trusted
+  # project (CNCF Graduated).
+  # This is advisory, not a gate: `--gha` reports the findings as annotations on the run and
+  # on the PR, and always exits 0. So this job is intentionally not listed in `results`.
+  deps:
+    name: Dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # gosocialcheck's `--gha` fetches the base branch on demand to rank the findings whose
+          # go.sum line changed in the PR first, so a shallow checkout is enough.
+          persist-credentials: false
+      - uses: ./.github/actions/install-go
+      - run: script/setup/install-dev-tools
+      # One step per module, as GitHub Actions shows at most 10 warning annotations per step
+      - run: make check-gosocialcheck GOSOCIALCHECK_MODULES=.
+        env:
+          # gosocialcheck queries the GitHub API, which is heavily rate-limited when anonymous
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: make check-gosocialcheck GOSOCIALCHECK_MODULES=api
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   man:
     name: Manpages
     runs-on: ubuntu-24.04
@@ -399,6 +428,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
+    if: github.event_name != 'merge_group'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     needs: [project, linters, protos, man]
@@ -760,6 +790,7 @@ jobs:
 
   integration-runsc:
     name: runsc (gVisor) integration
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [project, linters, protos, man]
@@ -867,7 +898,7 @@ jobs:
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
-
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
@@ -968,7 +999,7 @@ jobs:
     name: Report required job statuses
     runs-on: ubuntu-24.04
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
-    needs: [linters, project, protos, binaries, integration-linux, integration-windows, integration-runsc, tests-cri-in-userns, tests-mac-os, node-e2e]
+    needs: [linters, project, protos, man, crossbuild, binaries, integration-linux, integration-windows, integration-runsc, tests-cri-in-userns, tests-mac-os, node-e2e]
     if: ${{ always() }}
     steps:
       - run: exit 1

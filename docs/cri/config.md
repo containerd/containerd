@@ -602,7 +602,7 @@ version = 2
 
       # sandboxer is the sandbox controller for the runtime.
       # The default sandbox controller is the podsandbox controller, which create a "pause" container as a sandbox.
-      # We can create our own "shim" sandbox controller by implementing the sandbox api defined in runtime/sandbox/v1/sandbox.proto in our shim, and specifiy the sandboxer to "shim" here.
+      # We can create our own "shim" sandbox controller by implementing the sandbox api defined in runtime/sandbox/v1/sandbox.proto in our shim, and specify the sandboxer to "shim" here.
       # We can also run a grpc or ttrpc server to serve the sandbox controller API defined in services/sandbox/v1/sandbox.proto, and define a ProxyPlugin of "sandbox" type, and specify the name of the ProxyPlugin here.
       sandboxer = ""
 

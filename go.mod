@@ -2,6 +2,7 @@ module github.com/containerd/containerd/v2
 
 go 1.27.0
 
+// containerd, Docker/Moby, OCI, and golang.org/x packages are trusted
 require (
 	dario.cat/mergo v1.0.2
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
@@ -9,34 +10,34 @@ require (
 	github.com/Microsoft/hcsshim v0.15.0
 	github.com/checkpoint-restore/checkpointctl v1.7.0
 	github.com/checkpoint-restore/go-criu/v7 v7.2.0
-	github.com/containerd/btrfs/v2 v2.0.0
-	github.com/containerd/cgroups/v3 v3.1.3
-	github.com/containerd/console v1.0.5
-	github.com/containerd/containerd/api v1.12.0
-	github.com/containerd/continuity v0.5.1-0.20261030162832-8b279b01a614
-	github.com/containerd/errdefs v1.0.0
-	github.com/containerd/errdefs/pkg v0.3.0
-	github.com/containerd/fifo v1.1.0
-	github.com/containerd/go-cni v1.1.14
-	github.com/containerd/go-dmverity v0.0.0-20260611211332-9879dd340c85
-	github.com/containerd/go-runc v1.2.1
-	github.com/containerd/imgcrypt/v2 v2.0.3
-	github.com/containerd/log v0.2.0
-	github.com/containerd/log/otel v0.1.0
-	github.com/containerd/nri v0.12.5
-	github.com/containerd/otelttrpc v0.1.0
-	github.com/containerd/platforms v1.0.0-rc.5
-	github.com/containerd/plugin v1.1.0
-	github.com/containerd/ttrpc v1.2.9
-	github.com/containerd/typeurl/v2 v2.3.0
-	github.com/containerd/zfs/v2 v2.0.0
+	github.com/containerd/btrfs/v2 v2.0.0 //gosocialcheck:trusted
+	github.com/containerd/cgroups/v3 v3.1.3 //gosocialcheck:trusted
+	github.com/containerd/console v1.0.5 //gosocialcheck:trusted
+	github.com/containerd/containerd/api v1.12.0 //gosocialcheck:trusted
+	github.com/containerd/continuity v0.5.1-0.20261030162832-8b279b01a614 //gosocialcheck:trusted
+	github.com/containerd/errdefs v1.0.0 //gosocialcheck:trusted
+	github.com/containerd/errdefs/pkg v0.3.0 //gosocialcheck:trusted
+	github.com/containerd/fifo v1.1.0 //gosocialcheck:trusted
+	github.com/containerd/go-cni v1.1.15 //gosocialcheck:trusted
+	github.com/containerd/go-dmverity v0.1.0 //gosocialcheck:trusted
+	github.com/containerd/go-runc v1.2.1 //gosocialcheck:trusted
+	github.com/containerd/imgcrypt/v2 v2.0.3 //gosocialcheck:trusted
+	github.com/containerd/log v0.2.0 //gosocialcheck:trusted
+	github.com/containerd/log/otel v0.1.0 //gosocialcheck:trusted
+	github.com/containerd/nri v0.12.5 //gosocialcheck:trusted
+	github.com/containerd/otelttrpc v0.1.0 //gosocialcheck:trusted
+	github.com/containerd/platforms v1.0.0-rc.5 //gosocialcheck:trusted
+	github.com/containerd/plugin v1.1.0 //gosocialcheck:trusted
+	github.com/containerd/ttrpc v1.2.10 //gosocialcheck:trusted
+	github.com/containerd/typeurl/v2 v2.3.0 //gosocialcheck:trusted
+	github.com/containerd/zfs/v2 v2.0.0 //gosocialcheck:trusted
 	github.com/containernetworking/cni v1.3.1
-	github.com/containernetworking/plugins v1.9.1
+	github.com/containernetworking/plugins v1.10.0
 	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/distribution/reference v0.6.0
-	github.com/docker/go-events v0.1.0
-	github.com/docker/go-metrics v0.1.0
-	github.com/docker/go-units v0.5.0
+	github.com/docker/go-events v0.1.0 //gosocialcheck:trusted
+	github.com/docker/go-metrics v0.1.0 //gosocialcheck:trusted
+	github.com/docker/go-units v0.5.0 //gosocialcheck:trusted
 	github.com/erofs/go-erofs v0.3.3-0.20261101155608-4c135619312a
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/google/certtostore v1.0.7
@@ -44,18 +45,18 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.1
 	github.com/intel/goresctrl v0.13.0
-	github.com/klauspost/compress v1.20.3
-	github.com/mdlayher/vsock v1.3.0
-	github.com/moby/locker v1.0.1
-	github.com/moby/sys/mountinfo v0.7.2
-	github.com/moby/sys/signal v0.7.1
-	github.com/moby/sys/symlink v0.3.0
-	github.com/moby/sys/user v0.4.1
-	github.com/moby/sys/userns v0.2.1
-	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.1.1
-	github.com/opencontainers/runtime-spec v1.3.0
-	github.com/opencontainers/selinux v1.15.1
+	github.com/klauspost/compress v1.20.4
+	github.com/mdlayher/vsock v1.4.0
+	github.com/moby/locker v1.0.1 //gosocialcheck:trusted
+	github.com/moby/sys/mountinfo v0.7.2 //gosocialcheck:trusted
+	github.com/moby/sys/signal v0.7.1 //gosocialcheck:trusted
+	github.com/moby/sys/symlink v0.3.0 //gosocialcheck:trusted
+	github.com/moby/sys/user v0.5.1 //gosocialcheck:trusted
+	github.com/moby/sys/userns v0.2.1 //gosocialcheck:trusted
+	github.com/opencontainers/go-digest v1.0.0 //gosocialcheck:trusted
+	github.com/opencontainers/image-spec v1.1.1 //gosocialcheck:trusted
+	github.com/opencontainers/runtime-spec v1.3.0 //gosocialcheck:trusted
+	github.com/opencontainers/selinux v1.15.1 //gosocialcheck:trusted
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
@@ -76,10 +77,10 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.47.0
 	go.opentelemetry.io/otel/sdk v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
-	golang.org/x/mod v0.42.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/sys v0.49.0
-	golang.org/x/time v0.16.0
+	golang.org/x/mod v0.43.0 //gosocialcheck:trusted
+	golang.org/x/sync v0.25.0 //gosocialcheck:trusted
+	golang.org/x/sys v0.50.0 //gosocialcheck:trusted
+	golang.org/x/time v0.16.0 //gosocialcheck:trusted
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc
 	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
@@ -90,7 +91,7 @@ require (
 	k8s.io/cri-streaming v0.38.0-beta.0
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/streaming v0.38.0-beta.0
-	tags.cncf.io/container-device-interface v1.1.1
+	tags.cncf.io/container-device-interface v1.1.2
 )
 
 require (
@@ -109,19 +110,20 @@ require (
 	github.com/emicklei/go-restful/v3 v3.14.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.4 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.7 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/godbus/dbus/v5 v5.1.0 // indirect
+	github.com/godbus/dbus/v5 v5.2.4 // indirect
 	github.com/google/deck v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 // indirect
 	github.com/knqyf263/go-plugin v0.9.0 // indirect
-	github.com/mdlayher/socket v0.6.0 // indirect
+	github.com/mdlayher/socket v0.8.0 // indirect
 	github.com/miekg/pkcs11 v1.1.2 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
+	//gosocialcheck:trusted
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pandatix/go-abnf v0.5.5 // indirect
@@ -141,10 +143,15 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	//gosocialcheck:trusted
 	golang.org/x/crypto v0.58.0 // indirect
+	//gosocialcheck:trusted
 	golang.org/x/net v0.62.0 // indirect
+	//gosocialcheck:trusted
 	golang.org/x/oauth2 v0.37.0 // indirect
+	//gosocialcheck:trusted
 	golang.org/x/term v0.47.0 // indirect
+	//gosocialcheck:trusted
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

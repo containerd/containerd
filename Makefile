@@ -102,13 +102,18 @@ SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
-GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+GO_LD_X = \
+	-X $(PKG)/version.Version=$(VERSION) \
+	-X $(PKG)/version.Revision=$(REVISION) \
+	-X $(PKG)/version.Package=$(PACKAGE)
+
+GO_LDFLAGS=-ldflags '$(GO_LD_X) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
 	GO_LDFLAGS += -extldflags "-static"
 endif
 GO_LDFLAGS+='
 
-SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '$(GO_LD_X) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
 PACKAGES := $(shell $(GO) list ${GO_TAGS} ./... | grep -v /integration)
@@ -158,7 +163,7 @@ OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos check-gosocialcheck coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps $(CRI_INTEGRATION_TEST_BINARY) cri-integration-coverage integration-coverage all-coverage remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -197,6 +202,21 @@ check-protos: ## check if protobufs needs to be generated again
 	@(cd api && buf format --diff --exit-code --exclude-path vendor \
 		$(if $(GITHUB_ACTIONS),--error-format github-actions)) || \
 		(echo "$(ONI) please run 'make proto-fmt' to fix formatting or 'make protos' to regenerate proto files" && false)
+
+# gosocialcheck reports dependencies that do not appear to be adopted by a trusted project
+# (CNCF Graduated). Modules that are trusted anyway are annotated `gosocialcheck:trusted` in go.mod.
+# https://github.com/AkihiroSuda/gosocialcheck
+# Not part of `make check`: the verdict is advisory. On GitHub Actions, `--gha` reports the findings
+# as workflow annotations and always exits 0.
+# GOSOCIALCHECK_MODULES lists the module directories to check.
+GOSOCIALCHECK_MODULES ?= . api
+
+check-gosocialcheck: ## check if dependencies are adopted by a trusted project (advisory)
+	@echo "$(WHALE) $@"
+	@rc=0; for m in $(GOSOCIALCHECK_MODULES); do \
+		echo "$(WHALE) $@: $$m"; \
+		(cd $$m && gosocialcheck run $(if $(GITHUB_ACTIONS),--gha) ./...) || rc=1; \
+	done; exit $$rc
 
 proto-fmt: ## format proto files
 	@echo "$(WHALE) $@"

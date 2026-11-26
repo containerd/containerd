@@ -980,6 +980,90 @@ func TestFetcherBlobEndpointForwardsResolverHeaders(t *testing.T) {
 	}
 }
 
+func TestFetcherSkipsHostsWithoutPull(t *testing.T) {
+	body := []byte("ok")
+	dgst := digest.FromBytes(body)
+
+	var pushRequests atomic.Int32
+	pushServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		pushRequests.Add(1)
+		rw.WriteHeader(http.StatusNotFound)
+	}))
+	defer pushServer.Close()
+
+	// manifestOnly exists only under the manifests endpoint, so
+	// FetchByDigest falls back to it.
+	manifestOnly := digest.FromString("manifest only")
+	pullServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/blobs/"+manifestOnly.String()) {
+			rw.WriteHeader(http.StatusNotFound)
+			return
+		}
+		rw.Header().Set("Content-Length", strconv.Itoa(len(body)))
+		if r.Method == http.MethodGet {
+			_, _ = rw.Write(body)
+		}
+	}))
+	defer pullServer.Close()
+
+	refspec, err := reference.Parse("example.com/library/test:latest")
+	require.NoError(t, err)
+
+	var hosts []RegistryHost
+	for _, h := range []struct {
+		s    *httptest.Server
+		caps HostCapabilities
+	}{
+		{pushServer, HostCapabilityPush},
+		{pullServer, HostCapabilityPull},
+	} {
+		u, err := url.Parse(h.s.URL)
+		require.NoError(t, err)
+		hosts = append(hosts, RegistryHost{
+			Client:       h.s.Client(),
+			Host:         u.Host,
+			Scheme:       u.Scheme,
+			Capabilities: h.caps,
+		})
+	}
+	f := dockerFetcher{&dockerBase{
+		refspec:    refspec,
+		repository: "library/test",
+		hosts:      hosts,
+	}}
+
+	for _, tc := range []struct {
+		name  string
+		fetch func(context.Context) (io.ReadCloser, error)
+	}{
+		{"Fetch blob", func(ctx context.Context) (io.ReadCloser, error) {
+			return f.Fetch(ctx, ocispec.Descriptor{MediaType: "application/octet-stream", Digest: dgst, Size: int64(len(body))})
+		}},
+		{"Fetch manifest", func(ctx context.Context) (io.ReadCloser, error) {
+			return f.Fetch(ctx, ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: dgst, Size: int64(len(body))})
+		}},
+		{"FetchByDigest blob", func(ctx context.Context) (io.ReadCloser, error) {
+			rc, _, err := f.FetchByDigest(ctx, dgst)
+			return rc, err
+		}},
+		{"FetchByDigest manifest", func(ctx context.Context) (io.ReadCloser, error) {
+			rc, _, err := f.FetchByDigest(ctx, manifestOnly)
+			return rc, err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pushRequests.Store(0)
+			rc, err := tc.fetch(t.Context())
+			require.NoError(t, err)
+			got, err := io.ReadAll(rc)
+			require.NoError(t, err)
+			require.NoError(t, rc.Close())
+			assert.Equal(t, body, got)
+			assert.Zero(t, pushRequests.Load(), "requests sent to push-only host")
+		})
+	}
+}
+
 func TestContentEncoding(t *testing.T) {
 	t.Parallel()
 

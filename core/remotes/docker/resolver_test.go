@@ -44,6 +44,43 @@ import (
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
+func TestRequestFieldsOmitCredentialHeaders(t *testing.T) {
+	req := &http.Request{
+		Method: http.MethodGet,
+		Header: http.Header{
+			"Authorization":       {"example-auth"},
+			"pRoXy-Authorization": {"example-proxy-auth"},
+			"Cookie":              {"session=example-session", "other=example-other"},
+			"Cookie2":             {"example-legacy-cookie"},
+			"Accept":              {"application/json", "*/*"},
+		},
+	}
+	headers := req.Header.Clone()
+	assert.Equal(t, map[string]any{
+		"request.method":          http.MethodGet,
+		"request.header.accept":   "application/json",
+		"request.header.accept.1": "*/*",
+	}, requestFields(req))
+	assert.Equal(t, headers, req.Header)
+}
+
+func TestResponseFieldsOmitCookieHeaders(t *testing.T) {
+	resp := &http.Response{
+		Status: "200 OK",
+		Header: http.Header{
+			"sEt-CoOkIe":   {"session=example-session", "other=example-other"},
+			"Set-Cookie2":  {"session=example-legacy-session"},
+			"Content-Type": {"application/json"},
+		},
+	}
+	headers := resp.Header.Clone()
+	assert.Equal(t, map[string]any{
+		"response.status":              "200 OK",
+		"response.header.content-type": "application/json",
+	}, responseFields(resp))
+	assert.Equal(t, headers, resp.Header)
+}
+
 func TestHTTPResolver(t *testing.T) {
 	s := func(h http.Handler) (string, ResolverOptions, func()) {
 		s := httptest.NewServer(h)

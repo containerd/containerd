@@ -41,8 +41,8 @@ const maxUnixPathLen = 107
 // (Windows 10 1803+, Server 2019+), see localaddr.Parse for the address forms.
 //
 // uid and gid are unused: an AF_UNIX socket is instead restricted by DACL to
-// Builtin Administrators and Local System, and named pipes follow go-winio
-// defaults.
+// Builtin Administrators, Local System and the user running this process, and
+// named pipes follow go-winio defaults.
 func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 	network, path, _ := localaddr.Parse(path)
 	path = filepath.FromSlash(path)
@@ -53,13 +53,27 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 }
 
 // createUnixSocket listens on an AF_UNIX socket at path. os.Chmod and os.Chown
-// do nothing on Windows, so the parent directory is created with
-// MkdirAllWithACL and the socket gets a protected DACL.
+// do nothing on Windows, so the parent directory is created with a DACL and
+// the socket gets a protected DACL. Both grant the user running this process,
+// as a Unix socket's owner keeps access: otherwise a non-elevated containerd,
+// whose Administrators group is deny-only, could not reach its own socket.
 func createUnixSocket(path string) (net.Listener, error) {
 	if len(path) > maxUnixPathLen {
 		return nil, fmt.Errorf("%q: unix socket path too long (> %d)", path, maxUnixPathLen)
 	}
-	if err := MkdirAllWithACL(filepath.Dir(path), 0750); err != nil {
+	dirSDDL, err := withProcessUser(SddlAdministratorsLocalSystem, "OICI")
+	if err != nil {
+		return nil, err
+	}
+	dirSA, err := makeSecurityAttributes(dirSDDL)
+	if err != nil {
+		return nil, err
+	}
+	if err := mkdirall(filepath.Dir(path), dirSA); err != nil {
+		return nil, err
+	}
+	sockSDDL, err := withProcessUser(sddlSocketAdministratorsLocalSystem, "")
+	if err != nil {
 		return nil, err
 	}
 	if err := removeStaleSocket(path); err != nil {
@@ -70,9 +84,9 @@ func createUnixSocket(path string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to listen on unix socket %s: %w", path, err)
 	}
 	// The socket inherits its parent's ACEs until the DACL below replaces
-	// them. MkdirAllWithACL closes that window for directories created here;
-	// restricting a pre-existing parent is up to the deployer.
-	if err := setFileSecurityDescriptor(path, sddlSocketAdministratorsLocalSystem); err != nil {
+	// them. The parent DACL above closes that window for directories created
+	// here; restricting a pre-existing parent is up to the deployer.
+	if err := setFileSecurityDescriptor(path, sockSDDL); err != nil {
 		l.Close()
 		return nil, fmt.Errorf("failed to set security descriptor on unix socket %s: %w", path, err)
 	}
@@ -93,6 +107,21 @@ func removeStaleSocket(path string) error {
 		return fmt.Errorf("%s is a directory, not a unix socket", path)
 	}
 	return os.Remove(path)
+}
+
+// withProcessUser appends a full-access ACE with the given inheritance flags
+// for the user running this process to sddl. It returns sddl unchanged when
+// that user is Local System, which sddl already grants, so a containerd run as
+// a service keeps the same DACL.
+func withProcessUser(sddl, flags string) (string, error) {
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		return "", fmt.Errorf("failed to get the process user: %w", err)
+	}
+	if user.User.Sid.IsWellKnown(windows.WinLocalSystemSid) {
+		return sddl, nil
+	}
+	return sddl + "(A;" + flags + ";GA;;;" + user.User.Sid.String() + ")", nil
 }
 
 // setFileSecurityDescriptor applies the DACL of sddl to the file at path,

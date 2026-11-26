@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,22 +16,12 @@
    limitations under the License.
 */
 
-//go:build !linux
+package manager
 
-package verity
+import "strings"
 
-import "errors"
-
-// errDmNotSupported is returned by dm-ioctl functions on non-Linux platforms.
-var errDmNotSupported = errors.New("verity: dm-verity activation requires Linux")
-
-// Open is not supported on non-Linux platforms.
-func Open(_ *Params, _, _, _ string, _ []byte, _ string, _ []string) (string, error) {
-	return "", errDmNotSupported
+// splitMkdirPathValue splits value, an X-containerd.mkdir.path
+// option's value, into its colon-separated path/mode/uid/gid parts.
+func splitMkdirPathValue(value string) []string {
+	return strings.SplitN(value, ":", 4)
 }
-
-// Close is not supported on non-Linux platforms.
-func Close(_ string) error { return errDmNotSupported }
-
-// Check is not supported on non-Linux platforms.
-func Check(_ string, _ []byte) bool { return false }

@@ -1,3 +1,5 @@
+//go:build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,18 +16,19 @@
    limitations under the License.
 */
 
-//go:build !linux
+package manager
 
-package utils
+import (
+	"path/filepath"
+	"strings"
+)
 
-import "os"
-
-// GetBlockOrFileSize returns the size of the file at path. On non-Linux
-// platforms only regular files are supported; block devices are not available.
-func GetBlockOrFileSize(path string) (int64, error) {
-	st, err := os.Stat(path)
-	if err != nil {
-		return 0, err
-	}
-	return st.Size(), nil
+// splitMkdirPathValue splits value, an X-containerd.mkdir.path
+// option's value, into its colon-separated path/mode/uid/gid parts,
+// without splitting a drive letter's own colon out of the path.
+func splitMkdirPathValue(value string) []string {
+	vol := filepath.VolumeName(value)
+	parts := strings.SplitN(value[len(vol):], ":", 4)
+	parts[0] = vol + parts[0]
+	return parts
 }
