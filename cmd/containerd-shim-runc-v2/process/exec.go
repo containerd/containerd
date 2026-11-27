@@ -140,6 +140,9 @@ func (e *execProcess) delete(ctx context.Context) error {
 		e.deleting = nil
 		close(done)
 	}()
+	if e.io != nil {
+		e.io.CloseReaders()
+	}
 	shutdownAndDrain(ctx, e.parent.Platform, e.console, &e.wg, "exec process "+e.id)
 	closeIO(e.closers, e.console, e.io)
 	pidfile := filepath.Join(e.path, e.id+".pid")
