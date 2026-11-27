@@ -185,7 +185,7 @@ documentation.
 
 **imports**
 : Imports is a list of additional configuration files to include.
-This allows to split the main configuration file and keep some sections
+This allows splitting the main configuration file and keeping some sections
 separately (for example vendors may keep a custom runtime configuration in a
 separate file without modifying the main `config.toml`).
 Import paths containing `*` are expanded as glob patterns. Patterns with no
