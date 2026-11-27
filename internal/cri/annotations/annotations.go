@@ -17,8 +17,6 @@
 package annotations
 
 import (
-	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -106,30 +104,24 @@ func DefaultCRIAnnotations(
 	imageName string,
 	config *runtime.PodSandboxConfig,
 	sandbox bool,
-) []oci.SpecOpts {
-	opts := []oci.SpecOpts{
-		customopts.WithAnnotation(SandboxID, sandboxID),
-		customopts.WithAnnotation(SandboxNamespace, config.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(SandboxUID, config.GetMetadata().GetUid()),
-		customopts.WithAnnotation(SandboxName, config.GetMetadata().GetName()),
+) map[string]string {
+	annotations := map[string]string{
+		SandboxID:        sandboxID,
+		SandboxNamespace: config.GetMetadata().GetNamespace(),
+		SandboxUID:       config.GetMetadata().GetUid(),
+		SandboxName:      config.GetMetadata().GetName(),
 	}
-	ctrType := ContainerTypeContainer
 	if sandbox {
-		ctrType = ContainerTypeSandbox
 		// Sandbox log dir and sandbox image name get passed for sandboxes, the other metadata always
 		// gets sent however.
-		opts = append(
-			opts,
-			customopts.WithAnnotation(SandboxLogDir, config.GetLogDirectory()),
-			customopts.WithAnnotation(SandboxImageName, imageName),
-		)
+		annotations[ContainerType] = ContainerTypeSandbox
+		annotations[SandboxLogDir] = config.GetLogDirectory()
+		annotations[SandboxImageName] = imageName
 	} else {
 		// Image name and container name get passed for containers.
-		opts = append(
-			opts,
-			customopts.WithAnnotation(ContainerName, containerName),
-			customopts.WithAnnotation(ImageName, imageName),
-		)
+		annotations[ContainerType] = ContainerTypeContainer
+		annotations[ContainerName] = containerName
+		annotations[ImageName] = imageName
 	}
-	return append(opts, customopts.WithAnnotation(ContainerType, ctrType))
+	return annotations
 }
