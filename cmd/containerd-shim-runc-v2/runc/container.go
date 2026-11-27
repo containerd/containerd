@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
@@ -117,9 +118,17 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 			}
 		}
 	}()
+	_, span := tracing.StartSpan(ctx, "shim.mount_rootfs",
+		tracing.WithAttribute("container.id", r.ID),
+		tracing.WithAttribute("rootfs", rootfs),
+		tracing.WithAttribute("mounts.count", len(mounts)),
+	)
 	if err := mount.All(mounts, rootfs); err != nil {
+		span.RecordError(err)
+		span.End()
 		return nil, fmt.Errorf("failed to mount rootfs component: %w", err)
 	}
+	span.End()
 
 	p, err := newInit(
 		ctx,
@@ -348,7 +357,14 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 	if err != nil {
 		return nil, err
 	}
+
+	ctx, span := tracing.StartSpan(ctx, "process.Start",
+		tracing.WithAttribute("process.id", p.ID()),
+		tracing.WithAttribute("process.pid", p.Pid()),
+		tracing.WithAttribute("process.bundle", c.Bundle))
+	defer span.End()
 	if err := p.Start(ctx); err != nil {
+		span.RecordError(err)
 		return p, err
 	}
 	return p, nil
