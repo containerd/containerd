@@ -21,8 +21,31 @@ import (
 	"fmt"
 
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+// The CRI server keeps its view of a pod sandbox in extensions of the
+// containerd sandbox record, under these keys.
+const (
+	// MetadataKey is the key of the extension holding the Metadata of a
+	// sandbox.
+	MetadataKey = "metadata"
+	// UpdatedResourcesKey is the key of the extension holding the resources a
+	// pod sandbox was last updated with (UpdatePodSandboxResources).
+	UpdatedResourcesKey = "updated-resources"
+)
+
+// UpdatedResources holds the updated Linux resource constraints of a pod
+// sandbox.
+type UpdatedResources struct {
+	Overhead  *runtime.LinuxContainerResources
+	Resources *runtime.LinuxContainerResources
+}
+
+func init() {
+	typeurl.Register(&UpdatedResources{}, "io.containerd.cri.v1", "UpdatedResources")
+}
 
 // NOTE(random-liu):
 // 1) Metadata is immutable after created.

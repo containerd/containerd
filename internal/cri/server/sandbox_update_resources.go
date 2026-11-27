@@ -22,7 +22,6 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -65,11 +64,11 @@ func (c *criService) UpdatePodSandboxResources(ctx context.Context, r *runtime.U
 		return nil, fmt.Errorf("failed to get sandbox %s from sandbox store: %w", sandbox.ID, err)
 	}
 
-	updatedRes := podsandbox.UpdatedResources{
+	updatedRes := sstore.UpdatedResources{
 		Overhead:  overhead,
 		Resources: resources,
 	}
-	if err := sandboxInfo.AddExtension(podsandbox.UpdatedResourcesKey, &updatedRes); err != nil {
+	if err := sandboxInfo.AddExtension(sstore.UpdatedResourcesKey, &updatedRes); err != nil {
 		return nil, fmt.Errorf("failed to add updated sandbox resources extension: %w", err)
 	}
 	if _, err := c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {

@@ -21,9 +21,13 @@ import (
 	"testing"
 
 	"github.com/containerd/errdefs"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/v2/core/events/exchange"
+	v2 "github.com/containerd/containerd/v2/core/runtime/v2"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 // A failing create option ends Create before any shim is involved: the
@@ -32,4 +36,17 @@ func TestCreateOptionError(t *testing.T) {
 	c := &controllerLocal{}
 	err := c.Create(context.Background(), sandbox.Sandbox{ID: "sb"}, sandbox.WithRuntimePath("containerd-shim-example-v1"))
 	require.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+}
+
+func TestStatusWithoutShim(t *testing.T) {
+	// A sandbox whose shim is gone, or that this controller never started,
+	// is reported as not found. The callers (CRI recovery, PodSandboxStatus)
+	// map that to not ready.
+	shims, err := v2.NewShimManager(&v2.ManagerConfig{Events: exchange.NewExchange()})
+	require.NoError(t, err)
+	c := &controllerLocal{shims: shims}
+
+	_, err = c.Status(namespaces.WithNamespace(context.Background(), "test"), "no-such-sandbox", false)
+	require.Error(t, err)
+	assert.True(t, errdefs.IsNotFound(err), "got %v", err)
 }
