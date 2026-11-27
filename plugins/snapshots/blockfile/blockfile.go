@@ -250,6 +250,18 @@ func (o *snapshotter) Usage(ctx context.Context, key string) (usage snapshots.Us
 			usage.Inodes = 1
 		}
 
+		if info.Kind == snapshots.KindView && info.Parent != "" && o.recoversExt4Views() {
+			// A view that needed journal replay owns its backing file.
+			st, err := os.Stat(o.getBlockFile(id))
+			if err == nil {
+				usage = snapshots.Usage{Size: st.Size(), Inodes: 1}
+				return nil
+			}
+			if !os.IsNotExist(err) {
+				return err
+			}
+		}
+
 		if info.Parent != "" {
 			// GetInfo returns total number of bytes used by a snapshot (including parent).
 			// So subtract parent usage in order to get delta consumed by layer itself.
@@ -296,7 +308,7 @@ func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, 
 		return nil, err
 	}
 
-	return o.mounts(s), nil
+	return o.mounts(s)
 }
 
 func (o *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
@@ -400,6 +412,21 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			}
 		} else {
 			path = o.getBlockFile(s.ParentIDs[0])
+			if o.recoversExt4Views() {
+				viewPath := o.getBlockFile(s.ID)
+				// A crash before the metadata transaction commits can leave a file
+				// behind for an ID the metastore later reuses.
+				if err := os.Remove(viewPath); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+				recovered, err := recoverExt4View(ctx, path, viewPath)
+				if err != nil {
+					return fmt.Errorf("recovering ext4 journal for %s: %w", path, err)
+				}
+				if recovered {
+					path = viewPath
+				}
+			}
 		}
 
 		if o.testViewHookHelper != nil {
@@ -414,16 +441,21 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		return nil, err
 	}
 
-	return o.mounts(s), nil
+	return o.mounts(s)
 }
 
 func (o *snapshotter) getBlockFile(id string) string {
 	return filepath.Join(o.root, "snapshots", id)
 }
 
-func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
+func (o *snapshotter) recoversExt4Views() bool {
+	return runtime.GOOS == "linux" && o.fsType == "ext4" &&
+		!slices.Contains(o.options, "noload") && !slices.Contains(o.options, "norecovery")
+}
+
+func (o *snapshotter) mounts(s storage.Snapshot) ([]mount.Mount, error) {
 	var (
-		mountOptions = o.options
+		mountOptions = slices.Clone(o.options)
 		source       string
 	)
 
@@ -437,6 +469,14 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 		source = o.getBlockFile(s.ID)
 	} else {
 		source = o.getBlockFile(s.ParentIDs[0])
+		if o.recoversExt4Views() {
+			viewPath := o.getBlockFile(s.ID)
+			if _, err := os.Stat(viewPath); err == nil {
+				source = viewPath
+			} else if !os.IsNotExist(err) {
+				return nil, err
+			}
+		}
 	}
 
 	return []mount.Mount{
@@ -445,7 +485,7 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 			Type:    o.fsType,
 			Options: mountOptions,
 		},
-	}
+	}, nil
 }
 
 // Close closes the snapshotter

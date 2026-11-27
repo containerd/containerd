@@ -19,14 +19,123 @@
 package blockfile
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/containerd/errdefs"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
+
+func TestViewExt4JournalRecovery(t *testing.T) {
+	testutil.RequiresRoot(t)
+	debugfs, err := exec.LookPath("debugfs")
+	if err != nil {
+		t.Skip("debugfs is required to prepare an ext4 image that needs journal recovery")
+	}
+	ctx := t.Context()
+	opts, err := setupSnapshotter(t)
+	require.NoError(t, err)
+	opts = append(opts, withViewHookHelper(nil))
+	root := t.TempDir()
+	s, err := NewSnapshotter(root, opts...)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if s != nil {
+			require.NoError(t, s.Close())
+		}
+	})
+
+	active, err := s.Prepare(ctx, "active", "")
+	require.NoError(t, err)
+	const payload = "blockfile contents\n"
+	require.NoError(t, mount.WithTempMount(ctx, active, func(dir string) error {
+		return os.WriteFile(filepath.Join(dir, "data"), []byte(payload), 0600)
+	}))
+	backing := active[0].Source
+	// Mark the unmounted image as needing replay without racing a live ext4 writer.
+	out, err := exec.CommandContext(ctx, debugfs, "-w", "-R", "feature needs_recovery", backing).CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	require.NoError(t, s.Commit(ctx, "committed", "active"))
+
+	before, err := os.ReadFile(backing)
+	require.NoError(t, err)
+	view, err := s.View(ctx, "view", "committed")
+	require.NoError(t, err)
+	require.NoError(t, mount.WithTempMount(ctx, view, func(dir string) error {
+		data, err := os.ReadFile(filepath.Join(dir, "data"))
+		require.NoError(t, err)
+		require.Equal(t, payload, string(data))
+		require.ErrorIs(t, os.WriteFile(filepath.Join(dir, "write"), nil, 0600), unix.EROFS)
+		return nil
+	}))
+	require.NotEqual(t, backing, view[0].Source)
+	usage, err := s.Usage(ctx, "view")
+	require.NoError(t, err)
+	require.Equal(t, int64(len(before)), usage.Size)
+	require.Equal(t, int64(1), usage.Inodes)
+	require.NoError(t, s.Close())
+	s, err = NewSnapshotter(root, opts...)
+	require.NoError(t, err)
+	mounts, err := s.Mounts(ctx, "view")
+	require.NoError(t, err)
+	require.Equal(t, view, mounts)
+	require.NoError(t, s.Remove(ctx, "view"))
+	require.NoFileExists(t, view[0].Source)
+	after, err := os.ReadFile(backing)
+	require.NoError(t, err)
+	require.True(t, bytes.Equal(before, after), "journal recovery modified the committed image")
+}
+
+func TestViewAfterLazyExt4Unmount(t *testing.T) {
+	testutil.RequiresRoot(t)
+	ctx := t.Context()
+	opts, err := setupSnapshotter(t)
+	require.NoError(t, err)
+	s, err := NewSnapshotter(t.TempDir(), append(opts, withViewHookHelper(nil))...)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+
+	active, err := s.Prepare(ctx, "active", "")
+	require.NoError(t, err)
+	dir := t.TempDir()
+	require.NoError(t, mount.All(active, dir))
+	t.Cleanup(func() { require.NoError(t, mount.UnmountAll(dir, 0)) })
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "data"), []byte("test"), 0600))
+	ref, err := os.Open(dir)
+	require.NoError(t, err)
+	defer ref.Close()
+	require.NoError(t, mount.Unmount(dir, unix.MNT_DETACH))
+	require.NoError(t, s.Commit(ctx, "committed", "active"))
+
+	// The detached mount is still live until its last open reference closes.
+	waitCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	_, err = s.View(waitCtx, "view", "committed")
+	require.ErrorIs(t, err, errdefs.ErrUnavailable)
+	_, err = s.Stat(ctx, "view")
+	require.ErrorIs(t, err, errdefs.ErrNotFound)
+
+	require.NoError(t, ref.Close())
+	view, err := s.View(ctx, "view", "committed")
+	require.NoError(t, err)
+	require.Equal(t, active[0].Source, view[0].Source)
+	require.NoError(t, mount.WithTempMount(ctx, view, func(dir string) error {
+		data, err := os.ReadFile(filepath.Join(dir, "data"))
+		require.NoError(t, err)
+		require.Equal(t, "test", string(data))
+		return nil
+	}))
+}
 
 func setupSnapshotter(t *testing.T) ([]Opt, error) {
 	mkfs, err := exec.LookPath("mkfs.ext4")
