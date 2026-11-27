@@ -204,16 +204,44 @@ func TestConfigFromRequest(t *testing.T) {
 		assert.True(t, errdefs.IsInvalidArgument(err))
 	})
 
-	t.Run("user namespaces are not supported yet", func(t *testing.T) {
+	t.Run("user namespace", func(t *testing.T) {
+		mapping := func(containerID, hostID, length uint32) []*runtime.IDMapping {
+			return []*runtime.IDMapping{{ContainerId: containerID, HostId: hostID, Length: length}}
+		}
+		valid := mapping(0, 100000, 65536)
 		pc := testPodConfig()
-		pc.Linux.SecurityContext.NamespaceOptions.UsernsOptions = &runtime.UserNamespace{Mode: runtime.NamespaceMode_POD}
-		_, err := ConfigFromRequest(createRequest(t, pc, testNetNS))
-		require.Error(t, err)
-		assert.True(t, errdefs.IsNotImplemented(err))
+		ns := pc.Linux.SecurityContext.NamespaceOptions
+		ns.UsernsOptions = &runtime.UserNamespace{Uids: valid, Gids: mapping(0, 200000, 65536)}
+		cfg, err := ConfigFromRequest(createRequest(t, pc, testNetNS))
+		require.NoError(t, err)
+		assert.True(t, cfg.UserNS)
+		assert.Equal(t, specs.LinuxIDMapping{HostID: 100000, Size: 65536}, cfg.UIDMapping)
+		assert.Equal(t, specs.LinuxIDMapping{HostID: 200000, Size: 65536}, cfg.GIDMapping)
+		assert.Equal(t, map[string]string{"net.ipv4.ip_unprivileged_port_start": "0"}, cfg.Sysctls, "no default ping group range")
 
-		pc.Linux.SecurityContext.NamespaceOptions.UsernsOptions = &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE}
-		_, err = ConfigFromRequest(createRequest(t, pc, testNetNS))
+		for name, u := range map[string]*runtime.UserNamespace{
+			"no mapping":               {},
+			"two uid mappings":         {Uids: append(mapping(0, 100000, 65536), mapping(65536, 300000, 1)...), Gids: valid},
+			"no root":                  {Uids: mapping(1, 100000, 65536), Gids: valid},
+			"init user is not mapped":  {Uids: valid, Gids: mapping(0, 100000, 65535)},
+			"container user namespace": {Mode: runtime.NamespaceMode_CONTAINER, Uids: valid, Gids: valid},
+		} {
+			ns.UsernsOptions = u
+			_, err := ConfigFromRequest(createRequest(t, pc, testNetNS))
+			require.Error(t, err, name)
+			assert.True(t, errdefs.IsInvalidArgument(err), name)
+		}
+
+		ns.UsernsOptions = &runtime.UserNamespace{Uids: valid, Gids: valid}
+		ns.Network = runtime.NamespaceMode_NODE
+		cfg, err = ConfigFromRequest(createRequest(t, pc, ""))
+		require.NoError(t, err)
+		assert.True(t, cfg.UserNS, "with the host network")
+
+		ns.UsernsOptions = &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE}
+		cfg, err = ConfigFromRequest(createRequest(t, pc, ""))
 		require.NoError(t, err, "the host user namespace is the default")
+		assert.False(t, cfg.UserNS)
 	})
 
 	t.Run("unsupported sysctls", func(t *testing.T) {
@@ -221,7 +249,7 @@ func TestConfigFromRequest(t *testing.T) {
 		pc.Linux.Sysctls = map[string]string{"user.max_user_namespaces": "10"}
 		_, err := ConfigFromRequest(createRequest(t, pc, testNetNS))
 		require.Error(t, err)
-		assert.True(t, errdefs.IsNotImplemented(err), "user.* needs the pod user namespace")
+		assert.True(t, errdefs.IsNotImplemented(err), "user.* is not supported yet")
 
 		pc.Linux.Sysctls = map[string]string{"vm.swappiness": "10"}
 		_, err = ConfigFromRequest(createRequest(t, pc, testNetNS))
@@ -376,6 +404,20 @@ func TestSandboxSpec(t *testing.T) {
 			{Type: specs.IPCNamespace, Path: pins.IPC},
 			{Type: specs.UTSNamespace, Path: pins.UTS},
 			{Type: specs.PIDNamespace, Path: "/proc/42/ns/pid"},
+		}, spec.Linux.Namespaces)
+	})
+
+	t.Run("user namespace", func(t *testing.T) {
+		cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS}
+		userns := pins
+		userns.User = "/bundle/ns/user"
+		spec := sandboxSpec(cfg, userns, nil)
+		assert.Equal(t, []specs.LinuxNamespace{
+			{Type: specs.NetworkNamespace, Path: testNetNS},
+			{Type: specs.IPCNamespace, Path: pins.IPC},
+			{Type: specs.UTSNamespace, Path: pins.UTS},
+			{Type: specs.UserNamespace, Path: "/bundle/ns/user"},
+			{Type: specs.PIDNamespace},
 		}, spec.Linux.Namespaces)
 	})
 

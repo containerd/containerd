@@ -38,7 +38,8 @@ import (
 // under the shim bundle except for the rootfs of the setup runc container
 // (see rootfsPath):
 //
-//	<bundle>/ns/{ipc,uts}   namespace pins, and ns/pid for a shared-PID pod
+//	<bundle>/ns/{ipc,uts}   namespace pins, ns/pid for a shared-PID pod and
+//	                        ns/user for a user namespaced pod
 //	<bundle>/hostname       the pod hostname
 //	<bundle>/hosts          a copy of the host /etc/hosts
 //	<bundle>/resolv.conf    the pod DNS configuration
@@ -123,6 +124,7 @@ func Cleanup(ctx context.Context, bundle string) error {
 		filepath.Join(bundle, pinDir, string(specs.IPCNamespace)),
 		filepath.Join(bundle, pinDir, string(specs.UTSNamespace)),
 		filepath.Join(bundle, pinDir, string(specs.PIDNamespace)),
+		filepath.Join(bundle, pinDir, string(specs.UserNamespace)),
 		filepath.Join(bundle, sandboxfiles.ShmDir),
 	} {
 		// Only a mount point is unmounted: umount(2) on a plain file needs

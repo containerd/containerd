@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 )
 
@@ -70,7 +71,7 @@ const (
 	// reaped after SIGKILL.
 	initStopTimeout = 10 * time.Second
 	// pinDir is the bundle directory holding the namespace pins, one file
-	// per namespace type ("ipc", "uts", "pid").
+	// per namespace type ("ipc", "uts", "pid", "user").
 	pinDir = "ns"
 )
 
@@ -84,6 +85,8 @@ type Pins struct {
 	UTS string
 	// PID is the PID namespace of a pod that shares it.
 	PID string
+	// User is the user namespace of a user namespaced pod.
+	User string
 }
 
 // initProcess is the process of the setup runc container. The container id
@@ -137,8 +140,10 @@ func cgroupsPath(parent, id string) string {
 }
 
 // podNamespaces returns the namespaces the setup creates and the shim pins:
-// the IPC and UTS namespaces the pod does not share with the host, and the
-// PID namespace of a pod that shares one among its containers.
+// the IPC and UTS namespaces the pod does not share with the host, the PID
+// namespace of a pod that shares one among its containers, and the user
+// namespace of a user namespaced pod that uses the host network. CRI creates
+// the user namespace of a pod with its own network namespace.
 func podNamespaces(cfg *Config) []specs.LinuxNamespaceType {
 	var ns []specs.LinuxNamespaceType
 	if !cfg.HostIPC {
@@ -149,6 +154,9 @@ func podNamespaces(cfg *Config) []specs.LinuxNamespaceType {
 	}
 	if cfg.SharedPID {
 		ns = append(ns, specs.PIDNamespace)
+	}
+	if cfg.UserNS && cfg.HostNetwork {
+		ns = append(ns, specs.UserNamespace)
 	}
 	return ns
 }
@@ -162,9 +170,14 @@ func podNamespaces(cfg *Config) []specs.LinuxNamespaceType {
 // profile. The program of any other container never runs, and loading the
 // profile roughly doubles the time the setup takes.
 //
+// The container of a user namespaced pod joins the pod user namespace at
+// userNS, which already has the ID mappings, or runc creates it from the ID
+// mappings for a pod that uses the host network. runc creates the other
+// namespaces inside it and writes the sysctls as its root.
+//
 // TODO: the pod SELinux label is not applied yet, as for the files the shim
 // creates (see the SELinux TODO in CreateSandbox).
-func runcSpec(ctx context.Context, cfg *Config, rootfs, binary string) (*specs.Spec, error) {
+func runcSpec(ctx context.Context, cfg *Config, rootfs, binary, userNS string) (*specs.Spec, error) {
 	defaults, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: cfg.ID})
 	if err != nil {
 		return nil, err
@@ -175,6 +188,14 @@ func runcSpec(ctx context.Context, cfg *Config, rootfs, binary string) (*specs.S
 	}
 	for _, t := range podNamespaces(cfg) {
 		ns = append(ns, specs.LinuxNamespace{Type: t})
+	}
+	if userNS != "" {
+		ns = append(ns, specs.LinuxNamespace{Type: specs.UserNamespace, Path: userNS})
+	}
+	if cfg.UserNS && !cfg.SharedPID {
+		// A process in a user namespace can mount /proc only when that user
+		// namespace owns its PID namespace. The shim does not pin this one.
+		ns = append(ns, specs.LinuxNamespace{Type: specs.PIDNamespace})
 	}
 	var mounts []specs.Mount
 	for _, m := range defaults.Mounts {
@@ -213,6 +234,10 @@ func runcSpec(ctx context.Context, cfg *Config, rootfs, binary string) (*specs.S
 	if cfg.CgroupParent != "" {
 		s.Linux.CgroupsPath = cgroupsPath(cfg.CgroupParent, cfg.ID)
 	}
+	if cfg.UserNS && userNS == "" {
+		s.Linux.UIDMappings = []specs.LinuxIDMapping{cfg.UIDMapping}
+		s.Linux.GIDMappings = []specs.LinuxIDMapping{cfg.GIDMapping}
+	}
 	if cfg.SharedPID {
 		// DefaultProfile derives the profile from the capabilities set above.
 		s.Linux.Seccomp = seccomp.DefaultProfile(s)
@@ -224,9 +249,10 @@ func runcSpec(ctx context.Context, cfg *Config, rootfs, binary string) (*specs.S
 // in <bundle>/runc and pins them under <bundle>/ns (see initProcess). For an
 // ordinary pod it deletes the container before it returns. For a shared-PID
 // pod it returns the created container process, which the caller starts. It
-// does not run runc for a pod that does not have a namespace of its own. On
-// error it force-deletes the container, and the Cleanup of the caller removes
-// the pins.
+// does not run runc for a pod that does not have a namespace of its own. For
+// a user namespaced pod with its own network namespace it first pins the user
+// namespace that owns that network namespace. On error it force-deletes the
+// container, and the Cleanup of the caller removes the pins.
 func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _ *initProcess, retErr error) {
 	podNS := podNamespaces(cfg)
 	if len(podNS) == 0 {
@@ -258,6 +284,22 @@ func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _
 			return Pins{}, nil, err
 		}
 	}
+	var pins Pins
+	if err := os.MkdirAll(filepath.Join(bundle, pinDir), 0o700); err != nil {
+		return Pins{}, nil, fmt.Errorf("failed to create namespace pin directory: %w", err)
+	}
+	if cfg.UserNS {
+		// runc creates the mount points as root of the pod user namespace.
+		if err := os.Chown(rootfs, int(cfg.UIDMapping.HostID), int(cfg.GIDMapping.HostID)); err != nil {
+			return Pins{}, nil, err
+		}
+		if !cfg.HostNetwork {
+			pins.User = filepath.Join(bundle, pinDir, string(specs.UserNamespace))
+			if err := pinUserNamespace(cfg.NetNSPath, pins.User); err != nil {
+				return Pins{}, nil, err
+			}
+		}
+	}
 	// runc create requires the program to exist and be executable by the
 	// container user, although only a shared-PID pod runs it. Any other pod
 	// gets an empty file in the bundle, which does not depend on the shim
@@ -275,7 +317,7 @@ func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _
 			return Pins{}, nil, err
 		}
 	}
-	spec, err := runcSpec(ctx, cfg, rootfs, binary)
+	spec, err := runcSpec(ctx, cfg, rootfs, binary, pins.User)
 	if err != nil {
 		return Pins{}, nil, err
 	}
@@ -357,10 +399,6 @@ func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _
 	// The pins keep the namespaces alive after the process exits. The
 	// containers join the pins, whose paths stay valid after the kernel
 	// gives the pid to another process.
-	var pins Pins
-	if err := os.MkdirAll(filepath.Join(bundle, pinDir), 0o700); err != nil {
-		return Pins{}, nil, fmt.Errorf("failed to create namespace pin directory: %w", err)
-	}
 	for _, t := range podNS {
 		target := filepath.Join(bundle, pinDir, string(t))
 		if err := pin(fmt.Sprintf("/proc/%d/ns/%s", p.pid, t), target); err != nil {
@@ -373,6 +411,8 @@ func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _
 			pins.UTS = target
 		case specs.PIDNamespace:
 			pins.PID = target
+		case specs.UserNamespace:
+			pins.User = target
 		}
 	}
 	// The pins were taken through /proc/<pid>, which names another process
@@ -473,6 +513,22 @@ func rootfsPath(bundle string) string {
 	ns := filepath.Dir(bundle)
 	owner := filepath.Dir(ns)
 	return filepath.Join(filepath.Dir(owner), rootfsDir, filepath.Base(owner), filepath.Base(ns), filepath.Base(bundle))
+}
+
+// pinUserNamespace pins the user namespace that owns the network namespace
+// netns at target. CRI pins only the network namespace.
+func pinUserNamespace(netns, target string) error {
+	f, err := os.Open(netns)
+	if err != nil {
+		return fmt.Errorf("failed to open the pod network namespace: %w", err)
+	}
+	defer f.Close()
+	owner, err := sys.GetUsernsForNamespace(f.Fd())
+	if err != nil {
+		return fmt.Errorf("failed to get the user namespace of %s: %w", netns, err)
+	}
+	defer owner.Close()
+	return pin(owner.Name(), target)
 }
 
 // pin bind-mounts the namespace file src onto a new empty file at target so
