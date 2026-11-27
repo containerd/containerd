@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -205,17 +206,57 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	if configVersion >= version.ConfigVersion {
 		return nil
 	}
+	// v3 configs already use the split CRI runtime section.
+	runtimePlugin := string(plugins.CRIServicePlugin) + ".runtime"
+	dst, _ := pluginConfigs[runtimePlugin].(map[string]any)
+	if cni, ok := dst["cni"].(map[string]any); ok {
+		if binDir, ok := cni["bin_dir"].(string); ok {
+			if binDir != "" {
+				cni["bin_dirs"] = migratedCNIBinDirs(cni, binDir)
+			}
+			delete(cni, "bin_dir")
+		}
+	}
+
 	src, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"].(map[string]any)
 	if !ok {
 		return nil
 	}
-	dst, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"].(map[string]any)
-	if !ok {
+	if dst == nil {
 		dst = make(map[string]any)
 	}
 	migrateConfig(dst, src)
-	pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = dst
+	pluginConfigs[runtimePlugin] = dst
 	return nil
+}
+
+// The old runtime used bin_dir when bin_dirs was empty or held the platform
+// default. Preserve other values, including invalid ones, for the decoder.
+func migratedCNIBinDirs(cni map[string]any, binDir string) any {
+	dirs := cni["bin_dirs"]
+	if cniBinDirsUnset(dirs) {
+		return []string{binDir}
+	}
+	return dirs
+}
+
+// cniBinDirsUnset reports whether a bin_dirs value is missing, empty or equal
+// to the platform default, i.e. a value the old runtime let bin_dir override.
+func cniBinDirsUnset(value any) bool {
+	return cniBinDirsEqual(value, nil) || cniBinDirsEqual(value, criconfig.DefaultRuntimeConfig().CniConfig.NetworkPluginBinDirs)
+}
+
+func cniBinDirsEqual(value any, want []string) bool {
+	switch dirs := value.(type) {
+	case nil:
+		return len(want) == 0
+	case []string:
+		return slices.Equal(dirs, want)
+	case []any: // Arrays decoded from TOML.
+		return slices.EqualFunc(dirs, want, func(v any, dir string) bool { return v == dir })
+	default:
+		return false
+	}
 }
 
 func migrateConfig(dst, src map[string]any) {
@@ -261,18 +302,18 @@ func migrateConfig(dst, src map[string]any) {
 		if !ok {
 			newCniConf = map[string]any{}
 		}
+		// Resolve the old section's two fields together, before merging them.
+		// A custom list in the runtime section is authoritative; a missing,
+		// empty or platform-default list is overridden like in the same table.
+		if binDir, _ := cniConf["bin_dir"].(string); binDir != "" && cniBinDirsUnset(newCniConf["bin_dirs"]) {
+			newCniConf["bin_dirs"] = migratedCNIBinDirs(cniConf, binDir)
+		}
 		for k, v := range cniConf {
-			switch k {
-			case "bin_dir":
-				// migrate `bin_dir` to `bin_dirs` only if `bin_dirs`
-				// is not already set
-				if binDirs, ok := newCniConf["bin_dirs"].([]string); !ok || len(binDirs) == 0 {
-					newCniConf["bin_dirs"] = []string{v.(string)}
-				}
-			default:
-				if _, ok := newCniConf[k]; !ok {
-					newCniConf[k] = v
-				}
+			if k == "bin_dir" {
+				continue
+			}
+			if _, ok := newCniConf[k]; !ok {
+				newCniConf[k] = v
 			}
 		}
 		dst["cni"] = newCniConf
