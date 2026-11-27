@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	goruntime "runtime"
+	"syscall"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -72,6 +73,23 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 			if err := sb.GetExtension(UpdatedResourcesKey, &updatedRes); err != nil {
 				if !errdefs.IsNotFound(err) {
 					return sandbox, fmt.Errorf("failed to get updated sandbox resources extension: %w", err)
+				}
+			}
+			metadata := sandboxstore.Metadata{}
+			if err := sb.GetExtension(MetadataKey, &metadata); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return sandbox, fmt.Errorf("failed to get sandbox metadata: %w", err)
+				}
+			}
+			// sandbox task is running but sandbox ip is empty kill it make it not ready
+			if metadata.Config != nil && !hostNetwork(metadata.Config) {
+				if metadata.IP == "" {
+					task, err := cntr.Task(ctx, nil)
+					if err == nil {
+						if err = task.Kill(ctx, syscall.SIGKILL); err != nil && !errdefs.IsNotFound(err) {
+							return sandbox, fmt.Errorf("failed to kill pod sandbox container: %w", err)
+						}
+					}
 				}
 			}
 		}
