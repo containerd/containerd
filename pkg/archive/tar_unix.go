@@ -75,26 +75,11 @@ func open(p string) (*os.File, error) {
 	return os.Open(p)
 }
 
-func openFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	f, err := os.OpenFile(name, flag, perm)
-	if err != nil {
-		return nil, err
-	}
-	// Call chmod to avoid permission mask
-	if err := f.Chmod(perm); err != nil {
-		f.Close()
-		return nil, err
-	}
-	return f, err
-}
-
-func mkdir(path string, perm os.FileMode) error {
-	if err := os.Mkdir(path, perm); err != nil {
-		return err
-	}
-	// Only final created directory gets explicit permission
-	// call to avoid permission mask
-	return os.Chmod(path, perm)
+// openFileFlags returns the flags to pass to Root.OpenFile while applying
+// an archive. Root.OpenFile performs the same openat-based path resolution
+// as Root.Open, but does not know about platform specific performance hints.
+func openFileFlags(flag int) int {
+	return flag
 }
 
 func skipFile(hdr *tar.Header) bool {

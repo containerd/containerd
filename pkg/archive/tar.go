@@ -161,6 +161,24 @@ func Apply(ctx context.Context, root string, r io.Reader, opts ...ApplyOpt) (int
 // applying each file as either a whole file or whiteout.
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md#applying-changesets
 func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOptions) (size int64, err error) {
+	// Open the destination as an *os.Root for the root-relative filesystem
+	// operations below. Platform-specific special-file and metadata helpers,
+	// parent attribute copying, and custom whiteout callbacks still operate
+	// on pathnames and are not confined by this handle.
+	rootR, err := os.OpenRoot(root)
+	if err != nil {
+		return 0, err
+	}
+	defer rootR.Close()
+
+	// rel returns the path of p relative to root, the form expected by the
+	// *os.Root methods. If p is not inside root the resulting path begins
+	// with "..", which os.Root methods refuse, so no operation can touch a
+	// file outside the root tree.
+	rel := func(p string) string {
+		return rootRel(root, p)
+	}
+
 	var (
 		dirs []*tar.Header
 
@@ -202,8 +220,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 						return nil
 					}
 					if _, exists := unpackedPaths[path]; !exists {
-						err := os.RemoveAll(path)
-						if err != nil {
+						if err := rootR.RemoveAll(rel(path)); err != nil {
 							return err
 						}
 						if info.IsDir() {
@@ -219,7 +236,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 				originalBase := base[len(whiteoutPrefix):]
 				originalPath := filepath.Join(dir, originalBase)
 
-				return false, os.RemoveAll(originalPath)
+				return false, rootR.RemoveAll(rel(originalPath))
 			}
 
 			return true, nil
@@ -283,7 +300,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 			if base == "" {
 				parentPath = filepath.Dir(path)
 			}
-			if err := mkparent(ctx, parentPath, root, options.Parents); err != nil {
+			if err := mkparent(ctx, rootR, rel(parentPath), parentPath, root, options.Parents); err != nil {
 				return 0, err
 			}
 		}
@@ -304,9 +321,9 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		// The only exception is when it is a directory *and* the file from
 		// the layer is also a directory. Then we want to merge them (i.e.
 		// just apply the metadata from the layer).
-		if fi, err := os.Lstat(path); err == nil {
+		if fi, err := rootR.Lstat(rel(path)); err == nil {
 			if !fi.IsDir() || hdr.Typeflag != tar.TypeDir {
-				if err := os.RemoveAll(path); err != nil {
+				if err := rootR.RemoveAll(rel(path)); err != nil {
 					return 0, err
 				}
 			}
@@ -315,7 +332,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		srcData := io.Reader(tr)
 		srcHdr := hdr
 
-		if err := createTarFile(ctx, path, root, srcHdr, srcData, options.NoSameOwner); err != nil {
+		if err := createTarFile(ctx, rootR, rel(path), path, root, srcHdr, srcData, options.NoSameOwner); err != nil {
 			return 0, err
 		}
 
@@ -332,7 +349,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		if err != nil {
 			return 0, err
 		}
-		if err := chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime)); err != nil {
+		if err := rootR.Chtimes(rel(path), boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime)); err != nil {
 			return 0, err
 		}
 	}
@@ -340,7 +357,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	return size, nil
 }
 
-func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
+func createTarFile(ctx context.Context, rootR *os.Root, relPath, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
 	// hdr.Mode is in linux format, which we can use for syscalls,
 	// but for os.Foo() calls we need the mode converted to os.FileMode,
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
@@ -350,16 +367,25 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	case tar.TypeDir:
 		// Create directory unless it exists as a directory already.
 		// In that case we just want to merge the two
-		if fi, err := os.Lstat(path); err != nil || !fi.IsDir() {
-			if err := mkdir(path, hdrInfo.Mode()); err != nil {
+		if fi, err := rootR.Lstat(relPath); err != nil || !fi.IsDir() {
+			if err := rootR.Mkdir(relPath, hdrInfo.Mode().Perm()); err != nil {
+				return err
+			}
+			// Re-apply the mode to avoid the permission mask.
+			if err := rootR.Chmod(relPath, hdrInfo.Mode()); err != nil {
 				return err
 			}
 		}
 
 	//nolint:staticcheck // TypeRegA is deprecated but we may still receive an external tar with TypeRegA
 	case tar.TypeReg, tar.TypeRegA:
-		file, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, hdrInfo.Mode())
+		file, err := rootR.OpenFile(relPath, openFileFlags(os.O_WRONLY|os.O_CREATE|os.O_TRUNC), hdrInfo.Mode().Perm())
 		if err != nil {
+			return err
+		}
+		// Call chmod to avoid the permission mask.
+		if err := file.Chmod(hdrInfo.Mode()); err != nil {
+			file.Close()
 			return err
 		}
 
@@ -389,12 +415,15 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 			return err
 		}
 
-		if err := link(targetPath, path); err != nil {
+		// Root.Link resolves both the source and the destination relative to
+		// root, rejecting sources that escape it (the textual prefix check in
+		// hardlinkRootPath alone could be bypassed by a crafted linkname).
+		if err := rootR.Link(rootRel(extractDir, targetPath), relPath); err != nil {
 			return err
 		}
 
 	case tar.TypeSymlink:
-		if err := os.Symlink(hdr.Linkname, path); err != nil {
+		if err := rootR.Symlink(hdr.Linkname, relPath); err != nil {
 			return err
 		}
 
@@ -407,7 +436,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	}
 
 	if !noSameOwner {
-		if err := os.Lchown(path, hdr.Uid, hdr.Gid); err != nil {
+		if err := rootR.Lchown(relPath, hdr.Uid, hdr.Gid); err != nil {
 			err = fmt.Errorf("failed to Lchown %q for UID %d, GID %d: %w", path, hdr.Uid, hdr.Gid, err)
 			if errors.Is(err, syscall.EINVAL) && userns.RunningInUserNS() {
 				err = fmt.Errorf("%w (Hint: try increasing the number of subordinate IDs in /etc/subuid and /etc/subgid)", err)
@@ -423,7 +452,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 				if errors.Is(err, syscall.EPERM) && strings.HasPrefix(key, userXattrPrefix) {
 					// In the user.* namespace, only regular files and directories can have extended attributes.
 					// See https://man7.org/linux/man-pages/man7/xattr.7.html for details.
-					if fi, err := os.Lstat(path); err == nil && (!fi.Mode().IsRegular() && !fi.Mode().IsDir()) {
+					if fi, err := rootR.Lstat(relPath); err == nil && (!fi.Mode().IsRegular() && !fi.Mode().IsDir()) {
 						log.G(ctx).WithError(err).Warnf("ignored xattr %s in archive", key)
 						continue
 					}
@@ -445,8 +474,8 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 	return chtimes(path, boundTime(latestTime(hdr.AccessTime, hdr.ModTime)), boundTime(hdr.ModTime))
 }
 
-func mkparent(ctx context.Context, path, root string, parents []string) error {
-	if dir, err := os.Lstat(path); err == nil {
+func mkparent(ctx context.Context, rootR *os.Root, rel, path, root string, parents []string) error {
+	if dir, err := rootR.Lstat(rel); err == nil {
 		if dir.IsDir() {
 			return nil
 		}
@@ -465,17 +494,22 @@ func mkparent(ctx context.Context, path, root string, parents []string) error {
 	}
 
 	if i > len(root)+1 {
-		if err := mkparent(ctx, path[:i-1], root, parents); err != nil {
+		// Recompute the root-relative path for the truncated absolute path.
+		if err := mkparent(ctx, rootR, rootRel(root, path[:i-1]), path[:i-1], root, parents); err != nil {
 			return err
 		}
 	}
 
-	if err := mkdir(path, 0755); err != nil {
+	if err := rootR.Mkdir(rel, 0755); err != nil {
 		// Check that still doesn't exist
-		dir, err1 := os.Lstat(path)
+		dir, err1 := rootR.Lstat(rel)
 		if err1 == nil && dir.IsDir() {
 			return nil
 		}
+		return err
+	}
+	// Re-apply the mode to avoid the permission mask.
+	if err := rootR.Chmod(rel, 0755); err != nil {
 		return err
 	}
 
@@ -780,6 +814,18 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 	}
 	return written, err
 
+}
+
+// rootRel returns p relative to root, the form expected by the *os.Root
+// methods. Both root and p must be absolute paths. If p is not beneath
+// root, the returned path begins with "..", which *os.Root methods
+// refuse, so callers can never touch a file outside the root tree.
+func rootRel(root, p string) string {
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		return filepath.Clean(p)
+	}
+	return rel
 }
 
 // hardlinkRootPath returns target linkname, evaluating and bounding any
