@@ -201,7 +201,86 @@ func TestContainerCapabilities(t *testing.T) {
 		capability *runtime.Capability
 		includes   []string
 		excludes   []string
+		ambient    []string
 	}{
+		{
+			desc: "ambient only grants all required sets after drop all",
+			capability: &runtime.Capability{
+				AddAmbientCapabilities: []string{"NET_BIND_SERVICE"},
+				DropCapabilities:       []string{"ALL"},
+			},
+			includes: []string{"CAP_NET_BIND_SERVICE"},
+			excludes: util.SubtractStringSlice(allCaps, "CAP_NET_BIND_SERVICE"),
+			ambient:  []string{"CAP_NET_BIND_SERVICE"},
+		},
+		{
+			desc: "ordinary additions do not become ambient",
+			capability: &runtime.Capability{
+				AddCapabilities:        []string{"CHOWN"},
+				AddAmbientCapabilities: []string{"net_bind_service", "NET_BIND_SERVICE"},
+			},
+			includes: []string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE"},
+			ambient:  []string{"CAP_NET_BIND_SERVICE"},
+		},
+		{
+			desc: "individual drop wins over ambient addition",
+			capability: &runtime.Capability{
+				AddAmbientCapabilities: []string{"NET_BIND_SERVICE"},
+				DropCapabilities:       []string{"NET_BIND_SERVICE"},
+			},
+			excludes: []string{"CAP_NET_BIND_SERVICE"},
+		},
+		{
+			desc:       "ambient all grants all sets",
+			capability: &runtime.Capability{AddAmbientCapabilities: []string{"ALL"}},
+			includes:   allCaps,
+			ambient:    allCaps,
+		},
+		{
+			desc: "ambient all with an individual drop",
+			capability: &runtime.Capability{
+				AddAmbientCapabilities: []string{"all", "NET_BIND_SERVICE"},
+				DropCapabilities:       []string{"net_raw"},
+			},
+			includes: util.SubtractStringSlice(allCaps, "CAP_NET_RAW"),
+			excludes: []string{"CAP_NET_RAW"},
+			ambient:  util.SubtractStringSlice(allCaps, "CAP_NET_RAW"),
+		},
+		{
+			desc: "drop all resets ambient all",
+			capability: &runtime.Capability{
+				AddAmbientCapabilities: []string{"ALL"},
+				DropCapabilities:       []string{"ALL"},
+			},
+			excludes: allCaps,
+		},
+		{
+			desc: "explicit ambient additions follow the all reset",
+			capability: &runtime.Capability{
+				AddAmbientCapabilities: []string{"ALL", "NET_BIND_SERVICE", "CHOWN"},
+				DropCapabilities:       []string{"ALL", "CHOWN"},
+			},
+			includes: []string{"CAP_NET_BIND_SERVICE"},
+			excludes: util.SubtractStringSlice(allCaps, "CAP_NET_BIND_SERVICE"),
+			ambient:  []string{"CAP_NET_BIND_SERVICE"},
+		},
+		{
+			desc: "ambient all reset preserves explicit ordinary additions",
+			capability: &runtime.Capability{
+				AddCapabilities:        []string{"CHOWN"},
+				AddAmbientCapabilities: []string{"ALL", "NET_BIND_SERVICE"},
+				DropCapabilities:       []string{"ALL"},
+			},
+			includes: []string{"CAP_CHOWN", "CAP_NET_BIND_SERVICE"},
+			excludes: util.SubtractStringSlice(util.SubtractStringSlice(allCaps, "CAP_CHOWN"), "CAP_NET_BIND_SERVICE"),
+			ambient:  []string{"CAP_NET_BIND_SERVICE"},
+		},
+		{
+			desc:       "unknown ambient capability is passed through to the runtime",
+			capability: &runtime.Capability{AddAmbientCapabilities: []string{"UNKNOWN"}},
+			includes:   []string{"CAP_UNKNOWN"},
+			ambient:    []string{"CAP_UNKNOWN"},
+		},
 		{
 			desc: "should be able to add/drop capabilities",
 			capability: &runtime.Capability{
@@ -270,8 +349,8 @@ func TestContainerCapabilities(t *testing.T) {
 				assert.NotContains(t, spec.Process.Capabilities.Effective, exclude)
 				assert.NotContains(t, spec.Process.Capabilities.Permitted, exclude)
 			}
-			assert.Empty(t, spec.Process.Capabilities.Inheritable)
-			assert.Empty(t, spec.Process.Capabilities.Ambient)
+			assert.ElementsMatch(t, test.ambient, spec.Process.Capabilities.Inheritable)
+			assert.ElementsMatch(t, test.ambient, spec.Process.Capabilities.Ambient)
 		})
 	}
 }

@@ -850,12 +850,10 @@ func (c *criService) buildLinuxSpec(
 		}
 	}
 
-	// Clear all ambient capabilities. The implication of non-root + caps
-	// is not clearly defined in Kubernetes.
-	// See https://github.com/kubernetes/kubernetes/issues/56374
-	// Keep docker's behavior for now.
+	// Ambient capabilities require an explicit CRI request. Ordinary additions
+	// and privileged mode must not implicitly populate the ambient set.
 	specOpts = append(specOpts,
-		customopts.WithoutAmbientCaps,
+		customopts.WithAmbientCapabilities(securityContext, c.allCaps),
 		customopts.WithSelinuxLabels(processLabel, mountLabel),
 	)
 
