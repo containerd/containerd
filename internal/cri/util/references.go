@@ -30,10 +30,18 @@ func ParseImageReferences(refs []string) ([]string, []string) {
 		if err != nil {
 			continue
 		}
-		if _, ok := parsed.(reference.Canonical); ok {
-			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(reference.Tagged); ok {
-			tags = append(tags, parsed.String())
+		named, isNamed := parsed.(reference.Named)
+		if !isNamed {
+			continue
+		}
+		// A reference may carry both a tag and a digest (e.g. "ubuntu:16.04@sha256:...").
+		// Split it into its tag and digest components so the tag is not lost when the
+		// digest is reported.
+		if tagged, ok := parsed.(reference.Tagged); ok {
+			tags = append(tags, named.Name()+":"+tagged.Tag())
+		}
+		if canonical, ok := parsed.(reference.Canonical); ok {
+			digests = append(digests, named.Name()+"@"+canonical.Digest().String())
 		}
 	}
 	return tags, digests
