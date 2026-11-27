@@ -44,6 +44,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 )
@@ -59,7 +60,7 @@ func TestRuncSpec(t *testing.T) {
 	binary := "/usr/local/bin/" + InitBinary
 	sysctls := map[string]string{"net.ipv4.ip_forward": "1", "kernel.shm_rmid_forced": "1"}
 	cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS, CgroupParent: "/kubepods/pod1", Sysctls: sysctls}
-	spec, err := runcSpec(ctx, cfg, binary)
+	spec, err := runcSpec(ctx, cfg, "/rootfs", binary, "")
 	require.NoError(t, err)
 
 	require.NotNil(t, spec.Process)
@@ -69,7 +70,7 @@ func TestRuncSpec(t *testing.T) {
 	assert.Equal(t, &specs.LinuxCapabilities{}, spec.Process.Capabilities, "no capabilities")
 	require.NotNil(t, spec.Process.OOMScoreAdj)
 	assert.Equal(t, initOOMScoreAdj, *spec.Process.OOMScoreAdj)
-	assert.Equal(t, &specs.Root{Path: runcRootfs, Readonly: true}, spec.Root)
+	assert.Equal(t, &specs.Root{Path: "/rootfs", Readonly: true}, spec.Root)
 	assert.Equal(t, specs.Mount{Destination: "/" + InitBinary, Type: "bind", Source: binary, Options: []string{"bind", "ro", "nosuid", "nodev"}}, spec.Mounts[len(spec.Mounts)-1])
 	// The container creates the IPC and UTS namespaces and joins the CRI
 	// network namespace, where runc sets the hostname and the sysctls.
@@ -92,19 +93,54 @@ func TestRuncSpec(t *testing.T) {
 	t.Run("shared PID namespace", func(t *testing.T) {
 		cfg := *cfg
 		cfg.SharedPID = true
-		spec, err := runcSpec(ctx, &cfg, binary)
+		spec, err := runcSpec(ctx, &cfg, "/rootfs", binary, "")
 		require.NoError(t, err)
 		assert.Equal(t, specs.LinuxNamespace{Type: specs.PIDNamespace}, spec.Linux.Namespaces[len(spec.Linux.Namespaces)-1])
 		assert.Equal(t, seccomp.DefaultProfile(spec), spec.Linux.Seccomp, "a started container runs under the default profile")
 	})
 
+	t.Run("user namespace", func(t *testing.T) {
+		// The container joins the pod user namespace by path and gets a PID
+		// namespace of its own to mount /proc in.
+		cfg := *cfg
+		cfg.UserNS = true
+		user := specs.LinuxNamespace{Type: specs.UserNamespace, Path: "/bundle/ns/user"}
+		pid := specs.LinuxNamespace{Type: specs.PIDNamespace}
+		spec, err := runcSpec(ctx, &cfg, "/rootfs", binary, user.Path)
+		require.NoError(t, err)
+		assert.Equal(t, []specs.LinuxNamespace{user, pid}, spec.Linux.Namespaces[4:])
+		assert.Empty(t, spec.Linux.UIDMappings)
+		assert.Empty(t, spec.Linux.GIDMappings)
+
+		cfg.SharedPID = true
+		spec, err = runcSpec(ctx, &cfg, "/rootfs", binary, user.Path)
+		require.NoError(t, err)
+		assert.Equal(t, []specs.LinuxNamespace{pid, user}, spec.Linux.Namespaces[4:], "the PID namespace of the pod is the only one")
+
+		// runc creates the user namespace of a pod that uses the host network.
+		mapping := specs.LinuxIDMapping{HostID: 100000, Size: 65536}
+		cfg = Config{ID: testID, HostNetwork: true, HostIPC: true, UserNS: true, UIDMapping: mapping, GIDMapping: mapping}
+		spec, err = runcSpec(ctx, &cfg, "/rootfs", binary, "")
+		require.NoError(t, err)
+		assert.Equal(t, []specs.LinuxNamespace{{Type: specs.MountNamespace}, {Type: specs.UserNamespace}, pid}, spec.Linux.Namespaces)
+		assert.Equal(t, []specs.LinuxIDMapping{mapping}, spec.Linux.UIDMappings)
+		assert.Equal(t, []specs.LinuxIDMapping{mapping}, spec.Linux.GIDMappings)
+	})
+
 	t.Run("host namespaces", func(t *testing.T) {
-		spec, err := runcSpec(ctx, &Config{ID: testID, Hostname: "node", HostNetwork: true, HostIPC: true, SharedPID: true}, binary)
+		spec, err := runcSpec(ctx, &Config{ID: testID, Hostname: "node", HostNetwork: true, HostIPC: true, SharedPID: true}, "/rootfs", binary, "")
 		require.NoError(t, err)
 		assert.Equal(t, []specs.LinuxNamespace{{Type: specs.MountNamespace}, {Type: specs.PIDNamespace}}, spec.Linux.Namespaces)
 		assert.Empty(t, spec.Hostname, "the host UTS namespace keeps its hostname")
 		assert.Empty(t, spec.Linux.CgroupsPath)
 	})
+}
+
+func TestRootfsPath(t *testing.T) {
+	sandbox := rootfsPath("/run/containerd/io.containerd.sandbox.controller.v1.shim/k8s.io/id")
+	assert.Equal(t, "/run/containerd/sandboxed-runc/io.containerd.sandbox.controller.v1.shim/k8s.io/id", sandbox)
+	// "shim delete" cleans a task bundle up the same way.
+	assert.NotEqual(t, sandbox, rootfsPath("/run/containerd/io.containerd.runtime.v2.task/k8s.io/id"))
 }
 
 // startReaper makes the test process reap its children as the shim does; the
@@ -154,7 +190,14 @@ func newPod(t *testing.T, cfg *Config) (context.Context, string) {
 	cfg.CgroupParent = "/" + cfg.ID
 	// runc removes the container cgroup, not its parent.
 	t.Cleanup(func() { _ = os.Remove(filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)) })
-	bundle := t.TempDir()
+	// The bundle is laid out as under the containerd state directory, which
+	// anyone can search. The parent of t.TempDir has mode 0700.
+	state, err := os.MkdirTemp("", "sandbox-test-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(state) })
+	require.NoError(t, os.Chmod(state, 0o711))
+	bundle := filepath.Join(state, "shim", "testing", cfg.ID)
+	require.NoError(t, os.MkdirAll(bundle, 0o700))
 	t.Cleanup(func() { _ = Cleanup(ctx, bundle) })
 	return ctx, bundle
 }
@@ -223,17 +266,7 @@ func TestSetupNamespaces(t *testing.T) {
 	}
 
 	// runc set the hostname and the sysctls in the pod namespaces.
-	assert.Equal(t, "sandbox-test", inNamespace(t, pins.UTS, unix.CLONE_NEWUTS, func() (string, error) {
-		var u unix.Utsname
-		err := unix.Uname(&u)
-		return unix.ByteSliceToString(u.Nodename[:]), err
-	}))
-	readSysctl := func(file string) func() (string, error) {
-		return func() (string, error) {
-			b, err := os.ReadFile(file)
-			return strings.TrimSpace(string(b)), err
-		}
-	}
+	assert.Equal(t, "sandbox-test", inNamespace(t, pins.UTS, unix.CLONE_NEWUTS, nodename))
 	assert.Equal(t, "1", inNamespace(t, pins.IPC, unix.CLONE_NEWIPC, readSysctl("/proc/sys/kernel/shm_rmid_forced")))
 	assert.Equal(t, "0", inNamespace(t, podNetNS.GetPath(), unix.CLONE_NEWNET, readSysctl("/proc/sys/net/ipv4/ip_unprivileged_port_start")))
 	current, err := os.Hostname()
@@ -243,11 +276,93 @@ func TestSetupNamespaces(t *testing.T) {
 	// Cleanup unmounts the pins and removes them and the container files; a
 	// second run is a no-op.
 	require.NoError(t, Cleanup(ctx, bundle))
-	for _, p := range []string{filepath.Join(bundle, pinDir), filepath.Join(bundle, runcDir)} {
+	for _, p := range []string{filepath.Join(bundle, pinDir), filepath.Join(bundle, runcDir), rootfsPath(bundle)} {
 		assert.NoDirExists(t, p)
 	}
 	assertNoMountsUnder(t, bundle)
 	require.NoError(t, Cleanup(ctx, bundle))
+}
+
+// TestSetupNamespacesUserNS sets user namespaced pods up under a umask that
+// denies group and others. The pod network namespace is created inside a new
+// user namespace, as CRI creates it. runc creates the user namespace of a pod
+// that uses the host network.
+func TestSetupNamespacesUserNS(t *testing.T) {
+	testutil.RequiresRoot(t)
+	umask := unix.Umask(0o077)
+	t.Cleanup(func() { unix.Umask(umask) })
+	const hostID = 100000
+	mapping := specs.LinuxIDMapping{HostID: hostID, Size: 65536}
+
+	for name, cfg := range map[string]*Config{
+		"pod network":                {},
+		"pod network and shared PID": {SharedPID: true},
+		"host network":               {HostNetwork: true},
+		"host network and IPC":       {HostNetwork: true, HostIPC: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg.UserNS, cfg.UIDMapping, cfg.GIDMapping = true, mapping, mapping
+			if !cfg.HostNetwork {
+				var podNetNS *netns.NetNS
+				netnsDir := t.TempDir()
+				m := fmt.Sprintf("0:%d:%d", mapping.HostID, mapping.Size)
+				require.NoError(t, sys.UnshareAfterEnterUserns(m, m, unix.CLONE_NEWNET, func(pid int) error {
+					var err error
+					podNetNS, err = netns.NewNetNSFromPID(netnsDir, uint32(pid))
+					return err
+				}))
+				t.Cleanup(func() { _ = podNetNS.Remove() })
+				cfg.Hostname, cfg.NetNSPath = "sandbox-test", podNetNS.GetPath()
+			}
+			if !cfg.HostIPC {
+				cfg.Sysctls = map[string]string{"kernel.shm_rmid_forced": "1"}
+			}
+			ctx, bundle, pins, c := setupPod(t, cfg)
+			require.Equal(t, filepath.Join(bundle, pinDir, "user"), pins.User)
+			assert.NotEqual(t, inode(t, "/proc/self/ns/user"), inode(t, pins.User), "not the host user namespace")
+			if !cfg.SharedPID {
+				assert.Empty(t, pins.PID, "the shim does not pin the PID namespace of the setup container")
+			}
+
+			// The pod user namespace owns the other namespaces of the pod.
+			for _, p := range []string{cfg.NetNSPath, pins.IPC, pins.UTS, pins.PID} {
+				if p == "" {
+					continue
+				}
+				f, err := os.Open(p)
+				require.NoError(t, err)
+				owner, err := sys.GetUsernsForNamespace(f.Fd())
+				f.Close()
+				require.NoError(t, err)
+				assert.Equal(t, inode(t, pins.User), inode(t, owner.Name()), "owner of %s", p)
+				owner.Close()
+			}
+
+			// runc set the hostname and the sysctl in the pod namespaces.
+			if !cfg.HostNetwork {
+				assert.Equal(t, "sandbox-test", inNamespace(t, pins.UTS, unix.CLONE_NEWUTS, nodename))
+			}
+			if !cfg.HostIPC {
+				assert.Equal(t, "1", inNamespace(t, pins.IPC, unix.CLONE_NEWIPC, readSysctl("/proc/sys/kernel/shm_rmid_forced")))
+			}
+
+			if cfg.SharedPID {
+				require.NotNil(t, c)
+				startInit(ctx, t, c)
+				// The init runs as initUser of the pod user namespace.
+				var st unix.Stat_t
+				require.NoError(t, unix.Stat(fmt.Sprintf("/proc/%d", c.pid), &st))
+				assert.EqualValues(t, hostID+initUser, st.Uid)
+				_, err := c.stop(ctx)
+				require.NoError(t, err)
+			} else {
+				assert.Nil(t, c, "nothing stays running for an ordinary pod")
+			}
+
+			require.NoError(t, Cleanup(ctx, bundle))
+			assertNoMountsUnder(t, bundle)
+		})
+	}
 }
 
 // TestSetupNamespacesFailure has runc reject a sysctl value.
@@ -349,6 +464,21 @@ func inNamespace(t *testing.T, pin string, nsType int, fn func() (string, error)
 	<-done
 	require.NoError(t, err, "in namespace %s", pin)
 	return result
+}
+
+// nodename returns the hostname of the UTS namespace of the calling thread.
+func nodename() (string, error) {
+	var u unix.Utsname
+	err := unix.Uname(&u)
+	return unix.ByteSliceToString(u.Nodename[:]), err
+}
+
+// readSysctl returns a function that reads the sysctl at file.
+func readSysctl(file string) func() (string, error) {
+	return func() (string, error) {
+		b, err := os.ReadFile(file)
+		return strings.TrimSpace(string(b)), err
+	}
 }
 
 func inode(t *testing.T, path string) uint64 {

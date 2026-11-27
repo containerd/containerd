@@ -62,6 +62,17 @@
 //     both with the host and does not share a PID namespace among its
 //     containers.
 //
+//   - User namespace (setup.go). CRI creates the user namespace of a user
+//     namespaced pod and the pod network namespace inside it. The shim pins
+//     the owner of the network namespace under <bundle>/ns/user, and the
+//     setup container joins it: runc creates the other namespaces inside it
+//     and applies the sysctls as the pod root. A pod that uses the host
+//     network does not have a network namespace of its own: runc creates its
+//     user namespace from the ID mappings, and the shim pins it as it pins
+//     the IPC namespace. The pod root cannot reach the bundle, so the rootfs
+//     of the setup container is outside it, at
+//     <state>/sandboxed-runc/<sandbox controller>/<namespace>/<id>.
+//
 //   - Shared files (bundle.go). The shim writes hostname, copies the host
 //     hosts file, writes resolv.conf from the pod DNS config (or copies the
 //     host one) and mounts the pod shm tmpfs, all under its bundle instead of
@@ -93,18 +104,19 @@
 // service of containerd-shim-runc-v2 (task.go in package main), the runc tasks
 // of its containers. StopSandbox releases what the sandbox holds and
 // ShutdownSandbox ends the shim; CRI stops and removes the containers of a
-// pod before either. Everything the shim creates lives under its bundle at
-// fixed paths, so Cleanup needs no state and runs the same way on create
-// failure, on stop and from "shim delete".
+// pod before either. Everything the shim creates lives at fixed paths, under
+// its bundle except for the rootfs of the setup container, so Cleanup needs
+// no state and runs the same way on create failure, on stop and from "shim
+// delete".
 //
 // # Not supported yet
 //
-// User namespaced pods need their namespaces created inside the pod user
-// namespace. The setup runc container can do that, but the shim does not
-// configure it yet and rejects these pods. It also rejects user.* sysctls and
-// sysctls whose names contain a "." (runc maps every "." to "/"). The shim
-// requires cgroup v2, and runc 1.2 or newer on Linux 5.3 or newer to hand
-// over a pidfd. It does not run rootless. SELinux labels are not applied yet:
+// The shim rejects user.* sysctls and sysctls whose names contain a "." (runc
+// maps every "." to "/"). It requires cgroup v2, and runc 1.2 or newer on
+// Linux 5.3 or newer to hand over a pidfd. A user namespaced pod needs Linux
+// 6.3 or newer, as in Kubernetes: CRI mounts the pod files with the ID
+// mappings of the pod, and they are on tmpfs with the state directory. The
+// shim does not run rootless. SELinux labels are not applied yet:
 // the pod label allocation moves into the CRI layer with
 // https://github.com/containerd/containerd/pull/14108, after which the shim
 // applies the labels it is handed (see the TODO in CreateSandbox).

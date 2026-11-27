@@ -34,16 +34,18 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/sandboxfiles"
 )
 
-// Everything the sandbox creates lives under the shim bundle at fixed paths
-// (see the package doc):
+// Everything the sandbox creates lives at fixed paths (see the package doc),
+// under the shim bundle except for the rootfs of the setup runc container
+// (see rootfsPath):
 //
-//	<bundle>/ns/{ipc,uts}   namespace pins, and ns/pid for a shared-PID pod
+//	<bundle>/ns/{ipc,uts}   namespace pins, ns/pid for a shared-PID pod and
+//	                        ns/user for a user namespaced pod
 //	<bundle>/hostname       the pod hostname
 //	<bundle>/hosts          a copy of the host /etc/hosts
 //	<bundle>/resolv.conf    the pod DNS configuration
 //	<bundle>/shm            the pod /dev/shm tmpfs
 //	<bundle>/runc           the bundle of the setup runc container: its
-//	                        config.json, init.pid, runc log and empty rootfs
+//	                        config.json, init.pid and runc log
 
 // setupFiles creates the pod shared files and returns the mounts that expose
 // them to the containers of the pod; CRI picks the sources up from the
@@ -122,6 +124,7 @@ func Cleanup(ctx context.Context, bundle string) error {
 		filepath.Join(bundle, pinDir, string(specs.IPCNamespace)),
 		filepath.Join(bundle, pinDir, string(specs.UTSNamespace)),
 		filepath.Join(bundle, pinDir, string(specs.PIDNamespace)),
+		filepath.Join(bundle, pinDir, string(specs.UserNamespace)),
 		filepath.Join(bundle, sandboxfiles.ShmDir),
 	} {
 		// Only a mount point is unmounted: umount(2) on a plain file needs
@@ -148,6 +151,9 @@ func Cleanup(ctx context.Context, bundle string) error {
 		if err := os.RemoveAll(filepath.Join(bundle, name)); err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove %s: %w", name, err))
 		}
+	}
+	if err := os.RemoveAll(rootfsPath(bundle)); err != nil {
+		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
 }

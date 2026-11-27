@@ -110,7 +110,7 @@ func TestCleanupWithoutMounts(t *testing.T) {
 	// before mounting anything) are removed, and nothing else is touched.
 	require.NoError(t, os.Mkdir(filepath.Join(bundle, pinDir), 0o700))
 	require.NoError(t, os.Mkdir(filepath.Join(bundle, "shm"), 0o700))
-	require.NoError(t, os.MkdirAll(filepath.Join(bundle, runcDir, runcRootfs), 0o700))
+	require.NoError(t, os.Mkdir(filepath.Join(bundle, runcDir), 0o700))
 	require.NoError(t, os.Mkdir(filepath.Join(bundle, "rootfs"), 0o700))
 	for _, f := range []string{"hostname", "hosts", "resolv.conf", "ns/ipc", "ns/uts", "address"} {
 		require.NoError(t, os.WriteFile(filepath.Join(bundle, f), []byte("x"), 0o600))

@@ -52,6 +52,12 @@ type Config struct {
 	SharedPID bool
 	// NetNSPath is the network namespace CRI created for the pod.
 	NetNSPath string
+	// UserNS means the pod has a user namespace. CRI creates it as the owner
+	// of NetNSPath, and runc creates it for a pod that uses the host network.
+	UserNS bool
+	// UIDMapping and GIDMapping are the ID mappings of the pod user namespace.
+	UIDMapping specs.LinuxIDMapping
+	GIDMapping specs.LinuxIDMapping
 	// Sysctls is the effective set of namespaced sysctls to apply.
 	Sysctls map[string]string
 	// CgroupParent is the pod cgroup as a cgroup v2 group path. The sandbox
@@ -108,10 +114,18 @@ func configFromPodSandboxConfig(id, netns string, reqAnnotations map[string]stri
 		return nil, fmt.Errorf("sandbox %q: PID namespace mode TARGET is not valid for a pod sandbox: %w", id, errdefs.ErrInvalidArgument)
 	}
 	if u := nsOpts.GetUsernsOptions(); u != nil && u.GetMode() != runtime.NamespaceMode_NODE {
-		// The namespaces of a user namespaced pod must be owned by the pod
-		// user namespace. The setup runc container can create them there,
-		// but the shim does not configure that yet.
-		return nil, fmt.Errorf("sandbox %q: user namespaces are not supported yet by %s: %w", id, BinaryName, errdefs.ErrNotImplemented)
+		if u.GetMode() != runtime.NamespaceMode_POD {
+			return nil, fmt.Errorf("sandbox %q: user namespace mode %s is not valid for a pod sandbox: %w", id, u.GetMode(), errdefs.ErrInvalidArgument)
+		}
+		// initUser is the user of the setup runc container.
+		for _, m := range [][]*runtime.IDMapping{u.GetUids(), u.GetGids()} {
+			if len(m) != 1 || m[0].GetContainerId() != 0 || m[0].GetLength() <= initUser {
+				return nil, fmt.Errorf("sandbox %q: a user namespace needs a single mapping of container ids 0 to %d or more, got %v: %w", id, initUser, m, errdefs.ErrInvalidArgument)
+			}
+		}
+		cfg.UserNS = true
+		cfg.UIDMapping = specs.LinuxIDMapping{HostID: u.GetUids()[0].GetHostId(), Size: u.GetUids()[0].GetLength()}
+		cfg.GIDMapping = specs.LinuxIDMapping{HostID: u.GetGids()[0].GetHostId(), Size: u.GetGids()[0].GetLength()}
 	}
 
 	if cfg.HostNetwork {
@@ -128,7 +142,7 @@ func configFromPodSandboxConfig(id, netns string, reqAnnotations map[string]stri
 		cfg.Hostname = hostname
 	}
 
-	sysctls, err := effectiveSysctls(pc.GetLinux().GetSysctls(), cfg.HostNetwork, cfg.HostIPC)
+	sysctls, err := effectiveSysctls(pc.GetLinux().GetSysctls(), cfg)
 	if err != nil {
 		return nil, fmt.Errorf("sandbox %q: %w", id, err)
 	}
@@ -163,9 +177,9 @@ var ipcSysctls = map[string]bool{
 // clear error. It follows runc's rules: net.* needs the pod network
 // namespace, the IPC sysctls runc lists need the pod IPC namespace, and
 // kernel.domainname needs the pod UTS namespace. kernel.hostname conflicts
-// with the pod hostname, user.* belongs to a user namespace, which the
-// sandbox does not have, and runc rejects any other sysctl as not
-// namespaced. It returns the key in dotted form (see sysctlKey).
+// with the pod hostname, the shim does not support user.* yet, and runc
+// rejects any other sysctl as not namespaced. It returns the key in dotted
+// form (see sysctlKey).
 func validateSysctl(key string, hostNetwork, hostIPC bool) (string, error) {
 	dotted, err := sysctlKey(key)
 	if err != nil {
@@ -196,11 +210,13 @@ func validateSysctl(key string, hostNetwork, hostIPC bool) (string, error) {
 
 // effectiveSysctls validates the pod sysctls and adds the defaults. The keys
 // of the result are in dotted form; a sysctl the pod sets under two spellings
-// does not have a single value and is rejected.
-func effectiveSysctls(pod map[string]string, hostNetwork, hostIPC bool) (map[string]string, error) {
+// does not have a single value and is rejected. The default ping group range
+// is skipped for a user namespaced pod: the kernel rejects group ids the
+// user namespace does not map.
+func effectiveSysctls(pod map[string]string, cfg *Config) (map[string]string, error) {
 	out := make(map[string]string, len(pod)+len(defaultSysctls))
 	for k, v := range pod {
-		dotted, err := validateSysctl(k, hostNetwork, hostIPC)
+		dotted, err := validateSysctl(k, cfg.HostNetwork, cfg.HostIPC)
 		if err != nil {
 			return nil, err
 		}
@@ -209,8 +225,11 @@ func effectiveSysctls(pod map[string]string, hostNetwork, hostIPC bool) (map[str
 		}
 		out[dotted] = v
 	}
-	if !hostNetwork {
+	if !cfg.HostNetwork {
 		for k, v := range defaultSysctls {
+			if cfg.UserNS && k == "net.ipv4.ping_group_range" {
+				continue
+			}
 			if _, ok := out[k]; !ok {
 				out[k] = v
 			}
@@ -263,14 +282,15 @@ func sandboxSpec(cfg *Config, pins Pins, mounts []specs.Mount) *specs.Spec {
 			Sysctl: cfg.Sysctls,
 		},
 	}
-	if cfg.NetNSPath != "" {
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: cfg.NetNSPath})
-	}
-	if pins.IPC != "" {
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.IPCNamespace, Path: pins.IPC})
-	}
-	if pins.UTS != "" {
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.UTSNamespace, Path: pins.UTS})
+	for _, ns := range []specs.LinuxNamespace{
+		{Type: specs.NetworkNamespace, Path: cfg.NetNSPath},
+		{Type: specs.IPCNamespace, Path: pins.IPC},
+		{Type: specs.UTSNamespace, Path: pins.UTS},
+		{Type: specs.UserNamespace, Path: pins.User},
+	} {
+		if ns.Path != "" {
+			s.Linux.Namespaces = append(s.Linux.Namespaces, ns)
+		}
 	}
 	switch {
 	case cfg.HostPID:
