@@ -55,19 +55,23 @@ func TestMigration(t *testing.T) {
 	if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" && strings.Contains(defaultContent, "btrfs") && strings.Contains(defaultContent, "devmapper") {
 		migrationTests = append(migrationTests, []migrationTest{
 			{
-				Name:     "1.6-Default",
-				File:     "testdata/default-1.6.toml",
-				Migrated: defaultContent,
+				Name: "1.6-Default",
+				File: "testdata/default-1.6.toml",
+				// 1.6 did not have the overlay differ, so the migrated output
+				// preserves the original diff-service default order (walking only).
+				Migrated: replaceValue(defaultContent, "default", `['walking']`),
 			},
 			{
-				Name:     "1.7-Default",
-				File:     "testdata/default-1.7.toml",
-				Migrated: defaultContent,
+				Name: "1.7-Default",
+				File: "testdata/default-1.7.toml",
+				// 1.7 did not have the overlay differ, so the migrated output
+				// preserves the original diff-service default order (walking only).
+				Migrated: replaceValue(defaultContent, "default", `['walking']`),
 			},
 			{
 				Name: "1.7-Custom",
 				File: "testdata/custom-1.7.toml",
-				Migrated: replaceAllValues(defaultContent, map[string]string{
+				Migrated: replaceAllValues(replaceValue(defaultContent, "default", `['walking']`), map[string]string{
 					"sandbox":               "'custom.io/pause:3.10.2'",
 					"stream_idle_timeout":   "'2h0m0s'",
 					"stream_server_address": "'127.0.1.1'",

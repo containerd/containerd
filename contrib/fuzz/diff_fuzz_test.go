@@ -20,6 +20,7 @@ import (
 	"context"
 	_ "crypto/sha256" // required by go-digest
 	"testing"
+	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	"github.com/containerd/containerd/v2/core/diff/apply"
@@ -55,8 +56,10 @@ func FuzzDiffApply(f *testing.F) {
 		if err != nil {
 			return
 		}
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
 		fsa := apply.NewFileSystemApplier(cs)
-		_, _ = fsa.Apply(context.Background(), desc, mounts)
+		_, _ = fsa.Apply(ctx, desc, mounts)
 	})
 }
 
@@ -92,7 +95,8 @@ func FuzzDiffCompare(f *testing.F) {
 			upper = append(upper, m)
 		}
 
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+		defer cancel()
 		tmpDir := t.TempDir()
 		cs, err := local.NewStore(tmpDir)
 		if err != nil {
