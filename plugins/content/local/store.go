@@ -24,6 +24,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -641,6 +642,52 @@ func (s *store) Abort(ctx context.Context, ref string) error {
 	}
 
 	return nil
+}
+
+// FinalizeBlob enables integrity verification on a published blob and makes
+// it read-only, unless that is already done.
+func (s *store) FinalizeBlob(ctx context.Context, dgst digest.Digest) {
+	path, err := s.blobPath(dgst)
+	if err != nil {
+		return
+	}
+	fi, err := os.Stat(path)
+	if err != nil || !s.needsFinalize(path, fi) {
+		return
+	}
+	s.finalize(ctx, path, fi.Mode()&os.ModePerm)
+}
+
+func (s *store) needsFinalize(path string, fi os.FileInfo) bool {
+	if s.integritySupported {
+		if enabled, err := fsverity.IsEnabled(path); err == nil && !enabled {
+			return true
+		}
+	}
+	return runtime.GOOS != "windows" && fi.Mode()&0222 != 0
+}
+
+// finalize enables integrity verification on a published blob if supported,
+// then makes it read-only. Enabling fsverity requires write permission.
+func (s *store) finalize(ctx context.Context, path string, mode os.FileMode) {
+	if s.integritySupported {
+		if err := fsverity.Enable(path); err != nil {
+			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", path, err.Error())
+		}
+	}
+
+	// change to readonly, more important for read, but provides _some_
+	// protection from this point on. We use the existing perms with a mask
+	// only allowing reads honoring the umask on creation.
+	//
+	// This removes write and exec, only allowing read per the creation umask.
+	//
+	// NOTE: Windows does not support this operation
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(path, mode&^0333); err != nil {
+			log.G(ctx).WithField("path", path).Error("failed to make readonly")
+		}
+	}
 }
 
 func (s *store) blobPath(dgst digest.Digest) (string, error) {

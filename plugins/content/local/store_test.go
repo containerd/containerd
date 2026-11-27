@@ -440,3 +440,50 @@ func TestWriteReadEmptyFileTimestamp(t *testing.T) {
 		t.Errorf("read empty timestamp file should return time.Time{}, but got: %v", timestamp)
 	}
 }
+
+func TestWriterDeferFinalize(t *testing.T) {
+	root := t.TempDir()
+	if ok, err := fsverity.IsSupported(root); !ok {
+		t.Skipf("fsverity not supported: %v", err)
+	}
+	cs, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := cs.(*store)
+	ctx := t.Context()
+	blob := []byte("deferred integrity")
+	dgst := digest.FromBytes(blob)
+	cw, err := cs.Writer(ctx, content.WithRef("deferred"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := cw.(*writer)
+	w.DeferFinalize()
+	if _, err := w.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Commit(ctx, int64(len(blob)), dgst); err != nil {
+		t.Fatal(err)
+	}
+	path, err := s.blobPath(dgst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if enabled, err := fsverity.IsEnabled(path); err != nil || enabled {
+		t.Fatalf("blob sealed before FinalizeBlob: enabled=%v err=%v", enabled, err)
+	}
+	s.FinalizeBlob(ctx, dgst)
+	if enabled, err := fsverity.IsEnabled(path); err != nil || !enabled {
+		t.Fatalf("blob not sealed by FinalizeBlob: enabled=%v err=%v", enabled, err)
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode()&0222 != 0 {
+		t.Fatalf("blob not read-only after FinalizeBlob: %v", fi.Mode())
+	}
+	// Finalizing an already finalized blob is a no-op.
+	s.FinalizeBlob(ctx, dgst)
+}
