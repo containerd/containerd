@@ -244,9 +244,10 @@ func (c *StatsCollector) addSample(id string, timestamp time.Time, usageCoreNano
 	store.Add(timestamp, usageCoreNanoSeconds)
 }
 
-// GetUsageNanoCores returns the latest instantaneous UsageNanoCores rate for the given
-// container/sandbox ID. Returns 0 and false if no data is available or if
-// there aren't enough samples to calculate the rate.
+// GetUsageNanoCores returns the UsageNanoCores rate for the given
+// container/sandbox ID over the collector's recent sample window.
+// Returns 0 and false if no data is available or if there aren't enough
+// samples to calculate the rate.
 func (c *StatsCollector) GetUsageNanoCores(id string) (uint64, bool) {
 	c.mu.RLock()
 	store, ok := c.stores[id]
