@@ -19,6 +19,7 @@ package diff
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/errdefs"
@@ -69,6 +70,7 @@ func init() {
 				return nil, err
 			}
 			syncFs := ic.Config.(*config).SyncFs
+			ic.Meta.Exports[plugins.DiffServiceSyncFs] = strconv.FormatBool(syncFs)
 			orderedNames := ic.Config.(*config).Order
 			ordered := make([]differ, len(orderedNames))
 			for i, n := range orderedNames {
