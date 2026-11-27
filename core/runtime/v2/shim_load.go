@@ -76,7 +76,6 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 	}
 	eg, ctx2 := errgroup.WithContext(ctx)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
-	var errLoad error
 	for _, sd := range shimDirs {
 		if !sd.IsDir() {
 			continue
@@ -86,49 +85,43 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 		if len(id) > 0 && id[0] == '.' {
 			continue
 		}
-		bundle, err := LoadBundle(ctx, stateDir, id)
-		if err != nil {
-			errLoad = err
-			// fine to return error here, it is a programmer error if the context
-			// does not have a namespace
-			break
-		}
+		path := filepath.Join(stateDir, ns, id)
 		eg.Go(func() error {
 			// fast path
-			f, err := os.Open(bundle.Path)
+			f, err := os.Open(path)
 			if err != nil {
-				bundle.Delete()
-				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				deleteDir(path)
+				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", path)
 				return nil
 			}
 
 			bf, err := f.Readdirnames(-1)
 			f.Close()
 			if err != nil {
-				bundle.Delete()
-				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				deleteDir(path)
+				log.G(ctx2).WithError(err).Errorf("fast path read bundle path for %s", path)
 				return nil
 			}
 			if len(bf) == 0 {
-				bundle.Delete()
+				deleteDir(path)
 				return nil
 			}
-			if err := m.loadShim(ctx2, bundle); err != nil {
-				log.G(ctx2).WithError(err).Errorf("failed to load shim %s", bundle.Path)
-				bundle.Delete()
+			if err := m.loadShim(ctx2, path); err != nil {
+				log.G(ctx2).WithError(err).Errorf("failed to load shim %s", path)
+				deleteDir(path)
 				return nil
 			}
 			return nil
 		})
 	}
 	_ = eg.Wait()
-	return errLoad
+	return nil
 }
 
-func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
+func (m *ShimManager) loadShim(ctx context.Context, path string) error {
 	var (
 		runtime string
-		id      = bundle.ID
+		id      = filepath.Base(path)
 	)
 
 	// One budget for the whole load: shims are loaded during plugin
@@ -139,7 +132,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	defer cancel()
 
 	// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
-	if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(path, "shim-binary-path")); err == nil {
 		runtime = string(data)
 	} else if err != nil && !os.IsNotExist(err) {
 		log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
@@ -150,7 +143,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		container, err := m.containers.Get(ctx, id)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("loading container %s", id)
-			if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
+			if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
 			}
 			return err
@@ -160,12 +153,12 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 
 	runtime, err := m.resolveRuntimePath(runtime)
 	if err != nil {
-		bundle.Delete()
+		deleteDir(path)
 
 		return fmt.Errorf("failed to resolve runtime path: %w", err)
 	}
 
-	binaryCall := shimBinary(bundle,
+	binaryCall := shimBinary(path,
 		shimBinaryConfig{
 			runtime:      runtime,
 			address:      m.containerdAddress,
@@ -174,7 +167,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 			env:          m.env,
 		})
 	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
-	shim, err := loadShimTask(ctx, bundle, func() {
+	shim, err := loadShimTask(ctx, path, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
@@ -225,8 +218,8 @@ func shouldCleanupShim(sgetErr, pidErr error, pInfo []runtimeapi.ProcessInfo) bo
 			(pidErr == nil && len(pInfo) == 0))
 }
 
-func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
-	shim, err := loadShim(ctx, bundle, onClose)
+func loadShimTask(ctx context.Context, path string, onClose func()) (_ *shimTask, retErr error) {
+	shim, err := loadShim(ctx, path, onClose)
 	if err != nil {
 		return nil, err
 	}

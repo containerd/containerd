@@ -17,7 +17,24 @@
 package v2
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	// When testutil is imported for one platform (bundle_linux_test.go) it
 	// should be imported for all platforms.
 	_ "github.com/containerd/containerd/v2/pkg/testutil"
 )
+
+// A sandbox shim's working directory has neither a rootfs nor a work link.
+func TestDeleteDirWithoutBundle(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test-shim")
+	require.NoError(t, os.Mkdir(path, 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(path, "bootstrap.json"), nil, 0600))
+
+	require.NoError(t, deleteDir(path))
+	assert.NoDirExists(t, path)
+}

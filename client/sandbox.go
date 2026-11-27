@@ -201,6 +201,9 @@ func WithSandboxRuntime(name string, options any) NewSandboxOpts {
 }
 
 // WithSandboxSpec will provide the sandbox runtime spec
+//
+// Deprecated: the shim sandbox controller no longer writes the spec to the
+// shim's working directory.
 func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
 		c := &containers.Container{ID: sandbox.ID}

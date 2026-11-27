@@ -84,7 +84,6 @@ func init() {
 			}
 
 			c := &controllerLocal{
-				root:      root,
 				state:     state,
 				shims:     shims,
 				publisher: publisher,
@@ -95,7 +94,6 @@ func init() {
 }
 
 type controllerLocal struct {
-	root      string
 	state     string
 	shims     *v2.ShimManager
 	publisher events.Publisher
@@ -147,24 +145,13 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		return fmt.Errorf("sandbox %s already running: %w", sandboxID, errdefs.ErrAlreadyExists)
 	}
 
-	bundle, err := v2.NewBundle(ctx, c.root, c.state, sandboxID, info.Spec)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if retErr != nil {
-			bundle.Delete()
-		}
-	}()
-
 	// The shim manager accepts an absolute binary path in place of a
 	// runtime name.
 	runtimeName := info.Runtime.Name
 	if coptions.RuntimePath != "" {
 		runtimeName = coptions.RuntimePath
 	}
-	shim, err := c.shims.Start(ctx, sandboxID, bundle, runtime.CreateOpts{
-		Spec:           info.Spec,
+	shim, err := c.shims.Start(ctx, sandboxID, c.state, runtime.CreateOpts{
 		RuntimeOptions: info.Runtime.Options,
 		Runtime:        runtimeName,
 		TaskOptions:    nil,
@@ -180,7 +167,7 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:   sandboxID,
-		BundlePath:  shim.Bundle(),
+		BundlePath:  shim.WorkDir(),
 		Rootfs:      mount.ToProto(coptions.Rootfs),
 		Options:     typeurl.MarshalProto(coptions.Options),
 		NetnsPath:   coptions.NetNSPath,

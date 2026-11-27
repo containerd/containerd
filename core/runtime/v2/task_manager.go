@@ -189,7 +189,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	// which mount types and transforms it performs itself, which decides what
 	// the mount manager must do on its behalf. Starting the shim does not
 	// require the rootfs; only the task.Create call below consumes opts.Rootfs.
-	shim, err := m.manager.Start(ctx, taskID, bundle, opts)
+	shim, err := m.manager.start(ctx, taskID, bundle.Path, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start shim: %w", err)
 	}
@@ -223,7 +223,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	}
 
 	t, err := func() (runtime.Task, error) {
-		t, err := shimTask.Create(ctx, opts)
+		t, err := shimTask.Create(ctx, bundle.Path, opts)
 		if err == nil || !errdefs.IsNotImplemented(err) {
 			return t, err
 		}
@@ -238,7 +238,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 				if err != nil {
 					return nil, fmt.Errorf("failed to create shim task after downgrading: %w", err)
 				}
-				return shimTask.Create(ctx, opts)
+				return shimTask.Create(ctx, bundle.Path, opts)
 			}
 		}
 		return t, err

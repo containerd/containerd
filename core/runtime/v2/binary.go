@@ -43,9 +43,9 @@ type shimBinaryConfig struct {
 	env          []string
 }
 
-func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
+func shimBinary(path string, config shimBinaryConfig) *binary {
 	return &binary{
-		bundle:                 bundle,
+		path:                   path,
 		runtime:                config.runtime,
 		containerdAddress:      config.address,
 		containerdTTRPCAddress: config.ttrpcAddress,
@@ -59,19 +59,20 @@ type binary struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
 	socketDir              string
-	bundle                 *Bundle
+	path                   string
 	env                    []string
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
+	id := filepath.Base(b.path)
 	cmd, err := command(
 		ctx,
 		&commandConfig{
-			ID:           b.bundle.ID,
+			ID:           id,
 			RuntimePath:  b.runtime,
 			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
-			WorkDir:      b.bundle.Path,
+			WorkDir:      b.path,
 			Opts:         opts,
 			Env:          b.env,
 			LogLevel:     log.GetLevel(),
@@ -89,7 +90,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 			cancelShimLog()
 		}
 	}()
-	f, err := openShimLog(shimCtx, b.bundle, client.AnonDialer)
+	f, err := openShimLog(shimCtx, id, b.path, client.AnonDialer)
 	if err != nil {
 		return nil, fmt.Errorf("open shim log pipe: %w", err)
 	}
@@ -122,7 +123,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		f.Close()
 	}
 	// Save runtime binary path for restore.
-	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(b.path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
 		return nil, err
 	}
 
@@ -131,19 +132,21 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, err
 	}
 
-	conn, err := makeConnection(ctx, b.bundle.ID, params, onCloseWithShimLog, client.AnonDialer)
+	conn, err := makeConnection(ctx, id, params, onCloseWithShimLog, client.AnonDialer)
 	if err != nil {
 		return nil, err
 	}
 
 	// Save bootstrap configuration (so containerd can restore shims after restart).
-	if err := writeBootstrapParams(filepath.Join(b.bundle.Path, "bootstrap.json"), params); err != nil {
+	if err := writeBootstrapParams(filepath.Join(b.path, "bootstrap.json"), params); err != nil {
 		return nil, fmt.Errorf("failed to write bootstrap.json: %w", err)
 	}
 	// The address is in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>
 	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 	return &shim{
-		bundle:    b.bundle,
+		id:        id,
+		namespace: ns,
+		path:      b.path,
 		client:    conn,
 		address:   address,
 		version:   int(params.Version),
@@ -152,7 +155,8 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 }
 
 func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
-	log.G(ctx).WithField("id", b.bundle.ID).Info("cleaning up dead shim")
+	id := filepath.Base(b.path)
+	log.G(ctx).WithField("id", id).Info("cleaning up dead shim")
 
 	// On Windows and FreeBSD, the current working directory of the shim should
 	// not be the bundle path during the delete operation. Instead, we invoke
@@ -161,14 +165,14 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	// is in use with it. On FreeBSD, fork/exec can fail.
 	var bundlePath string
 	if gruntime.GOOS != "windows" && gruntime.GOOS != "freebsd" {
-		bundlePath = b.bundle.Path
+		bundlePath = b.path
 	}
 
 	cmd, err := command(ctx,
 		&commandConfig{
-			ID:           b.bundle.ID,
+			ID:           id,
 			RuntimePath:  b.runtime,
-			BundlePath:   b.bundle.Path,
+			BundlePath:   b.path,
 			GRPCAddress:  b.containerdAddress,
 			TTRPCAddress: b.containerdTTRPCAddress,
 			WorkDir:      bundlePath,
@@ -190,14 +194,14 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		log.G(ctx).WithFields(log.Fields{
 			"cmd":    cmd.String(),
 			"error":  err,
-			"id":     b.bundle.ID,
+			"id":     id,
 			"stderr": errb.String(),
 		}).Error("failed to delete dead shim")
 		return nil, shimCallError(ctx.Err(), errb.Bytes(), err)
 	}
 	if s := errb.String(); s != "" {
 		log.G(ctx).WithFields(log.Fields{
-			"id":       b.bundle.ID,
+			"id":       id,
 			"warnings": s,
 		}).Warn("warnings while cleaning up dead shim")
 	}
@@ -205,7 +209,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	if err := proto.Unmarshal(out.Bytes(), &response); err != nil {
 		return nil, err
 	}
-	if err := b.bundle.Delete(); err != nil {
+	if err := deleteDir(b.path); err != nil {
 		return nil, err
 	}
 	return &runtime.Exit{

@@ -17,10 +17,17 @@
 package v2
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 // bootstrappedShimInstance is a ShimInstance that also implements
@@ -56,4 +63,37 @@ func TestSandboxShimExtensions(t *testing.T) {
 // capability protocol would not.
 type legacyShimInstance struct {
 	ShimInstance
+}
+
+func TestStartWorkDir(t *testing.T) {
+	const (
+		ns = "test"
+		id = "test-shim"
+	)
+	var (
+		ctx = namespaces.WithNamespace(t.Context(), ns)
+		m   = &ShimManager{}
+		// No runtime is set, so the shim cannot be started.
+		opts = runtime.CreateOpts{}
+	)
+
+	t.Run("a failed start removes the directory it created", func(t *testing.T) {
+		state := t.TempDir()
+
+		_, err := m.Start(ctx, id, state, opts)
+		require.Error(t, err)
+		assert.NoDirExists(t, filepath.Join(state, ns, id))
+	})
+
+	t.Run("an existing directory is rejected and left in place", func(t *testing.T) {
+		state := t.TempDir()
+		path := filepath.Join(state, ns, id)
+		require.NoError(t, os.MkdirAll(path, 0700))
+		bootstrap := filepath.Join(path, "bootstrap.json")
+		require.NoError(t, os.WriteFile(bootstrap, nil, 0600))
+
+		_, err := m.Start(ctx, id, state, opts)
+		require.ErrorIs(t, err, errdefs.ErrAlreadyExists)
+		assert.FileExists(t, bootstrap)
+	})
 }

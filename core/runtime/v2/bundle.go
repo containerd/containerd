@@ -36,6 +36,8 @@ import (
 )
 
 // LoadBundle loads an existing bundle from disk
+//
+// Deprecated: containerd no longer loads shims through a Bundle.
 func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -149,15 +151,22 @@ type Bundle struct {
 
 // Delete a bundle atomically
 func (b *Bundle) Delete() error {
-	work, werr := resolveWorkLink(b.Path)
-	rootfs := filepath.Join(b.Path, "rootfs")
+	return deleteDir(b.Path)
+}
+
+// deleteDir removes a shim's working directory. For a task this is also its
+// bundle, so the rootfs mount and the work directory, when there are any, go
+// with it.
+func deleteDir(path string) error {
+	work, werr := resolveWorkLink(path)
+	rootfs := filepath.Join(path, "rootfs")
 	if err := mount.UnmountRecursive(rootfs, 0); err != nil {
 		return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
 	}
 	if err := os.Remove(rootfs); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove bundle rootfs: %w", err)
 	}
-	err := atomicDelete(b.Path)
+	err := atomicDelete(path)
 	if err == nil {
 		if werr == nil {
 			return atomicDelete(work)
