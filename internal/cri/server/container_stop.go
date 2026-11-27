@@ -172,26 +172,6 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			}
 		} else if container.StopSignal != "" {
 			stopSignal = container.StopSignal
-		} else {
-			// The image may have been deleted, and the `StopSignal` field is
-			// just introduced to handle that.
-			// However, for containers created before the `StopSignal` field is
-			// introduced, still try to get the stop signal from the image config.
-			// If the image has been deleted, logging an error and using the
-			// default SIGTERM is still better than returning error and leaving
-			// the container unstoppable. (See issue #990)
-			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
-			image, err := c.GetImage(container.ImageRef)
-			if err != nil {
-				if !errdefs.IsNotFound(err) {
-					return fmt.Errorf("failed to get image %q: %w", container.ImageRef, err)
-				}
-				log.G(ctx).Warningf("Image %q not found, stop container with signal %q", container.ImageRef, stopSignal)
-			} else {
-				if image.ImageSpec.Config.StopSignal != "" {
-					stopSignal = image.ImageSpec.Config.StopSignal
-				}
-			}
 		}
 		sig, err := signal.ParseSignal(stopSignal)
 		if err != nil {
