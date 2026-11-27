@@ -38,7 +38,7 @@ func WithForceCompression(s *ImageImportStream) {
 	s.forceCompress = true
 }
 
-// NewImageImportStream returns a image importer via tar stream
+// NewImageImportStream returns an image importer via tar stream.
 func NewImageImportStream(stream io.Reader, mediaType string, opts ...ImportOpt) *ImageImportStream {
 	s := &ImageImportStream{
 		stream:    stream,
@@ -50,6 +50,7 @@ func NewImageImportStream(stream io.Reader, mediaType string, opts ...ImportOpt)
 	return s
 }
 
+// ImageImportStream wraps an io.Reader stream to import an image archive into containerd.
 type ImageImportStream struct {
 	stream        io.Reader
 	mediaType     string

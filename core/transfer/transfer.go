@@ -28,6 +28,13 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 )
 
+// Transferrer transfers artifacts between a source and a destination.
+//
+// Standard operations pair sources and destinations from the transfer subpackages:
+//   - Pull: [github.com/containerd/containerd/v2/core/transfer/registry.OCIRegistry] to [github.com/containerd/containerd/v2/core/transfer/image.Store]
+//   - Push: [github.com/containerd/containerd/v2/core/transfer/image.Store] to [github.com/containerd/containerd/v2/core/transfer/registry.OCIRegistry]
+//   - Import: [github.com/containerd/containerd/v2/core/transfer/archive.ImageImportStream] to [github.com/containerd/containerd/v2/core/transfer/image.Store]
+//   - Export: [github.com/containerd/containerd/v2/core/transfer/image.Store] to [github.com/containerd/containerd/v2/core/transfer/archive.ImageExportStream]
 type Transferrer interface {
 	Transfer(ctx context.Context, source any, destination any, opts ...Opt) error
 }
@@ -187,8 +194,11 @@ type Config struct {
 	Progress ProgressFunc
 }
 
+// Opt configures a transfer operation.
 type Opt func(*Config)
 
+// WithProgress specifies a progress callback function to receive progress updates
+// during a transfer operation.
 func WithProgress(f ProgressFunc) Opt {
 	return func(opts *Config) {
 		opts.Progress = f
