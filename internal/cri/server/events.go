@@ -276,10 +276,13 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 	// shim server. We should call Delete API to io.containerd.service.v1.tasks-service
 	// to ensure that shim instance is shutdown.
 	//
+	// ErrUnavailable can leave the task record behind too. If the cleanup
+	// fails, return so the exit is retried and the container is not marked EXITED.
+	//
 	// REF:
 	// 1. https://github.com/containerd/containerd/issues/7496#issuecomment-1671100968
 	// 2. https://github.com/containerd/containerd/issues/8931
-	if errdefs.IsNotFound(err) {
+	if errdefs.IsNotFound(err) || errdefs.IsUnavailable(err) {
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: cntr.Container.ID()})
 		if err != nil {
 			err = errgrpc.ToNative(err)
