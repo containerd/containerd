@@ -20,11 +20,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/containerd/errdefs"
 
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/internal/erofsutils"
 )
 
 // labelPrefix namespaces the labels the snapshotter records about a snapshot
@@ -176,16 +178,67 @@ func (s *snapshotter) resolveBlob(id string, info snapshots.Info) (string, blobS
 	// directory. Lstat answers without following a link. A link would hand back
 	// a path outside the directory as though the snapshot owned it. Conversion
 	// at Commit, fsverity, and IMMUTABLE_FL would then act on its target.
-	layerBlob := s.layerBlobPath(id)
-	fi, err := os.Lstat(layerBlob)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", src, fmt.Errorf("%s: %w", layerBlob, errNoLayerBlob)
+	//
+	// A differ writes exactly one of the local blob names, chosen by the
+	// layer's role (see localBlobKinds).
+	for _, b := range localBlobKinds {
+		layerBlob := filepath.Join(s.root, "snapshots", id, b.name)
+		fi, err := os.Lstat(layerBlob)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return "", src, fmt.Errorf("failed to stat layer blob %q: %w", layerBlob, err)
 		}
-		return "", src, fmt.Errorf("failed to stat layer blob %q: %w", layerBlob, err)
+		if !fi.Mode().IsRegular() {
+			return "", src, fmt.Errorf("layer blob %q is not a regular file: %w", layerBlob, errdefs.ErrFailedPrecondition)
+		}
+		return layerBlob, src, nil
 	}
-	if !fi.Mode().IsRegular() {
-		return "", src, fmt.Errorf("layer blob %q is not a regular file: %w", layerBlob, errdefs.ErrFailedPrecondition)
+	return "", src, fmt.Errorf("%s: %w", s.layerBlobPath(id), errNoLayerBlob)
+}
+
+// layerKind identifies the role a layer blob plays in a mount, as defined by
+// the EROFS image layer format specification
+// (https://github.com/erofs/erofs-image-spec, §2.4).
+type layerKind int
+
+const (
+	// layerKindNormal is a complete, independently mountable EROFS
+	// filesystem image: a role-less or "overlay-lower" layer.
+	layerKindNormal layerKind = iota
+	// layerKindData is an "overlay-data" role layer: also a complete EROFS
+	// filesystem image, but mounted as a data-only overlay lower rather
+	// than a regular lowerdir.
+	layerKindData
+	// layerKindDevice is a "device" role layer: an opaque byte stream, never
+	// itself mounted, attached to a consuming layer's mount as a data
+	// device.
+	layerKindDevice
+)
+
+// localBlobKinds maps each file name a differ writes a local layer blob to
+// onto the role the blob plays.
+var localBlobKinds = [...]struct {
+	name string
+	kind layerKind
+}{
+	{erofsutils.LayerBlobName, layerKindNormal},
+	{erofsutils.DataBlobName, layerKindData},
+	{erofsutils.DeviceBlobName, layerKindDevice},
+}
+
+// blobKind returns the role of a layer blob returned by resolveBlob. A blob
+// from any source other than the snapshot directory is a pre-converted layer
+// image and always mounted as a normal layer.
+func blobKind(path string, src blobSource) layerKind {
+	if src.owned() {
+		name := filepath.Base(path)
+		for _, b := range localBlobKinds {
+			if b.name == name {
+				return b.kind
+			}
+		}
 	}
-	return layerBlob, src, nil
+	return layerKindNormal
 }

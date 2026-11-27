@@ -366,6 +366,29 @@ func layerSnapshotLabels(annotations map[string]string) map[string]string {
 	return labels
 }
 
+// parentChainIDsForLayers returns, for each layer, the ChainID string of the
+// nearest preceding layer which is not skippable (see
+// images.IsSkippableLayerType), or "" if there is none. A skippable layer
+// (currently only a standalone EROFS chunk-index layer) contributes no
+// content and gets no snapshot of its own, so the next real layer's
+// snapshot must be parented on the last real layer's snapshot instead of
+// the immediately preceding one. chainIDs must have one entry per layer,
+// pre-computed over every layer's DiffID regardless of skip status (e.g.
+// via identity.ChainIDs), so that the final ChainID and every committed
+// snapshot's ChainID are exactly as if every layer had contributed a
+// snapshot.
+func parentChainIDsForLayers(layers []ocispec.Descriptor, chainIDs []digest.Digest) []string {
+	parentChainIDs := make([]string, len(layers))
+	var lastChainID string
+	for i, l := range layers {
+		parentChainIDs[i] = lastChainID
+		if !images.IsSkippableLayerType(l.MediaType) {
+			lastChainID = chainIDs[i].String()
+		}
+	}
+	return parentChainIDs
+}
+
 func (u *Unpacker) unpack(
 	h images.Handler,
 	config ocispec.Descriptor,
@@ -385,9 +408,17 @@ func (u *Unpacker) unpack(
 		return fmt.Errorf("unmarshal image config: %w", err)
 	}
 
-	diffIDs := i.RootFS.DiffIDs
-	if len(layers) != len(diffIDs) {
-		return fmt.Errorf("number of layers and diffIDs don't match: %d != %d", len(layers), len(diffIDs))
+	// LayerIDs resolves each layer's identifier - a DiffID for a classic
+	// layer, or an EROFS-image-layer-format-spec ID for one that carries
+	// the AnnotationErofsUncompressedDigest annotation - falling back to
+	// the layer's own blob digest when neither an annotation nor a
+	// rootfs.diff_ids entry is present. See images.LayerIDs for the
+	// verification invariant this relies on: the value used here to key a
+	// snapshot's ChainID is always checked against the differ's own
+	// digest of the applied content below.
+	layerIDs, err := images.LayerIDs(layers, i.RootFS.DiffIDs)
+	if err != nil {
+		return err
 	}
 
 	// TODO: Support multiple unpacks rather than just first match
@@ -459,9 +490,11 @@ func (u *Unpacker) unpack(
 	}
 
 	// pre-calculate chain ids for each layer
-	chainIDs := make([]digest.Digest, len(diffIDs))
-	copy(chainIDs, diffIDs)
+	chainIDs := make([]digest.Digest, len(layerIDs))
+	copy(chainIDs, layerIDs)
 	chainIDs = identity.ChainIDs(chainIDs)
+
+	parentChainIDs := parentChainIDsForLayers(layers, chainIDs)
 
 	topHalf := func(i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
 		var (
@@ -469,8 +502,9 @@ func (u *Unpacker) unpack(
 			parent  string
 			chainID string
 		)
-		if i > 0 && !parallel {
-			parent = chainIDs[i-1].String()
+		parentChainID := parentChainIDs[i]
+		if parentChainID != "" && !parallel {
+			parent = parentChainID
 		}
 		chainID = chainIDs[i].String()
 
@@ -487,9 +521,9 @@ func (u *Unpacker) unpack(
 		// inherits a filtered set of annotations which are provided as snapshot labels
 		snapshotLabels := layerSnapshotLabels(desc.Annotations)
 		snapshotLabels[snapshots.LabelSnapshotRef] = chainID
-		snapshotLabels[snapshots.LabelSnapshotDiffID] = diffIDs[i].String()
-		if i > 0 {
-			snapshotLabels[labelSnapshotParent] = chainIDs[i-1].String()
+		snapshotLabels[snapshots.LabelSnapshotDiffID] = layerIDs[i].String()
+		if parentChainID != "" {
+			snapshotLabels[labelSnapshotParent] = parentChainID
 		}
 
 		var (
@@ -554,8 +588,8 @@ func (u *Unpacker) unpack(
 				return nil
 			}
 
-			if i > 0 && parallel {
-				opts = append(opts, snapshots.WithParent(chainIDs[i-1].String()))
+			if parallel && parentChainID != "" {
+				opts = append(opts, snapshots.WithParent(parentChainID))
 			}
 			if err := sn.Commit(ctx, chainID, key, opts...); err != nil {
 				cleanup.Do(ctx, abort)
@@ -575,7 +609,7 @@ func (u *Unpacker) unpack(
 			cinfo := content.Info{
 				Digest: desc.Digest,
 				Labels: map[string]string{
-					labels.LabelUncompressed: diffIDs[i].String(),
+					labels.LabelUncompressed: layerIDs[i].String(),
 				},
 			}
 			if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
@@ -638,7 +672,7 @@ func (u *Unpacker) unpack(
 			// to overlay mounts for the applier to perform whiteout conversion correctly.
 			// TODO: this is a temporary workaround until #13053 lands.
 			// See: https://github.com/containerd/containerd/issues/13030
-			if i > 0 && parallel && unpack.SnapshotterKey == "overlayfs" {
+			if parentChainID != "" && parallel && unpack.SnapshotterKey == "overlayfs" {
 				mounts = bindToOverlay(mounts)
 			}
 
@@ -650,9 +684,16 @@ func (u *Unpacker) unpack(
 				return
 			}
 
-			if diff.Digest != diffIDs[i] {
+			if diff.Digest != layerIDs[i] {
+				// This is the verification the security invariant
+				// documented on images.LayerIDs depends on: whatever
+				// value LayerIDs resolved for this layer - an
+				// annotation, a rootfs.diff_ids entry, or a blob-digest
+				// fallback - must agree with what the differ actually
+				// computed over the applied content, or the mismatch is
+				// rejected here before any snapshot is keyed on it.
 				cleanup.Do(ctx, abort)
-				status.err = fmt.Errorf("wrong diff id %q calculated on extraction %q, desc %q", diff.Digest, diffIDs[i], desc.Digest)
+				status.err = fmt.Errorf("wrong layer id %q calculated on extraction %q, desc %q", diff.Digest, layerIDs[i], desc.Digest)
 				resCh <- status
 				return
 			}
@@ -689,9 +730,22 @@ func (u *Unpacker) unpack(
 	var (
 		statusChans []<-chan *unpackStatus
 		topErr      error
+		skipped     []int
 	)
 
 	for i, desc := range layers {
+		if images.IsSkippableLayerType(desc.MediaType) {
+			// This layer contributes no content and gets no snapshot (see
+			// parentChainIDs above), but its blob must still be persisted,
+			// for a future consumer that does understand it (e.g. a chunk
+			// store) and so that this image remains fully pushable and
+			// exportable. It is fetched with the other layers and waited on
+			// once every layer has been unpacked.
+			startFetch(i)
+			skipped = append(skipped, i)
+			continue
+		}
+
 		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
 		unpackLayerStart := time.Now()
 		layerSpan.SetAttributes(
@@ -737,6 +791,18 @@ func (u *Unpacker) unpack(
 		errs = errors.Join(errs, topErr)
 		if errs != nil {
 			return errs
+		}
+	}
+
+	for _, i := range skipped {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-fetchDone:
+			if fetchErr != nil {
+				return fetchErr
+			}
+		case <-fetchC[i-fetchOffset]:
 		}
 	}
 
