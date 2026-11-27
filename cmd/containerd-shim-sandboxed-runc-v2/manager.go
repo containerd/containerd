@@ -28,7 +28,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
-	"slices"
 	"syscall"
 
 	"github.com/containerd/cgroups/v3"
@@ -37,8 +36,6 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go/features"
 
 	legacymanager "github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/manager"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
@@ -53,8 +50,7 @@ import (
 // manager is a fork of the containerd-shim-runc-v2 manager for the sandbox
 // flow: "start" runs once per pod, for the sandbox, keyed by the sandbox id
 // (containers join the shim through the sandbox endpoint, so there is no
-// grouping by OCI annotations); "delete" also cleans up a sandbox bundle; and
-// "-info" hides the user namespace feature.
+// grouping by OCI annotations); and "delete" also cleans up a sandbox bundle.
 //
 // TODO(mxpv): consolidate with the containerd-shim-runc-v2 manager.
 type manager struct {
@@ -293,24 +289,7 @@ func (m *manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) 
 	return status, errors.Join(err, sandbox.Cleanup(ctx, filepath.Join(filepath.Dir(cwd), id)))
 }
 
-// Info returns the runtime info of containerd-shim-runc-v2: the same runtime
-// type, and the features of the same runc minus the user namespace. CRI
-// advertises user namespace support for a handler from that feature, and this
-// shim rejects user namespaced pods for now.
+// Info returns the runtime info of containerd-shim-runc-v2.
 func (m *manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeInfo, error) {
-	info, err := m.legacy.Info(ctx, optionsR)
-	if err != nil || info.GetFeatures() == nil {
-		return info, err
-	}
-	var feat features.Features
-	if err := typeurl.UnmarshalTo(info.Features, &feat); err != nil {
-		return nil, fmt.Errorf("failed to decode the runc features: %w", err)
-	}
-	if feat.Linux != nil {
-		feat.Linux.Namespaces = slices.DeleteFunc(feat.Linux.Namespaces, func(ns string) bool { return ns == "user" })
-	}
-	if info.Features, err = typeurl.MarshalAnyToProto(&feat); err != nil {
-		return nil, fmt.Errorf("failed to encode the runc features: %w", err)
-	}
-	return info, nil
+	return m.legacy.Info(ctx, optionsR)
 }

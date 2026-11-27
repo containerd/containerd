@@ -639,10 +639,7 @@ jobs:
 
       # Experimental: the same critest suite through the pause-less sandbox
       # shim (containerd-shim-sandboxed-runc-v2 selected with runtime_path,
-      # with the shim sandboxer). The user namespace specs skip themselves:
-      # the handler does not advertise user namespaces until the shim
-      # supports them. The sandboxed shim is a Go shim: it runs on the
-      # runc.v2 legs only.
+      # with the shim sandboxer).
       - if: matrix.runtime == 'io.containerd.runc.v2'
         name: cri-tools critest (sandbox shim)
         env:
