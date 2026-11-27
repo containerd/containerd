@@ -136,6 +136,9 @@ func TestLoadShimKeepsBundleWhenBinaryMissing(t *testing.T) {
 	gone := filepath.Join(t.TempDir(), "gone", "containerd-shim-runc-v2")
 	require.NoError(t, os.WriteFile(filepath.Join(bundle.Path, "shim-binary-path"), []byte(gone), 0o600))
 
+	sock := filepath.Join(bundle.Path, "missing.sock")
+	require.NoError(t, os.WriteFile(filepath.Join(bundle.Path, "address"), []byte("unix://"+sock), 0o600))
+
 	m := &ShimManager{
 		containers:   fakeContainerStore{},
 		sandboxStore: fakeSandboxStore{},
@@ -143,7 +146,7 @@ func TestLoadShimKeepsBundleWhenBinaryMissing(t *testing.T) {
 		events:       exchange.NewExchange(),
 	}
 	// It gets as far as connecting, which fails for lack of a shim.
-	require.ErrorContains(t, m.loadShim(ctx, bundle), "unable to load shim")
+	require.ErrorContains(t, m.loadShim(ctx, bundle), "unable to make connection")
 	require.DirExists(t, bundle.Path)
 }
 
