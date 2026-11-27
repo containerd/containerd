@@ -76,6 +76,11 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		}
 		resp.Info = make(map[string]string)
 		resp.Info["config"] = string(configByt)
+		snapshotterByt, err := json.Marshal(c.ImageService.Config().Snapshotter)
+		if err != nil {
+			return nil, err
+		}
+		resp.Info["snapshotter"] = string(snapshotterByt)
 		versionByt, err := json.Marshal(goruntime.Version())
 		if err != nil {
 			return nil, err

@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -505,4 +506,16 @@ func TestDefaultConfigEnableCRIU(t *testing.T) {
 	cfg := DefaultRuntimeConfig()
 	assert.NotNil(t, cfg.EnableCRIU)
 	assert.True(t, *cfg.EnableCRIU)
+}
+
+func TestDefaultImageConfigOmitsSnapshotter(t *testing.T) {
+	b, err := toml.Marshal(DefaultImageConfig())
+	assert.NoError(t, err)
+	assert.NotContains(t, string(b), "snapshotter")
+
+	c := DefaultImageConfig()
+	c.Snapshotter = "native"
+	b, err = toml.Marshal(c)
+	assert.NoError(t, err)
+	assert.Contains(t, string(b), "snapshotter = 'native'")
 }
