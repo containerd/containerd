@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
@@ -38,6 +39,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -682,6 +684,7 @@ func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOpti
 }
 
 func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *api.MetricsResponse) {
+	var matched []runtime.Task
 	for _, tk := range tasks {
 		if !filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {
 			t := tk
@@ -697,19 +700,35 @@ func getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime
 		})) {
 			continue
 		}
-		collected := time.Now()
-		stats, err := tk.Stats(ctx)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
+		matched = append(matched, tk)
+	}
+
+	metrics := make([]*types.Metric, len(matched))
+	var eg errgroup.Group
+	eg.SetLimit(goruntime.GOMAXPROCS(0))
+	for i, tk := range matched {
+		eg.Go(func() error {
+			collected := time.Now()
+			stats, err := tk.Stats(ctx)
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
+				}
+				return nil
 			}
-			continue
-		}
-		r.Metrics = append(r.Metrics, &types.Metric{
-			Timestamp: protobuf.ToTimestamp(collected),
-			ID:        tk.ID(),
-			Data:      stats,
+			metrics[i] = &types.Metric{
+				Timestamp: protobuf.ToTimestamp(collected),
+				ID:        tk.ID(),
+				Data:      stats,
+			}
+			return nil
 		})
+	}
+	_ = eg.Wait()
+	for _, m := range metrics {
+		if m != nil {
+			r.Metrics = append(r.Metrics, m)
+		}
 	}
 }
 
