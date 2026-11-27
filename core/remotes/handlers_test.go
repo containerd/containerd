@@ -20,18 +20,25 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256"
+	_ "crypto/sha512"
 	"encoding/json"
 	"errors"
 	"io"
+	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	bolt "go.etcd.io/bbolt"
 )
 
 func TestContextCustomKeyPrefix(t *testing.T) {
@@ -287,6 +294,215 @@ func TestFetchSizeValidation(t *testing.T) {
 			t.Fatalf("expected blob not to be committed, got %v", err)
 		}
 	})
+}
+
+func newMetadataContentStore(t *testing.T, ctx context.Context) content.Store {
+	t.Helper()
+	dirname := t.TempDir()
+	cs, err := local.NewStore(filepath.Join(dirname, "content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bdb, err := bolt.Open(filepath.Join(dirname, "metadata.db"), 0644, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db := metadata.NewDB(bdb, cs, nil)
+	if err := db.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db.ContentStore()
+}
+
+// TestFetchAbortsIngestOnDigestMismatch verifies that a completed ingest whose
+// stored data does not match the descriptor digest is rejected by Commit and
+// aborted, so a subsequent fetch with the same ref re-downloads the content
+// instead of short-circuiting into the same failing commit.
+func TestFetchAbortsIngestOnDigestMismatch(t *testing.T) {
+	ctx := t.Context()
+	ctx = namespaces.WithNamespace(ctx, "testing")
+	cs := newMetadataContentStore(t, ctx)
+
+	payload := bytes.Repeat([]byte("A"), 34)
+	stored := bytes.Repeat([]byte("B"), 34) // same length as payload, different digest
+	dgst := digest.SHA512.FromBytes(payload)
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    dgst,
+		Size:      int64(len(payload)),
+	}
+	ref := MakeRefKey(ctx, desc)
+
+	// Pre-seed a complete, uncommitted ingest whose data does NOT match dgst.
+	w, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(desc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(stored); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	fetches := 0
+	fetcher := FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+		fetches++
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	})
+
+	// Commit must confirm the digest mismatch and the ingest must be aborted.
+	if err := Fetch(ctx, cs, fetcher, desc); !errors.Is(err, errdefs.ErrFailedPrecondition) {
+		t.Fatalf("expected ErrFailedPrecondition, got %v", err)
+	}
+
+	// A subsequent fetch with the same ref must re-download and succeed.
+	if err := Fetch(ctx, cs, fetcher, desc); err != nil {
+		t.Fatalf("expected retried fetch to succeed, got %v", err)
+	}
+	if fetches != 1 {
+		t.Fatalf("expected fetcher to be called once after aborting the stale ingest, got %d calls", fetches)
+	}
+	if info, err := cs.Info(ctx, dgst); err != nil {
+		t.Fatalf("expected SHA-512 blob to be committed, got %v", err)
+	} else if info.Digest != dgst {
+		t.Fatalf("unexpected committed digest %v, expected %v", info.Digest, dgst)
+	}
+}
+
+// TestFetchSerializesSameRef verifies that concurrent fetches of the same ref
+// are serialized by the per-ref fetch lock, so a failed commit's stale-ingest
+// abort can never delete a replacement ingest created by a concurrent fetch of
+// the same content.
+func TestFetchSerializesSameRef(t *testing.T) {
+	ctx := t.Context()
+	ctx = namespaces.WithNamespace(ctx, "testing")
+	cs := newMetadataContentStore(t, ctx)
+
+	payload := bytes.Repeat([]byte("A"), 34)
+	dgst := digest.SHA512.FromBytes(payload)
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    dgst,
+		Size:      int64(len(payload)),
+	}
+
+	// Block the first fetch inside the fetcher (it holds the per-ref lock), so
+	// we can observe that a second fetch of the same ref waits for it.
+	firstEntered := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	var first sync.Once
+	fetcher := FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+		first.Do(func() {
+			close(firstEntered)
+			<-releaseFirst
+		})
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	})
+
+	done := make(chan error, 2)
+	go func() {
+		done <- Fetch(ctx, cs, fetcher, desc)
+	}()
+	<-firstEntered
+
+	// A second fetch of the same ref must block behind the first.
+	go func() {
+		done <- Fetch(ctx, cs, fetcher, desc)
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("second fetch ran concurrently with the first (per-ref lock not effective): %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(releaseFirst)
+	for i := 0; i < 2; i++ {
+		if err := <-done; err != nil && !errdefs.IsAlreadyExists(err) {
+			t.Fatal(err)
+		}
+	}
+
+	// The content must have been committed (by the first fetch; the second
+	// fetch recognizes it already exists).
+	if info, err := cs.Info(ctx, dgst); err != nil {
+		t.Fatalf("expected blob to be committed, got %v", err)
+	} else if info.Digest != dgst {
+		t.Fatalf("unexpected committed digest %v, expected %v", info.Digest, dgst)
+	}
+}
+
+type ownershipMock struct {
+	content.Store
+	otherStartedAt time.Time
+	aborted        *atomic.Bool
+}
+
+func (m *ownershipMock) Status(ctx context.Context, ref string) (content.Status, error) {
+	st, err := m.Store.Status(ctx, ref)
+	if err == nil {
+		st.StartedAt = m.otherStartedAt
+	}
+	return st, err
+}
+
+func (m *ownershipMock) Abort(ctx context.Context, ref string) error {
+	m.aborted.Store(true)
+	return m.Store.Abort(ctx, ref)
+}
+
+// TestFetchDoesNotAbortReplacementOwnedByOtherClient verifies that the stale
+// ingest cleanup after a failed commit only aborts the very ingest whose commit
+// failed. If the ref now holds a different ingest (e.g. started by another
+// client through a proxy content store), cleanup must leave it alone.
+func TestFetchDoesNotAbortReplacementOwnedByOtherClient(t *testing.T) {
+	ctx := t.Context()
+	ctx = namespaces.WithNamespace(ctx, "testing")
+	cs := newMetadataContentStore(t, ctx)
+
+	payload := bytes.Repeat([]byte("A"), 34)
+	stored := bytes.Repeat([]byte("B"), 34)
+	dgst := digest.SHA512.FromBytes(payload)
+	desc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageLayer,
+		Digest:    dgst,
+		Size:      int64(len(payload)),
+	}
+	ref := MakeRefKey(ctx, desc)
+
+	// Seed a complete, uncommitted ingest whose data does NOT match dgst.
+	w, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(desc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(stored); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Report the ref as owned by a different ingest: cleanup must not abort it.
+	var aborted atomic.Bool
+	client := &ownershipMock{Store: cs, otherStartedAt: time.Now().Add(time.Hour), aborted: &aborted}
+	fetcher := FetcherFunc(func(context.Context, ocispec.Descriptor) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(payload)), nil
+	})
+
+	if err := Fetch(ctx, client, fetcher, desc); !errors.Is(err, errdefs.ErrFailedPrecondition) {
+		t.Fatalf("expected ErrFailedPrecondition, got %v", err)
+	}
+	if aborted.Load() {
+		t.Fatal("cleanup aborted an ingest owned by another client")
+	}
+
+	// The stale ingest must still be present.
+	if st, err := cs.Status(ctx, ref); err != nil {
+		t.Fatalf("expected stale ingest to remain, got %v", err)
+	} else if st.Offset != desc.Size {
+		t.Fatalf("unexpected stale ingest offset %d, expected %d", st.Offset, desc.Size)
+	}
 }
 
 func TestPushSizeValidation(t *testing.T) {
