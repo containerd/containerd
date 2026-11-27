@@ -1,0 +1,59 @@
+name: Release support
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+  pull_request:
+    paths:
+      - "releases/support.toml"
+      - "cmd/gen-release-support/**"
+      - ".github/workflows/release-support.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    if: github.repository == 'containerd/containerd' && github.event_name == 'pull_request'
+    name: Check RELEASES.md is current for today's date
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-go
+
+      - run: make check-release-support
+
+  update:
+    runs-on: ubuntu-latest
+    if: github.repository == 'containerd/containerd' && github.event_name != 'pull_request'
+    name: Open a pull request when RELEASES.md is stale
+    timeout-minutes: 10
+    concurrency: release-support-update
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: ./.github/actions/install-go
+
+      - run: make release-support
+
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          add-paths: RELEASES.md
+          commit-message: "releases: regenerate the support table"
+          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+          signoff: true
+          branch: automation/release-support
+          delete-branch: true
+          title: "releases: regenerate the support table"
+          body: This is an auto-generated PR to sync RELEASES.md with releases/support.toml and the latest release tags.
