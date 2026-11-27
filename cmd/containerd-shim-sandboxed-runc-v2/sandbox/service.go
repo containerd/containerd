@@ -444,3 +444,13 @@ func (s *Service) SandboxMetrics(ctx context.Context, r *api.SandboxMetricsReque
 func (s *Service) UpdateSandbox(ctx context.Context, r *api.UpdateSandboxRequest) (*api.UpdateSandboxResponse, error) {
 	return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "%s does not implement UpdateSandbox", BinaryName)
 }
+
+// CheckpointSandbox is not implemented.
+func (s *Service) CheckpointSandbox(ctx context.Context, r *api.CheckpointSandboxRequest) (*api.CheckpointSandboxResponse, error) {
+	return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "%s does not implement CheckpointSandbox", BinaryName)
+}
+
+// RestoreSandbox is not implemented.
+func (s *Service) RestoreSandbox(ctx context.Context, r *api.RestoreSandboxRequest) (*api.RestoreSandboxResponse, error) {
+	return nil, errgrpc.ToGRPCf(errdefs.ErrNotImplemented, "%s does not implement RestoreSandbox", BinaryName)
+}

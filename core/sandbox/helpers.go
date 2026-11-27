@@ -67,3 +67,88 @@ func FromProto(sandboxpb *types.Sandbox) Sandbox {
 		Extensions: extensions,
 	}
 }
+
+// CheckpointContainersToProto maps checkpoint containers to their protobuf
+// definition.
+func CheckpointContainersToProto(containers []CheckpointContainer) []*types.CheckpointSandboxContainer {
+	if len(containers) == 0 {
+		return nil
+	}
+	out := make([]*types.CheckpointSandboxContainer, 0, len(containers))
+	for _, c := range containers {
+		out = append(out, &types.CheckpointSandboxContainer{ID: c.ID, Name: c.Name})
+	}
+	return out
+}
+
+// CheckpointContainersFromProto maps protobuf checkpoint containers to
+// CheckpointContainer structs.
+func CheckpointContainersFromProto(containers []*types.CheckpointSandboxContainer) []CheckpointContainer {
+	if len(containers) == 0 {
+		return nil
+	}
+	out := make([]CheckpointContainer, 0, len(containers))
+	for _, c := range containers {
+		out = append(out, CheckpointContainer{ID: c.GetID(), Name: c.GetName()})
+	}
+	return out
+}
+
+// RestoreContainersToProto maps restore containers to their protobuf
+// definition.
+func RestoreContainersToProto(containers []RestoreContainer) []*types.RestoreSandboxContainer {
+	if len(containers) == 0 {
+		return nil
+	}
+	out := make([]*types.RestoreSandboxContainer, 0, len(containers))
+	for _, c := range containers {
+		out = append(out, &types.RestoreSandboxContainer{
+			ID:   c.ID,
+			Name: c.Name,
+			Spec: typeurl.MarshalProto(c.Spec),
+		})
+	}
+	return out
+}
+
+// RestoreContainersFromProto maps protobuf restore containers to
+// RestoreContainer structs.
+func RestoreContainersFromProto(containers []*types.RestoreSandboxContainer) []RestoreContainer {
+	if len(containers) == 0 {
+		return nil
+	}
+	out := make([]RestoreContainer, 0, len(containers))
+	for _, c := range containers {
+		rc := RestoreContainer{ID: c.GetID(), Name: c.GetName()}
+		// Assigning a nil *anypb.Any would make Spec a non-nil interface.
+		if c.GetSpec() != nil {
+			rc.Spec = c.GetSpec()
+		}
+		out = append(out, rc)
+	}
+	return out
+}
+
+// ExtensionsToProto maps extensions to their protobuf definition.
+func ExtensionsToProto(extensions map[string]typeurl.Any) map[string]*gogo_types.Any {
+	if len(extensions) == 0 {
+		return nil
+	}
+	out := make(map[string]*gogo_types.Any, len(extensions))
+	for k, v := range extensions {
+		out[k] = typeurl.MarshalProto(v)
+	}
+	return out
+}
+
+// ExtensionsFromProto maps protobuf extensions to typeurl.Any values.
+func ExtensionsFromProto(extensions map[string]*gogo_types.Any) map[string]typeurl.Any {
+	if len(extensions) == 0 {
+		return nil
+	}
+	out := make(map[string]typeurl.Any, len(extensions))
+	for k, v := range extensions {
+		out[k] = v
+	}
+	return out
+}

@@ -69,6 +69,10 @@ func TestServiceWithoutSandbox(t *testing.T) {
 
 	_, err = s.UpdateSandbox(ctx, &api.UpdateSandboxRequest{SandboxID: testID})
 	assert.True(t, errdefs.IsNotImplemented(errgrpc.ToNative(err)), "update: %v", err)
+	_, err = s.CheckpointSandbox(ctx, &api.CheckpointSandboxRequest{SandboxID: testID})
+	assert.True(t, errdefs.IsNotImplemented(errgrpc.ToNative(err)), "checkpoint: %v", err)
+	_, err = s.RestoreSandbox(ctx, &api.RestoreSandboxRequest{SandboxID: testID})
+	assert.True(t, errdefs.IsNotImplemented(errgrpc.ToNative(err)), "restore: %v", err)
 
 	resp, err := s.Platform(ctx, &api.PlatformRequest{SandboxID: testID})
 	require.NoError(t, err)

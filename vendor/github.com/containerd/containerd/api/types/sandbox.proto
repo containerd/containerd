@@ -51,3 +51,26 @@ message Sandbox {
   // Sandboxer is the name of the sandbox controller who manages the sandbox.
   string sandboxer = 10;
 }
+
+// CheckpointSandboxContainer selects a container to include in a checkpoint.
+message CheckpointSandboxContainer {
+  // ID is the ID of the container in the sandbox. It selects the container
+  // to checkpoint. IDs are not kept across checkpoint and restore.
+  string id = 1;
+  // Name is the stable name of the container. The checkpoint records it,
+  // and RestoreSandboxContainer.name must match it on restore.
+  string name = 2;
+}
+
+// RestoreSandboxContainer maps a container in a checkpoint to a container
+// in the restored sandbox.
+message RestoreSandboxContainer {
+  // ID is the ID of the container in the restored sandbox. It can be
+  // different from the ID at checkpoint time.
+  string id = 1;
+  // Name is the stable name of the container. It must match the name of a
+  // container in the checkpoint, which is how the container is matched.
+  string name = 2;
+  // Spec is the OCI runtime spec of the container in the restored sandbox.
+  google.protobuf.Any spec = 3;
+}

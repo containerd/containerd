@@ -151,6 +151,136 @@ func (x *Sandbox) GetSandboxer() string {
 	return ""
 }
 
+// CheckpointSandboxContainer selects a container to include in a checkpoint.
+type CheckpointSandboxContainer struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// ID is the ID of the container in the sandbox. It selects the container
+	// to checkpoint. IDs are not kept across checkpoint and restore.
+	ID string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Name is the stable name of the container. The checkpoint records it,
+	// and RestoreSandboxContainer.name must match it on restore.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+}
+
+func (x *CheckpointSandboxContainer) Reset() {
+	*x = CheckpointSandboxContainer{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_sandbox_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CheckpointSandboxContainer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckpointSandboxContainer) ProtoMessage() {}
+
+func (x *CheckpointSandboxContainer) ProtoReflect() protoreflect.Message {
+	mi := &file_types_sandbox_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckpointSandboxContainer.ProtoReflect.Descriptor instead.
+func (*CheckpointSandboxContainer) Descriptor() ([]byte, []int) {
+	return file_types_sandbox_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CheckpointSandboxContainer) GetID() string {
+	if x != nil {
+		return x.ID
+	}
+	return ""
+}
+
+func (x *CheckpointSandboxContainer) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+// RestoreSandboxContainer maps a container in a checkpoint to a container
+// in the restored sandbox.
+type RestoreSandboxContainer struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// ID is the ID of the container in the restored sandbox. It can be
+	// different from the ID at checkpoint time.
+	ID string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Name is the stable name of the container. It must match the name of a
+	// container in the checkpoint, which is how the container is matched.
+	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// Spec is the OCI runtime spec of the container in the restored sandbox.
+	Spec *anypb.Any `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
+}
+
+func (x *RestoreSandboxContainer) Reset() {
+	*x = RestoreSandboxContainer{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_types_sandbox_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *RestoreSandboxContainer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RestoreSandboxContainer) ProtoMessage() {}
+
+func (x *RestoreSandboxContainer) ProtoReflect() protoreflect.Message {
+	mi := &file_types_sandbox_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RestoreSandboxContainer.ProtoReflect.Descriptor instead.
+func (*RestoreSandboxContainer) Descriptor() ([]byte, []int) {
+	return file_types_sandbox_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RestoreSandboxContainer) GetID() string {
+	if x != nil {
+		return x.ID
+	}
+	return ""
+}
+
+func (x *RestoreSandboxContainer) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RestoreSandboxContainer) GetSpec() *anypb.Any {
+	if x != nil {
+		return x.Spec
+	}
+	return nil
+}
+
 type Sandbox_Runtime struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -166,7 +296,7 @@ type Sandbox_Runtime struct {
 func (x *Sandbox_Runtime) Reset() {
 	*x = Sandbox_Runtime{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_types_sandbox_proto_msgTypes[1]
+		mi := &file_types_sandbox_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -179,7 +309,7 @@ func (x *Sandbox_Runtime) String() string {
 func (*Sandbox_Runtime) ProtoMessage() {}
 
 func (x *Sandbox_Runtime) ProtoReflect() protoreflect.Message {
-	mi := &file_types_sandbox_proto_msgTypes[1]
+	mi := &file_types_sandbox_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -259,10 +389,21 @@ var file_types_sandbox_proto_rawDesc = []byte{
 	0x65, 0x79, 0x12, 0x2a, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
 	0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
 	0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x3a, 0x02,
-	0x38, 0x01, 0x42, 0x32, 0x5a, 0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
-	0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f, 0x6e, 0x74,
-	0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73,
-	0x3b, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x38, 0x01, 0x22, 0x40, 0x0a, 0x1a, 0x43, 0x68, 0x65, 0x63, 0x6b, 0x70, 0x6f, 0x69, 0x6e, 0x74,
+	0x53, 0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x43, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72,
+	0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64,
+	0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
+	0x6e, 0x61, 0x6d, 0x65, 0x22, 0x67, 0x0a, 0x17, 0x52, 0x65, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x53,
+	0x61, 0x6e, 0x64, 0x62, 0x6f, 0x78, 0x43, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x12,
+	0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12,
+	0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e,
+	0x61, 0x6d, 0x65, 0x12, 0x28, 0x0a, 0x04, 0x73, 0x70, 0x65, 0x63, 0x18, 0x03, 0x20, 0x01, 0x28,
+	0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x52, 0x04, 0x73, 0x70, 0x65, 0x63, 0x42, 0x32, 0x5a,
+	0x30, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x63, 0x6f, 0x6e, 0x74,
+	0x61, 0x69, 0x6e, 0x65, 0x72, 0x64, 0x2f, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72,
+	0x64, 0x2f, 0x61, 0x70, 0x69, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x3b, 0x74, 0x79, 0x70, 0x65,
+	0x73, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -277,29 +418,32 @@ func file_types_sandbox_proto_rawDescGZIP() []byte {
 	return file_types_sandbox_proto_rawDescData
 }
 
-var file_types_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_types_sandbox_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_types_sandbox_proto_goTypes = []interface{}{
-	(*Sandbox)(nil),               // 0: containerd.types.Sandbox
-	(*Sandbox_Runtime)(nil),       // 1: containerd.types.Sandbox.Runtime
-	nil,                           // 2: containerd.types.Sandbox.LabelsEntry
-	nil,                           // 3: containerd.types.Sandbox.ExtensionsEntry
-	(*anypb.Any)(nil),             // 4: google.protobuf.Any
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*Sandbox)(nil),                    // 0: containerd.types.Sandbox
+	(*CheckpointSandboxContainer)(nil), // 1: containerd.types.CheckpointSandboxContainer
+	(*RestoreSandboxContainer)(nil),    // 2: containerd.types.RestoreSandboxContainer
+	(*Sandbox_Runtime)(nil),            // 3: containerd.types.Sandbox.Runtime
+	nil,                                // 4: containerd.types.Sandbox.LabelsEntry
+	nil,                                // 5: containerd.types.Sandbox.ExtensionsEntry
+	(*anypb.Any)(nil),                  // 6: google.protobuf.Any
+	(*timestamppb.Timestamp)(nil),      // 7: google.protobuf.Timestamp
 }
 var file_types_sandbox_proto_depIdxs = []int32{
-	1, // 0: containerd.types.Sandbox.runtime:type_name -> containerd.types.Sandbox.Runtime
-	4, // 1: containerd.types.Sandbox.spec:type_name -> google.protobuf.Any
-	2, // 2: containerd.types.Sandbox.labels:type_name -> containerd.types.Sandbox.LabelsEntry
-	5, // 3: containerd.types.Sandbox.created_at:type_name -> google.protobuf.Timestamp
-	5, // 4: containerd.types.Sandbox.updated_at:type_name -> google.protobuf.Timestamp
-	3, // 5: containerd.types.Sandbox.extensions:type_name -> containerd.types.Sandbox.ExtensionsEntry
-	4, // 6: containerd.types.Sandbox.Runtime.options:type_name -> google.protobuf.Any
-	4, // 7: containerd.types.Sandbox.ExtensionsEntry.value:type_name -> google.protobuf.Any
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	3, // 0: containerd.types.Sandbox.runtime:type_name -> containerd.types.Sandbox.Runtime
+	6, // 1: containerd.types.Sandbox.spec:type_name -> google.protobuf.Any
+	4, // 2: containerd.types.Sandbox.labels:type_name -> containerd.types.Sandbox.LabelsEntry
+	7, // 3: containerd.types.Sandbox.created_at:type_name -> google.protobuf.Timestamp
+	7, // 4: containerd.types.Sandbox.updated_at:type_name -> google.protobuf.Timestamp
+	5, // 5: containerd.types.Sandbox.extensions:type_name -> containerd.types.Sandbox.ExtensionsEntry
+	6, // 6: containerd.types.RestoreSandboxContainer.spec:type_name -> google.protobuf.Any
+	6, // 7: containerd.types.Sandbox.Runtime.options:type_name -> google.protobuf.Any
+	6, // 8: containerd.types.Sandbox.ExtensionsEntry.value:type_name -> google.protobuf.Any
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_types_sandbox_proto_init() }
@@ -321,6 +465,30 @@ func file_types_sandbox_proto_init() {
 			}
 		}
 		file_types_sandbox_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CheckpointSandboxContainer); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_types_sandbox_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*RestoreSandboxContainer); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_types_sandbox_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Sandbox_Runtime); i {
 			case 0:
 				return &v.state
@@ -339,7 +507,7 @@ func file_types_sandbox_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_types_sandbox_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

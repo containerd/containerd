@@ -232,3 +232,48 @@ func (s *remoteSandboxController) Update(
 	}
 	return nil
 }
+
+func (s *remoteSandboxController) Checkpoint(ctx context.Context, sandboxID string, opts sandbox.CheckpointOptions) (sandbox.CheckpointResult, error) {
+	resp, err := s.client.Checkpoint(ctx, &api.ControllerCheckpointRequest{
+		SandboxID:   sandboxID,
+		Path:        opts.Path,
+		Containers:  sandbox.CheckpointContainersToProto(opts.Containers),
+		Annotations: opts.Annotations,
+		Extensions:  sandbox.ExtensionsToProto(opts.Extensions),
+		Sandboxer:   s.sandboxerName,
+	})
+	if err != nil {
+		return sandbox.CheckpointResult{}, errgrpc.ToNative(err)
+	}
+	return sandbox.CheckpointResult{
+		Annotations: resp.GetAnnotations(),
+		Extensions:  sandbox.ExtensionsFromProto(resp.GetExtensions()),
+	}, nil
+}
+
+func (s *remoteSandboxController) Restore(ctx context.Context, sandboxID string, opts sandbox.RestoreOptions) (sandbox.RestoreResult, error) {
+	resp, err := s.client.Restore(ctx, &api.ControllerRestoreRequest{
+		SandboxID:   sandboxID,
+		Path:        opts.Path,
+		Containers:  sandbox.RestoreContainersToProto(opts.Containers),
+		Annotations: opts.Annotations,
+		Extensions:  sandbox.ExtensionsToProto(opts.Extensions),
+		Sandboxer:   s.sandboxerName,
+	})
+	if err != nil {
+		return sandbox.RestoreResult{}, errgrpc.ToNative(err)
+	}
+
+	return sandbox.RestoreResult{
+		ControllerInstance: sandbox.ControllerInstance{
+			SandboxID: sandboxID,
+			Pid:       resp.GetPid(),
+			CreatedAt: resp.GetCreatedAt().AsTime(),
+			Labels:    resp.GetLabels(),
+			Address:   resp.GetAddress(),
+			Version:   resp.GetVersion(),
+			Spec:      resp.GetSpec(),
+		},
+		Extensions: sandbox.ExtensionsFromProto(resp.GetExtensions()),
+	}, nil
+}
