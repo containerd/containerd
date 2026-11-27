@@ -51,6 +51,15 @@ type Config struct {
 
 	// MountOptions are options used for the overlay mount (not used on bind mounts)
 	MountOptions []string `toml:"mount_options"`
+
+	// SyncOnCommit controls whether the upperdir filesystem is flushed to
+	// stable storage (syncfs) before a snapshot commit completes. It is
+	// enabled by default: without it, the snapshot metadata commit is
+	// durable while unpacked file contents may still live in the page
+	// cache, so a storage-level data loss inside the write-back window can
+	// leave committed snapshots with valid metadata but empty file
+	// contents. Set to false to disable.
+	SyncOnCommit *bool `toml:"sync_on_commit"`
 }
 
 func init() {
@@ -77,6 +86,9 @@ func init() {
 			}
 			if !config.SyncRemove {
 				oOpts = append(oOpts, overlay.AsynchronousRemove)
+			}
+			if config.SyncOnCommit != nil && !*config.SyncOnCommit {
+				oOpts = append(oOpts, overlay.WithoutSyncOnCommit)
 			}
 
 			if len(config.MountOptions) > 0 {
