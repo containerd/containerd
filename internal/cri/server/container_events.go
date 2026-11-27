@@ -17,17 +17,67 @@
 package server
 
 import (
+	"context"
+	"sync"
+
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+type eventQueue struct {
+	mu   sync.Mutex
+	cond *sync.Cond
+	buf  []*runtime.ContainerEventResponse
+}
+
+func newEventQueue() *eventQueue {
+	q := &eventQueue{}
+	q.cond = sync.NewCond(&q.mu)
+	return q
+}
+
+func (q *eventQueue) enqueue(evt *runtime.ContainerEventResponse) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.buf = append(q.buf, evt)
+	if len(q.buf) >= 100 {
+		log.G(context.Background()).Warnf("eventQueue buffer warning, current size=%d", len(q.buf))
+	}
+	q.cond.Signal()
+}
+
+func (q *eventQueue) dequeue() *runtime.ContainerEventResponse {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	for len(q.buf) == 0 {
+		q.cond.Wait()
+	}
+	evt := q.buf[0]
+	q.buf[0] = nil
+	q.buf = q.buf[1:]
+	return evt
+}
 
 func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
 	eventC, closer := c.containerEventsQ.Subscribe()
 	defer closer.Close()
 
-	for event := range eventC {
-		if err := s.Send(event); err != nil {
-			return err
+	eq := newEventQueue()
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		for {
+			evt := eq.dequeue()
+			if err := s.Send(evt); err != nil {
+				errCh <- err
+				return
+			}
 		}
+	}()
+
+	for event := range eventC {
+		eq.enqueue(event)
 	}
-	return nil
+	return <-errCh
 }
