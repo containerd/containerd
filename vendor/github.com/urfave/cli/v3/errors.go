@@ -61,6 +61,22 @@ func (e *errRequiredFlags) Error() string {
 	return fmt.Sprintf("Required flags %q not set", joinedMissingFlags)
 }
 
+type requiredArgumentsErr interface {
+	error
+}
+
+type errRequiredArguments struct {
+	missingArguments []string
+}
+
+func (e *errRequiredArguments) Error() string {
+	if len(e.missingArguments) == 1 {
+		return fmt.Sprintf("Required argument %q not set", e.missingArguments[0])
+	}
+	joinedMissingArguments := strings.Join(e.missingArguments, ", ")
+	return fmt.Sprintf("Required arguments %q not set", joinedMissingArguments)
+}
+
 type mutuallyExclusiveGroup struct {
 	flag1Name string
 	flag2Name string
@@ -134,6 +150,12 @@ func (ee *exitError) Error() string {
 
 func (ee *exitError) ExitCode() int {
 	return ee.exitCode
+}
+
+// Unwrap returns the error given to [Exit], so that [errors.Is] and
+// [errors.As] can inspect it through the ExitCoder wrapper.
+func (ee *exitError) Unwrap() error {
+	return ee.err
 }
 
 // HandleExitCoder handles errors implementing ExitCoder by printing their
