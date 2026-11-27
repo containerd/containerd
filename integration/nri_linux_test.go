@@ -19,6 +19,7 @@ package integration
 import (
 	"fmt"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -217,6 +218,99 @@ func TestNriPluginNetworkingLifecycle(t *testing.T) {
 		t.Fatalf("expected 3 hooks executed only got %d", hookExecs)
 	}
 
+}
+
+// Test that NRI plugins get the pod stop and remove events for the pods that
+// exist before a containerd restart.
+func TestNriPodSandboxEventsAfterContainerdRestart(t *testing.T) {
+	if runtimeHandlerIsRunsc() {
+		t.Skip("runsc sandboxes do not survive containerd restart; state recovery is not supported")
+	}
+	skipNriTestIfNecessary(t)
+
+	t.Log("Test that NRI plugins get pod stop and remove events after a containerd restart.")
+
+	var (
+		before = &mockPlugin{}
+		tc     = &nriTest{
+			t:       t,
+			plugins: []*mockPlugin{before},
+		}
+	)
+
+	tc.setup()
+	t.Cleanup(before.Stop)
+
+	runningPod := tc.runPod("pod-running")
+	tc.startContainer(runningPod, "ctr0")
+
+	// The plugin that is connected before the restart gets the first stop
+	// event for this pod.
+	stoppedPod := tc.runPod("pod-stopped")
+	require.NoError(t, runtimeService.StopPodSandbox(stoppedPod))
+	err := before.Wait(PodRefEvent(stoppedPod, StopPodSandbox), time.After(pluginSyncTimeout))
+	require.NoError(t, err, "stop event before restart")
+
+	t.Logf("Restart containerd")
+	RestartContainerd(t, syscall.SIGTERM)
+
+	stopNetNS := make(chan string, 1)
+	after := &mockPlugin{
+		stopPodSandbox: func(_ *mockPlugin, pod *api.PodSandbox) error {
+			if pod.GetId() == stoppedPod {
+				select {
+				case stopNetNS <- getNetworkNamespace(pod):
+				default:
+				}
+			}
+			return nil
+		},
+	}
+	tc.connectNewPlugin(after)
+	t.Cleanup(after.Stop)
+
+	for _, id := range tc.pods {
+		_, ok := after.pods[id]
+		require.True(t, ok, "runtime sync of pod "+id)
+	}
+
+	t.Run("running pod", func(t *testing.T) {
+		require.NoError(t, runtimeService.StopPodSandbox(runningPod))
+		require.NoError(t, runtimeService.RemovePodSandbox(runningPod))
+
+		err := after.Wait(PodRefEvent(runningPod, RemovePodSandbox), time.After(pluginSyncTimeout))
+		require.NoError(t, err, "remove event after restart")
+		assert.Equal(t, 1, countPodEvents(after, runningPod, StopPodSandbox), "stop events after restart")
+		assert.Equal(t, 1, countPodEvents(after, runningPod, RemovePodSandbox), "remove events after restart")
+	})
+
+	// The runtime has no record of the stop event that it sent before the
+	// restart. It sends the event again, with no network namespace.
+	t.Run("pod stopped before restart", func(t *testing.T) {
+		require.NoError(t, runtimeService.RemovePodSandbox(stoppedPod))
+
+		err := after.Wait(PodRefEvent(stoppedPod, RemovePodSandbox), time.After(pluginSyncTimeout))
+		require.NoError(t, err, "remove event after restart")
+		assert.Equal(t, 1, countPodEvents(after, stoppedPod, StopPodSandbox), "stop events after restart")
+		assert.Equal(t, 1, countPodEvents(after, stoppedPod, RemovePodSandbox), "remove events after restart")
+
+		select {
+		case ns := <-stopNetNS:
+			assert.Empty(t, ns, "network namespace in the stop event after restart")
+		case <-time.After(pluginSyncTimeout):
+			t.Fatal("test timed out waiting for the StopPodSandbox hook to be executed")
+		}
+	})
+}
+
+func countPodEvents(p *mockPlugin, pod string, eventType EventType) int {
+	count := 0
+	for _, e := range p.q.Events() {
+		if e.Type == eventType && e.Pod == pod {
+			count++
+		}
+	}
+	return count
 }
 
 func getNetworkNamespace(pod *api.PodSandbox) string {
