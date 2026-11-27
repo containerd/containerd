@@ -22,6 +22,27 @@ converted to the config version 3.
 For the further information, see [`../PLUGINS.md`](../PLUGINS.md).
 
 ## Basic configuration
+### List streaming
+
+The CRI list-streaming RPCs send results in batches. Configure the maximum number
+of top-level items in each response message with:
+
+```toml
+[plugins."io.containerd.grpc.v1.cri".list_streaming]
+  batch_size = 5000
+```
+
+This setting applies to `StreamContainers`, `StreamPodSandboxes`,
+`StreamContainerStats`, `StreamPodSandboxStats`, `StreamPodSandboxMetrics`, and
+`StreamImages`. If omitted, `batch_size` defaults to `5000`. Zero and negative
+values are invalid and prevent the CRI plugin from loading. Restart containerd
+after changing this setting.
+
+The limit counts items, not bytes. Item sizes vary, so a batch may still exceed
+the gRPC message size limit. Lowering `batch_size` can reduce response sizes,
+but cannot prevent an individual oversized item from exceeding that limit.
+This setting does not configure exec, attach, or port-forward streams.
+
 ### Cgroup Driver
 While containerd and Kubernetes use the legacy `cgroupfs` driver for managing cgroups by default,
 it is recommended to use the `systemd` driver on systemd-based hosts for compliance of
