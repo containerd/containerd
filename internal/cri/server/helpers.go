@@ -444,6 +444,12 @@ func hostNetwork(config *runtime.PodSandboxConfig) bool {
 	return hostNet
 }
 
+// isNetworkIsolated checks whether the sandbox was requested to use an isolated network.
+// the CNI plugin should not be invoked to set up or tear down its networking.
+func isNetworkIsolated(config *runtime.PodSandboxConfig) bool {
+	return config.GetPodNetwork() == runtime.PodNetwork_POD_NETWORK_ISOLATED
+}
+
 // getCgroupsPath generates container cgroups path.
 func getCgroupsPath(cgroupsParent, id string) string {
 	base := path.Base(cgroupsParent)
