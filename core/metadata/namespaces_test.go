@@ -18,8 +18,10 @@ package metadata
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -27,6 +29,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
 )
+
+func TestDeleteWithoutVersionBucket(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "metadata.db")
+	bdb, err := bbolt.Open(dbPath, 0644, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, bdb.Close())
+	})
+
+	err = bdb.Update(func(tx *bbolt.Tx) error {
+		store := NewNamespaceStore(tx)
+		return store.Delete(context.Background(), "missing")
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errdefs.ErrNotFound)
+}
 
 func TestCreateDelete(t *testing.T) {
 	ctx, db := testDB(t)
