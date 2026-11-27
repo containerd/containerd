@@ -93,9 +93,10 @@
 // service of containerd-shim-runc-v2 (task.go in package main), the runc tasks
 // of its containers. StopSandbox releases what the sandbox holds and
 // ShutdownSandbox ends the shim; CRI stops and removes the containers of a
-// pod before either. Everything the shim creates lives under its bundle at
-// fixed paths, so Cleanup needs no state and runs the same way on create
-// failure, on stop and from "shim delete".
+// pod before either. Everything the shim creates lives at fixed paths, under
+// its bundle except for the rootfs of the setup container, so Cleanup needs
+// no state and runs the same way on create failure, on stop and from "shim
+// delete".
 //
 // # Not supported yet
 //

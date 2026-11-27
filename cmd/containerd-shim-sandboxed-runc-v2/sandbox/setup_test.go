@@ -59,7 +59,7 @@ func TestRuncSpec(t *testing.T) {
 	binary := "/usr/local/bin/" + InitBinary
 	sysctls := map[string]string{"net.ipv4.ip_forward": "1", "kernel.shm_rmid_forced": "1"}
 	cfg := &Config{ID: testID, Hostname: "pod", NetNSPath: testNetNS, CgroupParent: "/kubepods/pod1", Sysctls: sysctls}
-	spec, err := runcSpec(ctx, cfg, binary)
+	spec, err := runcSpec(ctx, cfg, "/rootfs", binary)
 	require.NoError(t, err)
 
 	require.NotNil(t, spec.Process)
@@ -69,7 +69,7 @@ func TestRuncSpec(t *testing.T) {
 	assert.Equal(t, &specs.LinuxCapabilities{}, spec.Process.Capabilities, "no capabilities")
 	require.NotNil(t, spec.Process.OOMScoreAdj)
 	assert.Equal(t, initOOMScoreAdj, *spec.Process.OOMScoreAdj)
-	assert.Equal(t, &specs.Root{Path: runcRootfs, Readonly: true}, spec.Root)
+	assert.Equal(t, &specs.Root{Path: "/rootfs", Readonly: true}, spec.Root)
 	assert.Equal(t, specs.Mount{Destination: "/" + InitBinary, Type: "bind", Source: binary, Options: []string{"bind", "ro", "nosuid", "nodev"}}, spec.Mounts[len(spec.Mounts)-1])
 	// The container creates the IPC and UTS namespaces and joins the CRI
 	// network namespace, where runc sets the hostname and the sysctls.
@@ -92,19 +92,26 @@ func TestRuncSpec(t *testing.T) {
 	t.Run("shared PID namespace", func(t *testing.T) {
 		cfg := *cfg
 		cfg.SharedPID = true
-		spec, err := runcSpec(ctx, &cfg, binary)
+		spec, err := runcSpec(ctx, &cfg, "/rootfs", binary)
 		require.NoError(t, err)
 		assert.Equal(t, specs.LinuxNamespace{Type: specs.PIDNamespace}, spec.Linux.Namespaces[len(spec.Linux.Namespaces)-1])
 		assert.Equal(t, seccomp.DefaultProfile(spec), spec.Linux.Seccomp, "a started container runs under the default profile")
 	})
 
 	t.Run("host namespaces", func(t *testing.T) {
-		spec, err := runcSpec(ctx, &Config{ID: testID, Hostname: "node", HostNetwork: true, HostIPC: true, SharedPID: true}, binary)
+		spec, err := runcSpec(ctx, &Config{ID: testID, Hostname: "node", HostNetwork: true, HostIPC: true, SharedPID: true}, "/rootfs", binary)
 		require.NoError(t, err)
 		assert.Equal(t, []specs.LinuxNamespace{{Type: specs.MountNamespace}, {Type: specs.PIDNamespace}}, spec.Linux.Namespaces)
 		assert.Empty(t, spec.Hostname, "the host UTS namespace keeps its hostname")
 		assert.Empty(t, spec.Linux.CgroupsPath)
 	})
+}
+
+func TestRootfsPath(t *testing.T) {
+	sandbox := rootfsPath("/run/containerd/io.containerd.sandbox.controller.v1.shim/k8s.io/id")
+	assert.Equal(t, "/run/containerd/sandboxed-runc/io.containerd.sandbox.controller.v1.shim/k8s.io/id", sandbox)
+	// "shim delete" cleans a task bundle up the same way.
+	assert.NotEqual(t, sandbox, rootfsPath("/run/containerd/io.containerd.runtime.v2.task/k8s.io/id"))
 }
 
 // startReaper makes the test process reap its children as the shim does; the
@@ -154,7 +161,14 @@ func newPod(t *testing.T, cfg *Config) (context.Context, string) {
 	cfg.CgroupParent = "/" + cfg.ID
 	// runc removes the container cgroup, not its parent.
 	t.Cleanup(func() { _ = os.Remove(filepath.Join("/sys/fs/cgroup", cfg.CgroupParent)) })
-	bundle := t.TempDir()
+	// The bundle is laid out as under the containerd state directory, which
+	// anyone can search. The parent of t.TempDir has mode 0700.
+	state, err := os.MkdirTemp("", "sandbox-test-")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(state) })
+	require.NoError(t, os.Chmod(state, 0o711))
+	bundle := filepath.Join(state, "shim", "testing", cfg.ID)
+	require.NoError(t, os.MkdirAll(bundle, 0o700))
 	t.Cleanup(func() { _ = Cleanup(ctx, bundle) })
 	return ctx, bundle
 }
@@ -243,7 +257,7 @@ func TestSetupNamespaces(t *testing.T) {
 	// Cleanup unmounts the pins and removes them and the container files; a
 	// second run is a no-op.
 	require.NoError(t, Cleanup(ctx, bundle))
-	for _, p := range []string{filepath.Join(bundle, pinDir), filepath.Join(bundle, runcDir)} {
+	for _, p := range []string{filepath.Join(bundle, pinDir), filepath.Join(bundle, runcDir), rootfsPath(bundle)} {
 		assert.NoDirExists(t, p)
 	}
 	assertNoMountsUnder(t, bundle)

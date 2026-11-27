@@ -58,9 +58,9 @@ const (
 	// sandbox bundle. The config.json of the sandbox bundle belongs to the
 	// client that created the sandbox.
 	runcDir = "runc"
-	// runcRootfs is the empty rootfs of the container, relative to
-	// runcDir.
-	runcRootfs = "rootfs"
+	// rootfsDir holds the empty rootfs of each setup runc container, next
+	// to the state directory of the sandbox controller (see rootfsPath).
+	rootfsDir = "sandboxed-runc"
 	// initUser is the user the container process runs as. It is neither
 	// root nor nobody (65534), which workloads commonly run as.
 	initUser = 65535
@@ -164,7 +164,7 @@ func podNamespaces(cfg *Config) []specs.LinuxNamespaceType {
 //
 // TODO: the pod SELinux label is not applied yet, as for the files the shim
 // creates (see the SELinux TODO in CreateSandbox).
-func runcSpec(ctx context.Context, cfg *Config, binary string) (*specs.Spec, error) {
+func runcSpec(ctx context.Context, cfg *Config, rootfs, binary string) (*specs.Spec, error) {
 	defaults, err := oci.GenerateSpec(ctx, nil, &containers.Container{ID: cfg.ID})
 	if err != nil {
 		return nil, err
@@ -197,7 +197,7 @@ func runcSpec(ctx context.Context, cfg *Config, binary string) (*specs.Spec, err
 			NoNewPrivileges: true,
 			OOMScoreAdj:     &oomScoreAdj,
 		},
-		Root:   &specs.Root{Path: runcRootfs, Readonly: true},
+		Root:   &specs.Root{Path: rootfs, Readonly: true},
 		Mounts: mounts,
 		Linux: &specs.Linux{
 			Resources:     &specs.LinuxResources{CPU: &specs.LinuxCPU{Shares: &shares}},
@@ -243,14 +243,20 @@ func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _
 		return Pins{}, nil, fmt.Errorf("failed to read the runc options: %w", err)
 	}
 	dir := filepath.Join(bundle, runcDir)
-	rootfs := filepath.Join(dir, runcRootfs)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return Pins{}, nil, err
+	}
+	rootfs := rootfsPath(bundle)
 	if err := os.MkdirAll(rootfs, 0o711); err != nil {
 		return Pins{}, nil, err
 	}
-	// The container user needs search permission on "/" to exec its program.
+	// The container user needs search permission on "/" to exec its program,
+	// and the root of a pod user namespace on the directories above it.
 	// MkdirAll applies the umask of the shim, and Chmod does not.
-	if err := os.Chmod(rootfs, 0o711); err != nil {
-		return Pins{}, nil, err
+	for i, d := 0, rootfs; i < 4; i, d = i+1, filepath.Dir(d) {
+		if err := os.Chmod(d, 0o711); err != nil {
+			return Pins{}, nil, err
+		}
 	}
 	// runc create requires the program to exist and be executable by the
 	// container user, although only a shared-PID pod runs it. Any other pod
@@ -269,7 +275,7 @@ func setupNamespaces(ctx context.Context, bundle string, cfg *Config) (_ Pins, _
 			return Pins{}, nil, err
 		}
 	}
-	spec, err := runcSpec(ctx, cfg, binary)
+	spec, err := runcSpec(ctx, cfg, rootfs, binary)
 	if err != nil {
 		return Pins{}, nil, err
 	}
@@ -455,6 +461,18 @@ func (p *initProcess) delete(ctx context.Context) error {
 		return fmt.Errorf("failed to delete the sandbox container: %w", err)
 	}
 	return nil
+}
+
+// rootfsPath returns the rootfs of the setup runc container of the sandbox at
+// bundle: <state>/sandboxed-runc/<owner>/<namespace>/<id> for the bundle
+// <state>/<owner>/<namespace>/<id>. The root of a pod user namespace must
+// reach the rootfs, and the directory of the sandbox controller is private.
+// <owner> keeps it apart from the path of a task bundle with the same
+// namespace and id, which "shim delete" cleans up as well.
+func rootfsPath(bundle string) string {
+	ns := filepath.Dir(bundle)
+	owner := filepath.Dir(ns)
+	return filepath.Join(filepath.Dir(owner), rootfsDir, filepath.Base(owner), filepath.Base(ns), filepath.Base(bundle))
 }
 
 // pin bind-mounts the namespace file src onto a new empty file at target so
