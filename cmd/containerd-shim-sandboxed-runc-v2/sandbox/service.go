@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	gorunc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
@@ -43,6 +44,7 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
@@ -101,6 +103,10 @@ var _ api.TTRPCSandboxService = (*Service)(nil)
 
 // NewService returns a sandbox service. sd ends the shim on ShutdownSandbox.
 func NewService(sd shutdown.Service) *Service {
+	// The shim reaps its children itself, so go-runc must wait for the runc
+	// commands through the reaper. The task service sets the same value, but
+	// the sandbox service does not depend on it being created first.
+	gorunc.Monitor = reaper.Default
 	return &Service{shutdown: sd}
 }
 
