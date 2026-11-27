@@ -58,10 +58,16 @@ func timeoutDialer(address string, timeout time.Duration) (net.Conn, error) {
 			}
 		}
 	}()
+	// A zero timeout means no deadline, matching net.DialTimeout semantics.
+	// A nil channel never fires, so only a non-zero timeout arms the timer.
+	var timeoutC <-chan time.Time
+	if timeout != 0 {
+		timeoutC = time.After(timeout)
+	}
 	select {
 	case dr := <-synC:
 		return dr.c, dr.err
-	case <-time.After(timeout):
+	case <-timeoutC:
 		close(stopC)
 		go func() {
 			dr := <-synC
