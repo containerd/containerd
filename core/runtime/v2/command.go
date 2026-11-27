@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	bootapi "github.com/containerd/containerd/api/runtime/bootstrap/v1"
+	"github.com/containerd/containerd/v2/internal/shimenv"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -100,18 +101,18 @@ func command(ctx context.Context, config *commandConfig) (*exec.Cmd, error) {
 
 	cmd := exec.CommandContext(ctx, config.RuntimePath, args...)
 	cmd.Dir = config.WorkDir
-	cmd.Env = append(
+	cmd.Env = shimenv.CommandEnv(
 		os.Environ(),
-		"GOMAXPROCS=2",
-		maxVersionEnv+"=2",
-		// TODO: Remove in a future release in favor of Bootstrap protocol.
-		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
-		fmt.Sprintf("%s=%s", grpcAddressEnv, config.GRPCAddress),
-		fmt.Sprintf("%s=%s", namespaceEnv, ns),
+		[]string{
+			maxVersionEnv + "=2",
+			// TODO: Remove in a future release in favor of Bootstrap protocol.
+			fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
+			fmt.Sprintf("%s=%s", grpcAddressEnv, config.GRPCAddress),
+			fmt.Sprintf("%s=%s", namespaceEnv, ns),
+		},
+		config.Env,
+		config.Action == "start",
 	)
-	if len(config.Env) > 0 {
-		cmd.Env = append(cmd.Env, config.Env...)
-	}
 	cmd.SysProcAttr = getSysProcAttr()
 
 	// Special path when upgrading from 1.7 shims to 2.x containerd.
