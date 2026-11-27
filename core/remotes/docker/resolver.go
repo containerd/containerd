@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -956,6 +957,29 @@ func (r *request) setMediaType(mediatype string) {
 
 func (r *request) setOffset(offset int64) {
 	r.header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+}
+
+func (r *request) setRange(start, end int64) {
+	r.header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+}
+
+// contentRangeSize returns the complete length from a Content-Range header
+// such as "bytes 0-1023/4096". It returns false if the length is unknown
+// ("*") or the header is not a valid byte range.
+func contentRangeSize(cr string) (int64, bool) {
+	rng, ok := strings.CutPrefix(cr, "bytes ")
+	if !ok {
+		return 0, false
+	}
+	_, size, ok := strings.Cut(rng, "/")
+	if !ok {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(size, 10, 64)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 func requestFields(req *http.Request) log.Fields {
