@@ -19,6 +19,7 @@ package images
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/tracing"
@@ -54,10 +55,15 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		return fmt.Errorf("can not resolve %q locally: %w", imageSpec.GetImage(), err)
 	}
 	span.SetAttributes(tracing.Attribute("image.id", image.ID))
-	// Remove all image references.
-	for i, ref := range image.References {
+	// Remove all image references, the image ID reference first. It is the only
+	// reference that cannot be resolved by name, so if the removal is interrupted
+	// part way through, a leftover named reference can still be listed and removed
+	// again, whereas a leftover ID-only record is unreachable and pins the manifest,
+	// layers and snapshot chain indefinitely.
+	refs := imageIDFirst(image.References, image.ID)
+	for i, ref := range refs {
 		var opts []images.DeleteOpt
-		if i == len(image.References)-1 {
+		if i == len(refs)-1 {
 			// Delete the last image reference synchronously to trigger garbage collection.
 			// This is best effort. It is possible that the image reference is deleted by
 			// someone else before this point.
@@ -74,4 +80,17 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
 	}
 	return nil
+}
+
+// imageIDFirst returns refs with the image ID reference moved to the front, keeping
+// the relative order of the remaining references. refs is not modified.
+func imageIDFirst(refs []string, id string) []string {
+	idx := slices.Index(refs, id)
+	if idx <= 0 {
+		return refs
+	}
+	ordered := make([]string, 0, len(refs))
+	ordered = append(ordered, id)
+	ordered = append(ordered, refs[:idx]...)
+	return append(ordered, refs[idx+1:]...)
 }
