@@ -42,9 +42,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/internal/kmutex"
-	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
@@ -315,7 +313,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			}
 			for _, layers := range queued {
 				u.eg.Go(func() error {
-					return u.fetch(u.ctx, h, layers, nil)
+					return u.fetch(u.ctx, h, layers)
 				})
 			}
 		}
@@ -342,14 +340,6 @@ type unpackConfig struct {
 
 	// RootFS references the layer content addresses used by the image.
 	RootFS ocispec.RootFS `json:"rootfs"`
-}
-
-type unpackStatus struct {
-	err     error
-	desc    ocispec.Descriptor
-	bottomF func(bool) error
-	span    *tracing.Span
-	startAt time.Time
 }
 
 // layerSnapshotLabels filters out containerd.io/snapshot/uidmapping and
@@ -410,343 +400,25 @@ func (u *Unpacker) unpack(
 
 	if unpack == nil {
 		log.G(ctx).WithField("image", config.Digest).WithField("platform", platforms.Format(imgPlatform)).Debugf("unpacker does not support platform, only fetching layers")
-		return u.fetch(ctx, h, layers, nil)
+		return u.fetch(ctx, h, layers)
 	}
 
 	u.unpacks.Add(1)
-
-	var (
-		sn = unpack.Snapshotter
-		a  = unpack.Applier
-		cs = u.content
-
-		fetchOffset int
-		fetchC      []chan struct{}
-		fetchDone   chan struct{}
-		fetchErr    error
-
-		parallel = u.supportParallel(unpack)
-	)
-
-	// Cancel outstanding fetches on return, joining them for fetch-all callers.
-	ctx, cancel := context.WithCancel(ctx)
-	defer func() {
-		cancel()
-		if u.fetchAll && fetchDone != nil {
-			<-fetchDone
-		}
-	}()
-
-	startFetch := func(i int) {
-		if fetchDone != nil {
-			return
-		}
-		fetchOffset = i
-		fetchC = make([]chan struct{}, len(layers)-i)
-		for j := range fetchC {
-			fetchC[j] = make(chan struct{})
-		}
-		fetchDone = make(chan struct{})
-		go func() {
-			fetchErr = u.fetch(ctx, h, layers[i:], fetchC)
-			close(fetchDone)
-		}()
-	}
-	if u.fetchAll {
-		// Retained snapshots do not imply that their compressed blobs survived GC.
-		// Each extraction still waits only for its own layer's download.
-		startFetch(0)
-	}
 
 	// pre-calculate chain ids for each layer
 	chainIDs := make([]digest.Digest, len(diffIDs))
 	copy(chainIDs, diffIDs)
 	chainIDs = identity.ChainIDs(chainIDs)
 
-	topHalf := func(i int, desc ocispec.Descriptor, span *tracing.Span, startAt time.Time) (<-chan *unpackStatus, error) {
-		var (
-			err     error
-			parent  string
-			chainID string
-		)
-		if i > 0 && !parallel {
-			parent = chainIDs[i-1].String()
-		}
-		chainID = chainIDs[i].String()
-
-		unlock, err := u.lockSnChainID(ctx, chainID, unpack.SnapshotterKey)
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			if err != nil {
-				unlock()
-			}
-		}()
-
-		// inherits a filtered set of annotations which are provided as snapshot labels
-		snapshotLabels := layerSnapshotLabels(desc.Annotations)
-		snapshotLabels[snapshots.LabelSnapshotRef] = chainID
-		snapshotLabels[snapshots.LabelSnapshotDiffID] = diffIDs[i].String()
-		if i > 0 {
-			snapshotLabels[labelSnapshotParent] = chainIDs[i-1].String()
-		}
-
-		var (
-			key    string
-			mounts []mount.Mount
-			// Clone before appending: topHalf runs concurrently per layer in
-			// parallel mode, and appending directly to unpack.SnapshotOpts could
-			// write into its shared backing array from multiple goroutines.
-			opts   = append(slices.Clone(unpack.SnapshotOpts), snapshots.WithLabels(snapshotLabels))
-			staged bool
-		)
-
-		for try := 1; try <= 3; try++ {
-			// Prepare snapshot with from parent, label as root
-			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
-			mounts, err = sn.Prepare(ctx, key, parent, opts...)
-			if err != nil {
-				if errdefs.IsAlreadyExists(err) {
-					if snInfo, err := sn.Stat(ctx, chainID); err != nil {
-						if !errdefs.IsNotFound(err) {
-							return nil, fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
-						}
-						// Try again, this should be rare, log it
-						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
-					} else {
-						log.G(ctx).Debugf("snapshot %s with chainID %s already exists, skip extraction of blob %q", snInfo.Name, chainID, desc.Digest)
-						// no need to handle, snapshot now found with chain id
-						return nil, nil
-					}
-				} else {
-					return nil, fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
-				}
-			} else {
-				break
-			}
-		}
-		if err != nil {
-			return nil, fmt.Errorf("unable to prepare extraction snapshot: %w", err)
-		}
-
-		if isStaged(mounts) {
-			// The snapshotter staged the layer content into the active snapshot
-			// as read-only (e.g. a layer content cache hit). Skip apply,
-			// but still commit it below (which applies the parent).
-			staged = true
-		}
-
-		// Abort the snapshot if commit does not happen
-		abort := func(ctx context.Context) {
-			if err := sn.Remove(ctx, key); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
-			}
-		}
-
-		// commitF is the bottom half shared by normal and staged layers: it rebases
-		// in the real parent (parallel mode) and commits the snapshot. Staged layers
-		// skip apply's digest verification, so they cannot set the uncompressed label.
-		commitF := func(shouldAbort bool) error {
-			defer unlock()
-			if shouldAbort {
-				cleanup.Do(ctx, abort)
-				return nil
-			}
-
-			if i > 0 && parallel {
-				opts = append(opts, snapshots.WithParent(chainIDs[i-1].String()))
-			}
-			if err := sn.Commit(ctx, chainID, key, opts...); err != nil {
-				cleanup.Do(ctx, abort)
-				if errdefs.IsAlreadyExists(err) {
-					return nil
-				}
-				return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
-			}
-
-			if staged {
-				// Apply did not verify the uncompressed digest, even if fetched.
-				return nil
-			}
-
-			// Set the uncompressed label after the uncompressed
-			// digest has been verified through apply.
-			cinfo := content.Info{
-				Digest: desc.Digest,
-				Labels: map[string]string{
-					labels.LabelUncompressed: diffIDs[i].String(),
-				},
-			}
-			if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
-				return err
-			}
-			return nil
-		}
-
-		if staged {
-			// Content is already staged in the active snapshot; no apply is needed.
-			// Downloads may still be running. Run commitF in the (serialized)
-			// bottom half so the parent is rebased in and the chain is linked.
-			resCh := make(chan *unpackStatus, 1)
-			resCh <- &unpackStatus{
-				desc:    desc,
-				span:    span,
-				startAt: startAt,
-				bottomF: commitF,
-			}
-			close(resCh)
-			return resCh, nil
-		}
-
-		startFetch(i)
-
-		if err = u.acquire(ctx, u.unpackLimiter); err != nil {
-			cleanup.Do(ctx, abort)
-			return nil, err
-		}
-
-		resCh := make(chan *unpackStatus, 1)
-		go func() {
-			defer func() {
-				u.release(u.unpackLimiter)
-				close(resCh)
-			}()
-
-			status := &unpackStatus{
-				desc:    desc,
-				span:    span,
-				startAt: startAt,
-				bottomF: commitF,
-			}
-
-			select {
-			case <-ctx.Done():
-				status.err = ctx.Err()
-			case <-fetchDone:
-				status.err = fetchErr
-			case <-fetchC[i-fetchOffset]:
-			}
-			if status.err != nil {
-				cleanup.Do(ctx, abort)
-				resCh <- status
-				return
-			}
-
-			// In case of parallel unpack, the parent snapshot isn't provided to the snapshotter.
-			// The overlayfs will return bind mounts for all layers, we need to convert them
-			// to overlay mounts for the applier to perform whiteout conversion correctly.
-			// TODO: this is a temporary workaround until #13053 lands.
-			// See: https://github.com/containerd/containerd/issues/13030
-			if i > 0 && parallel && unpack.SnapshotterKey == "overlayfs" {
-				mounts = bindToOverlay(mounts)
-			}
-
-			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
-			if err != nil {
-				cleanup.Do(ctx, abort)
-				status.err = fmt.Errorf("failed to extract layer (%s %s) to %s as %q: %w", desc.MediaType, desc.Digest, unpack.SnapshotterKey, key, err)
-				resCh <- status
-				return
-			}
-
-			if diff.Digest != diffIDs[i] {
-				cleanup.Do(ctx, abort)
-				status.err = fmt.Errorf("wrong diff id %q calculated on extraction %q, desc %q", diff.Digest, diffIDs[i], desc.Digest)
-				resCh <- status
-				return
-			}
-
-			resCh <- status
-		}()
-
-		return resCh, nil
+	job := &unpackJob{
+		u:        u,
+		p:        unpack,
+		diffIDs:  diffIDs,
+		chainIDs: chainIDs,
+		mode:     u.preparationMode(unpack),
 	}
-
-	bottomHalf := func(s *unpackStatus, prevErrs error) error {
-		var err error
-		if s.err != nil {
-			s.bottomF(true)
-			err = s.err
-		} else if prevErrs != nil {
-			s.bottomF(true)
-			err = errors.New("aborted")
-		} else {
-			err = s.bottomF(false)
-		}
-
-		s.span.SetStatus(err)
-		s.span.End()
-		if err == nil {
-			log.G(ctx).WithFields(log.Fields{
-				"layer":    s.desc.Digest,
-				"duration": time.Since(s.startAt),
-			}).Debug("layer unpacked")
-		}
+	if err := job.run(ctx, h, layers); err != nil {
 		return err
-	}
-
-	var (
-		statusChans []<-chan *unpackStatus
-		topErr      error
-	)
-
-	for i, desc := range layers {
-		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
-		unpackLayerStart := time.Now()
-		layerSpan.SetAttributes(
-			tracing.Attribute("layer.media.type", desc.MediaType),
-			tracing.Attribute("layer.media.size", desc.Size),
-			tracing.Attribute("layer.media.digest", desc.Digest.String()),
-		)
-		statusCh, err := topHalf(i, desc, layerSpan, unpackLayerStart)
-		if err != nil {
-			layerSpan.SetStatus(err)
-			layerSpan.End()
-			if !parallel {
-				return err
-			}
-			// Layers queued before the failure still need to be drained and
-			// committed (or aborted) below, so remember the error and join it
-			// after the drain instead of returning right away.
-			topErr = err
-			break
-		}
-		if statusCh == nil {
-			// nothing to do, already exists
-			layerSpan.End()
-			continue
-		}
-		if parallel {
-			statusChans = append(statusChans, statusCh)
-		} else {
-			if err = bottomHalf(<-statusCh, nil); err != nil {
-				return err
-			}
-		}
-	}
-
-	// In parallel mode, snapshots still need to be committed and rebased sequentially
-	if parallel {
-		var errs error
-		for _, sc := range statusChans {
-			if err := bottomHalf(<-sc, errs); err != nil {
-				errs = errors.Join(errs, err)
-			}
-		}
-		errs = errors.Join(errs, topErr)
-		if errs != nil {
-			return errs
-		}
-	}
-
-	// In fetch-all mode, existing snapshots have no extraction waiting for downloads.
-	// Include those downloads and their errors in the unpack result.
-	if u.fetchAll && fetchDone != nil {
-		<-fetchDone
-		if fetchErr != nil {
-			return fetchErr
-		}
 	}
 
 	var chainID string
@@ -759,64 +431,29 @@ func (u *Unpacker) unpack(
 			"containerd.io/gc.ref.snapshot." + unpack.SnapshotterKey: chainID,
 		},
 	}
-	_, err = cs.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+unpack.SnapshotterKey)
+	_, err = u.content.Update(ctx, cinfo, "labels.containerd.io/gc.ref.snapshot."+unpack.SnapshotterKey)
 	if err != nil {
 		return err
 	}
 	log.G(ctx).WithFields(log.Fields{
 		"config":   config.Digest,
 		"chainID":  chainID,
-		"parallel": parallel,
+		"parallel": job.mode == prepareIndependent,
 		"duration": time.Since(unpackStart),
 	}).Debug("image unpacked")
 
 	return nil
 }
 
-func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
-	eg, ctx2 := errgroup.WithContext(ctx)
+// fetch downloads the blobs of layers that are not unpacked. It returns the
+// first error.
+func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor) error {
+	group, ctx := errgroup.WithContext(ctx)
+	blobs := newBlobSet(u, h, group)
 	for i, desc := range layers {
-		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
-		layerSpan.SetAttributes(
-			tracing.Attribute("layer.media.type", desc.MediaType),
-			tracing.Attribute("layer.media.size", desc.Size),
-			tracing.Attribute("layer.media.digest", desc.Digest.String()),
-		)
-		var ch chan struct{}
-		if done != nil {
-			ch = done[i]
-		}
-
-		if err := u.acquire(ctx, u.limiter); err != nil {
-			return err
-		}
-
-		eg.Go(func() error {
-			defer layerSpan.End()
-
-			unlock, err := u.lockBlobDescriptor(ctx2, desc)
-			if err != nil {
-				u.release(u.limiter)
-				return err
-			}
-
-			_, err = h.Handle(ctx2, desc)
-
-			unlock()
-			u.release(u.limiter)
-
-			if err != nil && !errors.Is(err, images.ErrSkipDesc) {
-				return err
-			}
-			if ch != nil {
-				close(ch)
-			}
-
-			return nil
-		})
+		blobs.fetch(ctx, i, desc)
 	}
-
-	return eg.Wait()
+	return group.Wait()
 }
 
 func (u *Unpacker) acquire(ctx context.Context, l Limiter) error {
@@ -863,15 +500,18 @@ func (u *Unpacker) makeBlobDescriptorKey(desc ocispec.Descriptor) string {
 	return fmt.Sprintf("blob://%v", desc.Digest)
 }
 
-func (u *Unpacker) supportParallel(unpack *Platform) bool {
+// preparationMode selects independent preparation when a limiter is configured
+// and the snapshotter supports rebasing. The limiter may allow just one apply.
+// TODO: check applier compatibility through both direct and proxy calls (#13053).
+func (u *Unpacker) preparationMode(unpack *Platform) preparationMode {
 	if u.unpackLimiter == nil {
-		return false
+		return prepareWithParent
 	}
 	if !slices.Contains(unpack.SnapshotterCapabilities, snapshots.RebaseCap) {
 		log.L.Infof("snapshotter does not support rebase capability, unpacking will be sequential")
-		return false
+		return prepareWithParent
 	}
-	return true
+	return prepareIndependent
 }
 
 func uniquePart() string {

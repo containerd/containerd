@@ -738,9 +738,9 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 	// such a snapshot out read-only and its blob stays in the cache. Nothing in
 	// the snapshot can write to the shared entry.
 	//
-	// TODO(2.5): cached layers above the unpacker's first cache miss still have
-	// their blobs downloaded. Skipping those fetches needs the unpacker rework
-	// planned for 2.5.
+	// TODO: unpack in parallel without an unpack limiter after appliers can
+	// be checked for compatibility (#13053). A sequential unpack, the default,
+	// also downloads the blobs of cache hits above its first cache miss.
 	if kind == snapshots.KindActive {
 		if cacheBlob := s.lookupCache(ctx, opts...); cacheBlob != "" {
 			// Mode "on" requires a sidecar. Checking it before the snapshot is
