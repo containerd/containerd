@@ -108,7 +108,7 @@ func TestSkipNonDistributableBlobs(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	cs, err := local.NewLabeledStore(dir, newMemoryLabelStore())
+	cs, err := local.NewLabeledStore(dir, newMemoryLabelStore(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
