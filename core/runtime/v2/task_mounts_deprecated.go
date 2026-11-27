@@ -23,6 +23,7 @@ import (
 
 	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
 )
 
 // deprecatedAllowedMounts is the RuntimeInfo annotation a shim could set to
@@ -60,20 +61,26 @@ type deprecatedMountCapabilities struct {
 	// runtime name. Set to query through a *ShimManager by
 	// newDeprecatedMountCapabilities; overridable in tests so they do not
 	// need a real shim binary.
-	queryRuntimeInfo func(ctx context.Context, runtimeName string) (*apitypes.RuntimeInfo, error)
+	queryRuntimeInfo func(ctx context.Context, runtimeName string, options typeurl.Any) (*apitypes.RuntimeInfo, error)
 
-	// cache is a cache of runtime name -> *apitypes.MountCapabilities. A
+	// cache maps a runtime name and its options to *apitypes.MountCapabilities. A
 	// stored nil means the runtime was already checked and has nothing to
 	// migrate, so it is not queried again.
 	cache sync.Map
+}
+
+type deprecatedRuntimeKey struct {
+	name    string
+	typeURL string
+	value   string
 }
 
 // newDeprecatedMountCapabilities returns a deprecatedMountCapabilities that
 // queries shims for their deprecated runtime-allow-mounts annotation.
 func newDeprecatedMountCapabilities(shims *ShimManager) *deprecatedMountCapabilities {
 	return &deprecatedMountCapabilities{
-		queryRuntimeInfo: func(ctx context.Context, runtimeName string) (*apitypes.RuntimeInfo, error) {
-			return getRuntimeInfo(ctx, shims, &apitypes.RuntimeRequest{RuntimePath: runtimeName})
+		queryRuntimeInfo: func(ctx context.Context, runtimeName string, options typeurl.Any) (*apitypes.RuntimeInfo, error) {
+			return getRuntimeInfo(ctx, shims, &apitypes.RuntimeRequest{RuntimePath: runtimeName, Options: typeurl.MarshalProto(options)})
 		},
 	}
 }
@@ -82,34 +89,37 @@ func newDeprecatedMountCapabilities(shims *ShimManager) *deprecatedMountCapabili
 // annotation, or nil if it has none, is a runtime known not to set it, or d
 // itself is nil.
 //
-// A successful lookup is cached, so runtimeName is only ever queried once per
-// process lifetime for a successful result, matching the caching this
-// migration path replaced. A failed query is not cached, so a transient
-// failure to exec the shim binary is retried on the next call rather than
+// A successful lookup is cached per runtime name and options. A failed query
+// is not cached, so a transient exec failure is retried rather than
 // permanently disabling the migration path for that runtime.
-func (d *deprecatedMountCapabilities) lookup(ctx context.Context, runtimeName string) *apitypes.MountCapabilities {
+func (d *deprecatedMountCapabilities) lookup(ctx context.Context, runtimeName string, options typeurl.Any) *apitypes.MountCapabilities {
 	if d == nil || deprecatedNoAnnotationRuntimes[runtimeName] {
 		return nil
 	}
 
-	if v, ok := d.cache.Load(runtimeName); ok {
+	key := deprecatedRuntimeKey{name: runtimeName}
+	if options != nil {
+		key.typeURL = options.GetTypeUrl()
+		key.value = string(options.GetValue())
+	}
+	if v, ok := d.cache.Load(key); ok {
 		caps, _ := v.(*apitypes.MountCapabilities)
 		return caps
 	}
 
-	caps, err := d.query(ctx, runtimeName)
+	caps, err := d.query(ctx, runtimeName, options)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("runtime", runtimeName).
 			Error("failed to query deprecated runtime-allow-mounts annotation")
 		return nil
 	}
 
-	d.cache.Store(runtimeName, caps)
+	d.cache.Store(key, caps)
 	return caps
 }
 
-func (d *deprecatedMountCapabilities) query(ctx context.Context, runtimeName string) (*apitypes.MountCapabilities, error) {
-	rinfo, err := d.queryRuntimeInfo(ctx, runtimeName)
+func (d *deprecatedMountCapabilities) query(ctx context.Context, runtimeName string, options typeurl.Any) (*apitypes.MountCapabilities, error) {
+	rinfo, err := d.queryRuntimeInfo(ctx, runtimeName, options)
 	if err != nil {
 		return nil, err
 	}
