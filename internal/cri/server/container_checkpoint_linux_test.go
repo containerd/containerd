@@ -19,6 +19,8 @@
 package server
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -31,6 +33,67 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+// tarball builds an in-memory tar with the given regular-file entries.
+func tarball(t *testing.T, entries map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	for name, content := range entries {
+		require.NoError(t, tw.WriteHeader(&tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     name,
+			Mode:     0o600,
+			Size:     int64(len(content)),
+		}))
+		_, err := tw.Write([]byte(content))
+		require.NoError(t, err)
+	}
+	require.NoError(t, tw.Close())
+	return buf.Bytes()
+}
+
+func TestUnpackCheckpointDataRegularFiles(t *testing.T) {
+	dir := t.TempDir()
+	data := tarball(t, map[string]string{"dump.img": "a", "pages-1.img": "bb"})
+
+	require.NoError(t, unpackCheckpointData(bytes.NewReader(data), dir))
+
+	got, err := os.ReadFile(filepath.Join(dir, "dump.img"))
+	require.NoError(t, err)
+	assert.Equal(t, "a", string(got))
+	got, err = os.ReadFile(filepath.Join(dir, "pages-1.img"))
+	require.NoError(t, err)
+	assert.Equal(t, "bb", string(got))
+}
+
+func TestUnpackCheckpointDataRejectsTraversal(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "checkpoint")
+	require.NoError(t, os.Mkdir(dir, 0o700))
+
+	for _, name := range []string{"../escape", "/etc/escape"} {
+		data := tarball(t, map[string]string{name: "x"})
+		err := unpackCheckpointData(bytes.NewReader(data), dir)
+		require.Error(t, err, "entry %q must be rejected", name)
+	}
+	assert.NoFileExists(t, filepath.Join(parent, "escape"))
+}
+
+func TestUnpackCheckpointDataRejectsSymlinkEscape(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "checkpoint")
+	require.NoError(t, os.Mkdir(dir, 0o700))
+	outside := filepath.Join(parent, "outside")
+	require.NoError(t, os.Mkdir(outside, 0o700))
+	// A symlink left inside the checkpoint dir must not be followed out of it.
+	require.NoError(t, os.Symlink(outside, filepath.Join(dir, "link")))
+
+	data := tarball(t, map[string]string{"link/evil": "x"})
+	err := unpackCheckpointData(bytes.NewReader(data), dir)
+	require.Error(t, err)
+	assert.NoFileExists(t, filepath.Join(outside, "evil"))
+}
 
 func TestCopyNoFollowRegularFile(t *testing.T) {
 	dir := t.TempDir()
