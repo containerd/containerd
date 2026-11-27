@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -37,6 +38,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func init() {
@@ -127,17 +129,6 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	if ropts.hostDir != "" {
 		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
 	}
-	if ropts.creds != nil {
-		// TODO: Support bearer
-		hostOptions.Credentials = func(host string) (string, string, error) {
-			c, err := ropts.creds.GetCredentials(context.Background(), ref, host)
-			if err != nil {
-				return "", "", err
-			}
-
-			return c.Username, c.Secret, nil
-		}
-	}
 	if ropts.defaultScheme != "" {
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
@@ -153,7 +144,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	}
 
 	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts:   config.ConfigureHosts(ctx, hostOptions),
+		Hosts:   hosts(ctx, ref, ropts.creds, hostOptions),
 		Headers: ropts.headers,
 	})
 
@@ -175,11 +166,33 @@ type CredentialHelper interface {
 	GetCredentials(ctx context.Context, ref, host string) (Credentials, error)
 }
 
+// Credentials are the credentials for a single registry host.
+//
+// A CredentialHelper is asked for each host the resolver uses, including
+// mirrors configured in hosts.toml, and must only return credentials meant
+// for that host.
+//
+// When Header is set, it is sent verbatim as the HTTP Authorization header
+// on requests to that registry host, bypassing the username/secret token
+// flow, and Username and Secret are ignored. It is never sent on redirects
+// to another scheme, host or port. A 401 response to a request that carried
+// the current header is returned as an error wrapping
+// docker.ErrInvalidAuthorization instead of re-authenticating.
+//
+// Credentials are cached per host by the OCIRegistry that requested them
+// until Expires, or for the lifetime of that OCIRegistry when Expires is
+// zero. Expires is compared with the clock of the process using the
+// credentials, which is the daemon for a proxied transfer. After Expires,
+// the helper is asked again on the next request. A
+// refreshed Header is used from then on; refreshed Username and Secret are
+// only used once the resolver creates a new authentication handler for the
+// host.
 type Credentials struct {
 	Host     string
 	Username string
 	Secret   string
 	Header   string
+	Expires  time.Time
 }
 
 // OCI
@@ -263,18 +276,29 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 					return
 				}
 
-				var s transfertypes.AuthRequest
+				// Always reply: the server blocks until it gets a response.
+				// On failure, reply with no credentials.
+				var (
+					s      transfertypes.AuthRequest
+					creds  Credentials
+					resp   transfertypes.AuthResponse
+					failed bool
+				)
 				if err := typeurl.UnmarshalTo(req, &s); err != nil {
 					log.G(ctx).WithError(err).Error("failed to unmarshal credential request")
-					continue
-				}
-				creds, err := r.creds.GetCredentials(ctx, s.Reference, s.Host)
-				if err != nil {
+					failed = true
+				} else if creds, err = r.creds.GetCredentials(ctx, s.Reference, s.Host); err != nil {
 					log.G(ctx).WithError(err).Error("failed to get credentials")
-					continue
+					creds, failed = Credentials{}, true
 				}
-				var resp transfertypes.AuthResponse
-				if creds.Header != "" {
+				if failed {
+					// Expired, so the server asks again on the next request
+					// rather than caching the failure as no credentials.
+					resp.AuthType = transfertypes.AuthType_NONE
+					resp.ExpireAt = timestamppb.New(time.Unix(0, 0))
+				} else if creds == (Credentials{}) {
+					resp.AuthType = transfertypes.AuthType_NONE
+				} else if creds.Header != "" {
 					resp.AuthType = transfertypes.AuthType_HEADER
 					resp.Secret = creds.Header
 				} else if creds.Username != "" {
@@ -285,11 +309,17 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 					resp.AuthType = transfertypes.AuthType_REFRESH
 					resp.Secret = creds.Secret
 				}
+				if !creds.Expires.IsZero() {
+					resp.ExpireAt = timestamppb.New(creds.Expires)
+				}
 
 				a, err := typeurl.MarshalAny(&resp)
 				if err != nil {
+					// The server is waiting for a reply; end the stream
+					// rather than leave it blocked.
 					log.G(ctx).WithError(err).Error("failed to marshal credential response")
-					continue
+					stream.Close()
+					return
 				}
 
 				if err := stream.Send(a); err != nil {
@@ -371,14 +401,6 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 			r.creds = &credCallback{
 				stream: stream,
 			}
-			hostOptions.Credentials = func(host string) (string, string, error) {
-				c, err := r.creds.GetCredentials(context.Background(), s.Reference, host)
-				if err != nil {
-					return "", "", err
-				}
-
-				return c.Username, c.Secret, nil
-			}
 		}
 		r.headers = http.Header{}
 		for k, v := range s.Resolver.Headers {
@@ -424,7 +446,7 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 
 	r.reference = s.Reference
 	r.resolver = docker.NewResolver(docker.ResolverOptions{
-		Hosts:   config.ConfigureHosts(ctx, hostOptions),
+		Hosts:   hosts(ctx, s.Reference, r.creds, hostOptions),
 		Headers: r.headers,
 	})
 
@@ -470,6 +492,9 @@ func (cc *credCallback) GetCredentials(ctx context.Context, ref, host string) (C
 		creds.Secret = s.Secret
 	case transfertypes.AuthType_HEADER:
 		creds.Header = s.Secret
+	}
+	if s.ExpireAt != nil {
+		creds.Expires = s.ExpireAt.AsTime()
 	}
 
 	return creds, nil
