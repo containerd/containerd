@@ -54,8 +54,8 @@ type Config struct {
 	NetNSPath string
 	// Sysctls is the effective set of namespaced sysctls to apply.
 	Sysctls map[string]string
-	// CgroupParent is the pod cgroup as a cgroup v2 group path: the sandbox
-	// reports its metrics, and places the init of a shared-PID pod under it.
+	// CgroupParent is the pod cgroup as a cgroup v2 group path. The sandbox
+	// reports its metrics and places the setup runc container under it.
 	// kubelet spells it that way with both cgroup drivers: the systemd
 	// driver hands over the expanded slice path, which CRI shortens to its
 	// base for runc.
@@ -109,8 +109,8 @@ func configFromPodSandboxConfig(id, netns string, reqAnnotations map[string]stri
 	}
 	if u := nsOpts.GetUsernsOptions(); u != nil && u.GetMode() != runtime.NamespaceMode_NODE {
 		// The namespaces of a user namespaced pod must be owned by the pod
-		// user namespace, which a multithreaded shim cannot enter; CRI has
-		// to create them. That is a follow-up.
+		// user namespace. The setup runc container can create them there,
+		// but the shim does not configure that yet.
 		return nil, fmt.Errorf("sandbox %q: user namespaces are not supported yet by %s: %w", id, BinaryName, errdefs.ErrNotImplemented)
 	}
 
@@ -137,12 +137,6 @@ func configFromPodSandboxConfig(id, netns string, reqAnnotations map[string]stri
 	return cfg, nil
 }
 
-// Sysctls are applied by the shim thread that created the pod namespaces (for
-// pause, runc applied them inside the pause container), so only namespaced
-// sysctls of namespaces the pod owns can be honored.
-
-const sysctlRoot = "/proc/sys"
-
 // defaultSysctls are applied to pods with their own network namespace unless
 // the pod sets them, matching what containerd applies to pause sandboxes with
 // its default CRI configuration (enable_unprivileged_ports and
@@ -152,14 +146,28 @@ var defaultSysctls = map[string]string{
 	"net.ipv4.ping_group_range":           "0 2147483647",
 }
 
-// validateSysctl accepts the namespaced sysctls the shim can apply from a host
-// thread that entered the pod namespaces, and rejects the rest: user.* is
-// scoped to a user namespace the shim never enters, a sysctl of a namespace
-// the pod shares with the host would change the host, and anything else is
-// not namespaced at all. It returns the key in dotted form, the form it
-// classified and the one that names the file (see sysctlPath).
+// ipcSysctls are the IPC namespace sysctls runc accepts, besides fs.mqueue.*.
+var ipcSysctls = map[string]bool{
+	"kernel.msgmax":          true,
+	"kernel.msgmnb":          true,
+	"kernel.msgmni":          true,
+	"kernel.sem":             true,
+	"kernel.shmall":          true,
+	"kernel.shmmax":          true,
+	"kernel.shmmni":          true,
+	"kernel.shm_rmid_forced": true,
+}
+
+// validateSysctl accepts the sysctls runc applies to the setup runc container
+// (see runcSpec) and rejects the rest before runc runs so that the pod gets a
+// clear error. It follows runc's rules: net.* needs the pod network
+// namespace, the IPC sysctls runc lists need the pod IPC namespace, and
+// kernel.domainname needs the pod UTS namespace. kernel.hostname conflicts
+// with the pod hostname, user.* belongs to a user namespace, which the
+// sandbox does not have, and runc rejects any other sysctl as not
+// namespaced. It returns the key in dotted form (see sysctlKey).
 func validateSysctl(key string, hostNetwork, hostIPC bool) (string, error) {
-	_, dotted, err := sysctlPath(key)
+	dotted, err := sysctlKey(key)
 	if err != nil {
 		return "", err
 	}
@@ -168,30 +176,36 @@ func validateSysctl(key string, hostNetwork, hostIPC bool) (string, error) {
 		if hostNetwork {
 			return "", fmt.Errorf("sysctl %q is not allowed for a pod using the host network: %w", key, errdefs.ErrInvalidArgument)
 		}
-	case strings.HasPrefix(dotted, "kernel.shm"), strings.HasPrefix(dotted, "kernel.msg"), dotted == "kernel.sem", strings.HasPrefix(dotted, "fs.mqueue."):
+	case ipcSysctls[dotted], strings.HasPrefix(dotted, "fs.mqueue."):
 		if hostIPC {
 			return "", fmt.Errorf("sysctl %q is not allowed for a pod using the host IPC namespace: %w", key, errdefs.ErrInvalidArgument)
 		}
-	case dotted == "kernel.hostname", dotted == "kernel.domainname":
+	case dotted == "kernel.domainname":
 		if hostNetwork {
 			return "", fmt.Errorf("sysctl %q is not allowed for a pod using the host network (and UTS) namespace: %w", key, errdefs.ErrInvalidArgument)
 		}
+	case dotted == "kernel.hostname":
+		return "", fmt.Errorf("sysctl %q is not allowed: the pod hostname sets it: %w", key, errdefs.ErrInvalidArgument)
 	case strings.HasPrefix(dotted, "user."):
 		return "", fmt.Errorf("sysctl %q: user.* sysctls are not supported by %s: %w", key, BinaryName, errdefs.ErrNotImplemented)
 	default:
-		return "", fmt.Errorf("sysctl %q is not namespaced and cannot be set for a pod: %w", key, errdefs.ErrInvalidArgument)
+		return "", fmt.Errorf("sysctl %q cannot be set for a pod: it is not namespaced, or runc does not allow it: %w", key, errdefs.ErrInvalidArgument)
 	}
 	return dotted, nil
 }
 
 // effectiveSysctls validates the pod sysctls and adds the defaults. The keys
-// of the result are in dotted form.
+// of the result are in dotted form; a sysctl the pod sets under two spellings
+// does not have a single value and is rejected.
 func effectiveSysctls(pod map[string]string, hostNetwork, hostIPC bool) (map[string]string, error) {
 	out := make(map[string]string, len(pod)+len(defaultSysctls))
 	for k, v := range pod {
 		dotted, err := validateSysctl(k, hostNetwork, hostIPC)
 		if err != nil {
 			return nil, err
+		}
+		if _, ok := out[dotted]; ok {
+			return nil, fmt.Errorf("sysctl %q is set more than once: %w", dotted, errdefs.ErrInvalidArgument)
 		}
 		out[dotted] = v
 	}
@@ -205,39 +219,28 @@ func effectiveSysctls(pod map[string]string, hostNetwork, hostIPC bool) (map[str
 	return out, nil
 }
 
-// sysctlPath maps a sysctl key to its file under /proc/sys and returns the key
-// in dotted form, the form validateSysctl classifies. Keys are spelled as in
-// sysctl.d(5), which is what kubelet passes through and runc accepts: the
-// first separator, "." or "/", separates the components and the other
-// character is literal. The rp_filter of the interface eth0.100 is therefore
-// "net.ipv4.conf.eth0/100.rp_filter" or "net/ipv4/conf/eth0.100/rp_filter",
-// the file /proc/sys/net/ipv4/conf/eth0.100/rp_filter. Every component must
-// be a name: with "." or ".." the file would be of another class than the
-// dotted form says.
-func sysctlPath(key string) (path, dotted string, err error) {
-	swap := func(r rune) rune {
-		switch r {
-		case '.':
-			return '/'
-		case '/':
-			return '.'
-		}
-		return r
-	}
-	dotted = key
+// sysctlKey returns a sysctl key, spelled as in sysctl.d(5) with either
+// separator, in dotted form. A name containing the other separator (the VLAN
+// interface of net/ipv4/conf/eth0.100/rp_filter) is rejected: runc maps every
+// "." to "/", as it does for a pause sandbox.
+func sysctlKey(key string) (string, error) {
+	sep := "."
 	if i := strings.IndexAny(key, "./"); i >= 0 && key[i] == '/' {
-		dotted = strings.Map(swap, key)
+		sep = "/"
 	}
-	rel := strings.Map(swap, dotted)
-	for c := range strings.SplitSeq(rel, "/") {
+	parts := strings.Split(key, sep)
+	for _, c := range parts {
 		if c == "" || c == "." || c == ".." || strings.ContainsRune(c, 0) {
-			return "", "", fmt.Errorf("invalid sysctl key %q: %w", key, errdefs.ErrInvalidArgument)
+			return "", fmt.Errorf("invalid sysctl key %q: %w", key, errdefs.ErrInvalidArgument)
+		}
+		if strings.ContainsAny(c, "./") {
+			return "", fmt.Errorf("sysctl %q: a name containing %q is not supported, runc would set the wrong file: %w", key, c, errdefs.ErrNotImplemented)
 		}
 	}
-	return sysctlRoot + "/" + rel, dotted, nil
+	return strings.Join(parts, "."), nil
 }
 
-// buildSpec synthesizes the sandbox spec CRI and NRI consume. It is not the
+// sandboxSpec synthesizes the sandbox spec CRI and NRI consume. It is not the
 // spec of a process: it describes the namespaces the sandbox holds, from what
 // was actually pinned, the sysctls applied to them, and the pod shared files
 // as mounts. A namespace the pod shares with the host has no entry. Linux is
@@ -246,43 +249,35 @@ func sysctlPath(key string) (path, dotted string, err error) {
 //
 // The PID namespace entry has a path only for a pod that shares its PID
 // namespace (NamespaceMode_POD, the CRI default and kubelet's
-// shareProcessNamespace): pidNS, the pinned namespace containerd-sandbox-init
-// is PID 1 of. Otherwise the sandbox holds no PID namespace, and the entry, without a
-// path, declares that each container gets a new one of its own; CRI honors
-// the declaration. A host PID pod has no entry.
-func buildSpec(cfg *Config, pins Pins, mounts []specs.Mount, pidNS string) *specs.Spec {
+// shareProcessNamespace): pins.PID, the namespace containerd-sandbox-init is
+// PID 1 of. Otherwise the sandbox does not hold a PID namespace, and the
+// entry, without a path, declares that each container gets a new one of its
+// own; CRI honors the declaration. A host PID pod does not get an entry.
+func sandboxSpec(cfg *Config, pins Pins, mounts []specs.Mount) *specs.Spec {
 	s := &specs.Spec{
 		Version:     specs.Version,
 		Hostname:    cfg.Hostname,
 		Annotations: cfg.Annotations,
 		Mounts:      mounts,
 		Linux: &specs.Linux{
-			Sysctl:     cfg.Sysctls,
-			Namespaces: podNamespaces(cfg, pins),
+			Sysctl: cfg.Sysctls,
 		},
+	}
+	if cfg.NetNSPath != "" {
+		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: cfg.NetNSPath})
+	}
+	if pins.IPC != "" {
+		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.IPCNamespace, Path: pins.IPC})
+	}
+	if pins.UTS != "" {
+		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.UTSNamespace, Path: pins.UTS})
 	}
 	switch {
 	case cfg.HostPID:
-	case pidNS != "":
-		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.PIDNamespace, Path: pidNS})
+	case pins.PID != "":
+		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.PIDNamespace, Path: pins.PID})
 	default:
 		s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{Type: specs.PIDNamespace})
 	}
 	return s
-}
-
-// podNamespaces are the network, IPC and UTS namespaces the sandbox holds,
-// which the sandbox spec lists and containerd-sandbox-init joins.
-func podNamespaces(cfg *Config, pins Pins) []specs.LinuxNamespace {
-	var ns []specs.LinuxNamespace
-	if cfg.NetNSPath != "" {
-		ns = append(ns, specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: cfg.NetNSPath})
-	}
-	if pins.IPC != "" {
-		ns = append(ns, specs.LinuxNamespace{Type: specs.IPCNamespace, Path: pins.IPC})
-	}
-	if pins.UTS != "" {
-		ns = append(ns, specs.LinuxNamespace{Type: specs.UTSNamespace, Path: pins.UTS})
-	}
-	return ns
 }

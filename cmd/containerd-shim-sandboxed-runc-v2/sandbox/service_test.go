@@ -28,12 +28,25 @@ import (
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	gorunc "github.com/containerd/go-runc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 )
+
+// TestNewServiceSetsMonitor checks that the service does not rely on the task
+// service to make go-runc wait through the reaper.
+func TestNewServiceSetsMonitor(t *testing.T) {
+	prev := gorunc.Monitor
+	t.Cleanup(func() { gorunc.Monitor = prev })
+	gorunc.Monitor = nil
+	_, sd := shutdown.WithShutdown(context.Background())
+	NewService(sd)
+	assert.Same(t, reaper.Default, gorunc.Monitor)
+}
 
 func TestServiceWithoutSandbox(t *testing.T) {
 	ctx := context.Background()
