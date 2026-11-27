@@ -60,6 +60,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 			return nil, fmt.Errorf("failed to query controller status: %w", err)
 		}
 		state = runtime.PodSandboxState_SANDBOX_NOTREADY.String()
+		createdAt = sandbox.Status.Get().CreatedAt
 		if r.GetVerbose() {
 			info, err = toDeletedCRISandboxInfo(sandbox)
 			if err != nil {

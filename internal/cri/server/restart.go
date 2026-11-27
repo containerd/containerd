@@ -147,7 +147,7 @@ func (c *criService) recover(ctx context.Context) error {
 			}
 		}
 
-		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
+		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state, CreatedAt: sbx.CreatedAt})
 		sb.Sandboxer = sbx.Sandboxer
 		sb.Endpoint = endpoint
 

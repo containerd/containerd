@@ -22,9 +22,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/sandbox"
 	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
@@ -226,4 +228,70 @@ func TestSetUpdatedResources(t *testing.T) {
 			}
 		})
 	}
+}
+
+// notFoundSandboxService reports NotFound for SandboxStatus, simulating a
+// sandbox whose controller (shim) is gone, e.g. after containerd was killed
+// and the sandbox was recovered from the store.
+type notFoundSandboxService struct {
+	*fakeSandboxService
+}
+
+func (notFoundSandboxService) SandboxStatus(context.Context, string, string, bool) (sandbox.ControllerStatus, error) {
+	return sandbox.ControllerStatus{}, errdefs.ErrNotFound
+}
+
+// TestPodSandboxStatusNotFoundCreatedAt verifies that when the sandbox
+// controller reports NotFound, PodSandboxStatus falls back to the CreatedAt
+// stored in the sandbox store instead of returning a zero timestamp. A zero
+// time.Time converts to a large negative UnixNano value, which previously
+// surfaced as a bogus date (e.g. "1754") to CRI clients.
+func TestPodSandboxStatusNotFoundCreatedAt(t *testing.T) {
+	const id = "test-id"
+
+	createdAt := time.Now()
+	config := &runtime.PodSandboxConfig{
+		Metadata: &runtime.PodSandboxMetadata{
+			Name:      "test-name",
+			Uid:       "test-uid",
+			Namespace: "test-ns",
+			Attempt:   1,
+		},
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{
+					// Host network avoids needing a NetNS for getIPs.
+					Network: runtime.NamespaceMode_NODE,
+				},
+			},
+		},
+		Windows: &runtime.WindowsPodSandboxConfig{
+			SecurityContext: &runtime.WindowsSandboxSecurityContext{
+				// hostNetwork() checks HostProcess on Windows, so set it too;
+				// otherwise getIPs would call Closed() on a nil NetNS.
+				HostProcess: true,
+			},
+		},
+	}
+	metadata := sandboxstore.Metadata{
+		ID:     id,
+		Name:   "test-name",
+		Config: config,
+	}
+
+	service := newTestCRIService()
+	service.sandboxService = notFoundSandboxService{&fakeSandboxService{}}
+
+	sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{
+		State:     sandboxstore.StateNotReady,
+		CreatedAt: createdAt,
+	})
+	assert.NoError(t, service.sandboxStore.Add(sb))
+
+	resp, err := service.PodSandboxStatus(context.Background(), &runtime.PodSandboxStatusRequest{
+		PodSandboxId: id,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, createdAt.UnixNano(), resp.GetStatus().GetCreatedAt())
+	assert.Equal(t, runtime.PodSandboxState_SANDBOX_NOTREADY, resp.GetStatus().GetState())
 }
