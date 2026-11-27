@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
@@ -98,7 +97,7 @@ func ToTabularMarkdown(cmd *cli.Command, appPath string) (string, error) {
 // ToTabularToFileBetweenTags creates a tabular markdown documentation for the `*App` and updates the file between
 // the tags in the file. The function errors if either parsing or writing of the string fails.
 func ToTabularToFileBetweenTags(cmd *cli.Command, appPath, filePath string, startEndTags ...string) error {
-	var start, end = "<!--GENERATED:CLI_DOCS-->", "<!--/GENERATED:CLI_DOCS-->" // default tags
+	start, end := "<!--GENERATED:CLI_DOCS-->", "<!--/GENERATED:CLI_DOCS-->" // default tags
 
 	if len(startEndTags) == 2 {
 		start, end = startEndTags[0], startEndTags[1]
@@ -128,7 +127,7 @@ func ToTabularToFileBetweenTags(cmd *cli.Command, appPath, filePath string, star
 	updated := re.ReplaceAll(content, []byte(strings.Join([]string{start, comment, md, end}, "\n")))
 
 	// write updated content to file
-	if err = os.WriteFile(filePath, updated, 0664); err != nil {
+	if err = os.WriteFile(filePath, updated, 0o664); err != nil {
 		return err
 	}
 
@@ -278,8 +277,10 @@ func prepareFlags(
 // flagDetails returns a string containing the flags metadata
 func flagDetails(flag cli.DocGenerationFlag) string {
 	description := flag.GetUsage()
-	value := getFlagDefaultValue(flag)
-	if value != "" {
+	value, defaultText := getFlagDefaultValue(flag)
+	if defaultText != "" {
+		description += " (default: " + defaultText + ")"
+	} else if value != "" {
 		description += " (default: " + value + ")"
 	}
 	return ": " + description
@@ -364,10 +365,10 @@ type tabularTemplate struct{}
 
 // PrepareCommands converts CLI commands into a structs for the rendering.
 func (tt tabularTemplate) PrepareCommands(commands []*cli.Command, appPath, parentCommandName string, level uint) []cliTabularCommandTemplate {
-	var result = make([]cliTabularCommandTemplate, 0, len(commands))
+	result := make([]cliTabularCommandTemplate, 0, len(commands))
 
 	for _, cmd := range commands {
-		var command = cliTabularCommandTemplate{
+		command := cliTabularCommandTemplate{
 			AppPath:     appPath,
 			Name:        strings.TrimSpace(strings.Join([]string{parentCommandName, cmd.Name}, " ")),
 			Aliases:     cmd.Aliases,
@@ -394,7 +395,7 @@ func (tt tabularTemplate) PrepareCommands(commands []*cli.Command, appPath, pare
 
 // PrepareFlags converts CLI flags into a structs for the rendering.
 func (tt tabularTemplate) PrepareFlags(flags []cli.Flag) []cliTabularFlagTemplate {
-	var result = make([]cliTabularFlagTemplate, 0, len(flags))
+	result := make([]cliTabularFlagTemplate, 0, len(flags))
 
 	for _, appFlag := range flags {
 		flag, ok := appFlag.(cli.DocGenerationFlag)
@@ -402,16 +403,20 @@ func (tt tabularTemplate) PrepareFlags(flags []cli.Flag) []cliTabularFlagTemplat
 			continue
 		}
 
-		var f = cliTabularFlagTemplate{
+		value, defaultText := getFlagDefaultValue(flag)
+		defaultValue := ""
+		if defaultText != "" {
+			defaultValue = defaultText
+		} else if value != "" {
+			defaultValue = fmt.Sprintf("`%s`", value)
+		}
+
+		f := cliTabularFlagTemplate{
 			Usage:      tt.PrepareMultilineString(flag.GetUsage()),
 			EnvVars:    flag.GetEnvVars(),
 			TakesValue: flag.TakesValue(),
-			Default:    getFlagDefaultValue(flag),
+			Default:    defaultValue,
 			Type:       flag.TypeName(),
-		}
-
-		if boolFlag, isBool := appFlag.(*cli.BoolFlag); isBool {
-			f.Default = strconv.FormatBool(boolFlag.Value)
 		}
 
 		for i, name := range appFlag.Names() {
@@ -449,7 +454,7 @@ func (tabularTemplate) PrepareMultilineString(s string) string {
 }
 
 func (tabularTemplate) Prettify(s string) string {
-	var max = func(x, y int) int {
+	max := func(x, y int) int {
 		if x > y {
 			return x
 		}
@@ -460,14 +465,14 @@ func (tabularTemplate) Prettify(s string) string {
 
 	// search for tables
 	for _, rawTable := range regexp.MustCompile(`(?m)^(\|[^\n]+\|\r?\n)((?:\|:?-+:?)+\|)(\n(?:\|[^\n]+\|\r?\n?)*)?$`).FindAllString(s, -1) {
-		var lines = strings.FieldsFunc(rawTable, func(r rune) bool { return r == '\n' })
+		lines := strings.FieldsFunc(rawTable, func(r rune) bool { return r == '\n' })
 
 		if len(lines) < 3 { // header, separator, body
 			continue
 		}
 
 		// parse table into the matrix
-		var matrix = make([][]string, 0, len(lines))
+		matrix := make([][]string, 0, len(lines))
 		for _, line := range lines {
 			items := strings.FieldsFunc(strings.Trim(line, "| "), func(r rune) bool { return r == '|' })
 
@@ -479,13 +484,13 @@ func (tabularTemplate) Prettify(s string) string {
 		}
 
 		// determine centered columns
-		var centered = make([]bool, 0, len(matrix[1]))
+		centered := make([]bool, 0, len(matrix[1]))
 		for _, cell := range matrix[1] {
 			centered = append(centered, strings.HasPrefix(cell, ":") && strings.HasSuffix(cell, ":"))
 		}
 
 		// calculate max lengths
-		var lengths = make([]int, len(matrix[0]))
+		lengths := make([]int, len(matrix[0]))
 		for n, row := range matrix {
 			for i, cell := range row {
 				if n == 1 {
@@ -558,33 +563,26 @@ func (tabularTemplate) Prettify(s string) string {
 	return s + "\n" // add an extra newline
 }
 
-// getFlagDefaultValue returns the default value of a flag. Previously, the [cli.DocGenerationFlag] interface included
-// a GetValue string method, but it was removed in https://github.com/urfave/cli/pull/1988.
-// This function serves as a workaround, attempting to retrieve the value using the removed method; if that fails, it
-// tries to obtain it via reflection (the [cli.FlagBase] still has a Value field).
-func getFlagDefaultValue(f cli.DocGenerationFlag) string {
+// getFlagDefaultValue returns the default text or default value of a flag.
+// cli.BoolFlag will always return an default.
+func getFlagDefaultValue(f cli.DocGenerationFlag) (value, text string) {
+	if defaultText := f.GetDefaultText(); defaultText != "" {
+		return "", defaultText
+	}
+
 	if !f.TakesValue() {
-		return ""
+		if boolFlag, isBool := f.(*cli.BoolFlag); isBool {
+			return strconv.FormatBool(boolFlag.Value), ""
+		}
+		return "", ""
 	}
 
-	if v, ok := f.(interface{ GetValue() string }); ok {
-		return v.GetValue()
+	if value := f.GetValue(); value != "" {
+		if _, ok := f.(*cli.StringFlag); ok {
+			return strings.Trim(value, "\""), ""
+		} else {
+			return value, ""
+		}
 	}
-
-	var ref = reflect.ValueOf(f)
-	if ref.Kind() != reflect.Ptr {
-		return ""
-	} else {
-		ref = ref.Elem()
-	}
-
-	if ref.Kind() != reflect.Struct {
-		return ""
-	}
-
-	if val := ref.FieldByName("Value"); val.IsValid() && val.Type().Kind() != reflect.Bool {
-		return fmt.Sprintf("%v", val.Interface())
-	}
-
-	return ""
+	return "", ""
 }

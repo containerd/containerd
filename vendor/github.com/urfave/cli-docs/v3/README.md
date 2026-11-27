@@ -82,3 +82,7 @@ greet [GLOBAL OPTIONS] [command [COMMAND OPTIONS]] [ARGUMENTS...]
 ```
 
 ````
+
+## Examples
+Some examples of the cli generated using this markdown
+* https://woodpecker-ci.org/docs/cli

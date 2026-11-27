@@ -1,12 +1,20 @@
 {{ define "flags" }}
-| Name | Description | Type | Default value | Environment variables |
-|------|-------------|------|:-------------:|:---------------------:|
+{{- $hasEnvVars := false -}}
+{{- range . -}}
+{{- if and (not $hasEnvVars) .EnvVars -}}
+{{- $hasEnvVars = true -}}
+{{- end -}}
+{{- end }}
+| Name | Description | Type | Default value {{ if $hasEnvVars }}| Environment variables {{ end }}|
+|------|-------------|------|:-------------:{{ if $hasEnvVars }}|:---------------------:{{ end }}|
 {{   range $flag := . -}}
 {{- /**/ -}} | `{{ $flag.Name }}{{ if $flag.TakesValue }}="…"{{ end }}` {{ if $flag.Aliases }}(`{{ join $flag.Aliases "`, `" }}`) {{ end }}
 {{- /**/ -}} | {{ $flag.Usage }}
 {{- /**/ -}} | {{ $flag.Type }}
-{{- /**/ -}} | {{ if $flag.Default }}`{{ $flag.Default }}`{{ end }}
+{{- /**/ -}} | {{ if $flag.Default }}{{ $flag.Default }}{{ end }}
+{{- if $hasEnvVars -}}
 {{- /**/ -}} | {{ if $flag.EnvVars }}`{{ join $flag.EnvVars "`, `" }}`{{ else }}*none*{{ end }}
+{{- end -}}
 {{- /**/ -}} |
 {{   end }}
 {{ end }}
