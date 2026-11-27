@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -315,4 +316,44 @@ func (m testManifest) RegisterHandler(r *http.ServeMux, name string) {
 	for _, c := range append(m.references, m.config) {
 		r.Handle(fmt.Sprintf("/v2/%s/blobs/%s", name, c.Digest()), c)
 	}
+}
+
+func TestResolverDialAddrUnixSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("dial_addr is not supported on Windows")
+	}
+	// The host name does not resolve, so the requests can only succeed over the socket.
+	const base = "dial-addr.registry.invalid"
+	hostsWithDialAddr := func(t *testing.T, sock string) docker.ResolverOptions {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, base), 0755); err != nil {
+			t.Fatal(err)
+		}
+		hostTOML := fmt.Sprintf("[host.\"http://%s\"]\n  capabilities = [\"pull\", \"resolve\"]\n  dial_addr = \"unix://%s\"\n", base, sock)
+		if err := os.WriteFile(filepath.Join(dir, base, "hosts.toml"), []byte(hostTOML), 0644); err != nil {
+			t.Fatal(err)
+		}
+		return docker.ResolverOptions{Hosts: ConfigureHosts(context.TODO(), HostOptions{HostDir: HostDirFromRoot(dir)})}
+	}
+
+	t.Run("served over socket", func(t *testing.T) {
+		runBasicTest(t, "testname", func(h http.Handler) (string, docker.ResolverOptions, func()) {
+			sock := filepath.Join(t.TempDir(), "reg.sock")
+			l, err := net.Listen("unix", sock)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := httptest.NewUnstartedServer(h)
+			s.Listener = l
+			s.Start()
+			return base, hostsWithDialAddr(t, sock), s.Close
+		})
+	})
+
+	t.Run("nonexistent socket fails", func(t *testing.T) {
+		resolver := docker.NewResolver(hostsWithDialAddr(t, filepath.Join(t.TempDir(), "missing.sock")))
+		if _, _, err := resolver.Resolve(context.Background(), base+"/testname:latest"); err == nil {
+			t.Fatal("expected resolve to fail when dial_addr points at a nonexistent socket")
+		}
+	})
 }
