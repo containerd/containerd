@@ -143,9 +143,30 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	return shim, nil
 }
 
-func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[ShimInstance], events *exchange.Exchange, binaryCall *binary) {
+// cleanupAfterDeadShim returns false if the ID is now registered to another
+// bundle, in which case it does nothing and the caller must leave the
+// registration alone.
+func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[ShimInstance], events *exchange.Exchange, binaryCall *binary) bool {
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
+
+	// The ID was reused before this late callback ran.
+	replaced := func() bool {
+		cur, err := rt.Get(ctx, id)
+		if err != nil {
+			return false
+		}
+		h, ok := cur.(bundleHolder)
+		if !ok {
+			return false
+		}
+		b := h.heldBundle()
+		return b != nil && b != binaryCall.bundle
+	}
+	if replaced() {
+		log.G(ctx).WithField("id", id).Warn("ignoring disconnect of a replaced shim")
+		return false
+	}
 
 	log.G(ctx).WithField("id", id).Info("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
@@ -157,13 +178,16 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	if err != nil {
 		// Task was never started, or its record has already been removed.
 		// No need to publish events.
-		return
+		return true
+	}
+	if replaced() {
+		return false
 	}
 
 	// If the task delete already succeeded, the shim itself has delivered the
 	// exit and delete events. No need to publish duplicates.
 	if s.(taskDeleteState).taskDeleteResult() != nil {
-		return
+		return true
 	}
 
 	var (
@@ -193,6 +217,21 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 		ExitStatus:  exitStatus,
 		ExitedAt:    protobuf.ToTimestamp(exitedAt),
 	})
+	return true
+}
+
+// bundleHolder is implemented by shim instances that know their bundle.
+type bundleHolder interface {
+	heldBundle() *Bundle
+}
+
+func (s *shim) heldBundle() *Bundle { return s.bundle }
+
+func (s *shimTask) heldBundle() *Bundle {
+	if h, ok := s.ShimInstance.(bundleHolder); ok {
+		return h.heldBundle()
+	}
+	return nil
 }
 
 // cleanupShimTask reaps a shim task we have given up on, after a failed start or

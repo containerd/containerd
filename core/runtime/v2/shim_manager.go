@@ -296,12 +296,13 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 		shim, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-			cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
 			// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 			// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 			// disconnect and there is no chance to remove this dead task from runtime task lists.
 			// Thus it's better to delete it here.
-			m.shims.Delete(ctx, id)
+			if cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b) {
+				m.shims.Delete(ctx, id)
+			}
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
@@ -371,12 +372,13 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
 		// Thus it's better to delete it here.
-		m.shims.Delete(ctx, id)
+		if cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b) {
+			m.shims.Delete(ctx, id)
+		}
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start failed: %w", err)

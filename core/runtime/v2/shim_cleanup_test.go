@@ -25,6 +25,7 @@ import (
 	"time"
 
 	task "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,4 +77,25 @@ func TestCleanupShimTaskWaitsForOnClose(t *testing.T) {
 
 	assert.ErrorContains(t, <-errCh, "delete failed")
 	assert.True(t, closed.Load(), "on-close callback must be done")
+}
+
+// TestCleanupAfterDeadShimIgnoresReusedID verifies that a late disconnect of an
+// old shim does not act on a shim that reuses the ID.
+func TestCleanupAfterDeadShimIgnoresReusedID(t *testing.T) {
+	ctx, root, state := bundleDirs(t)
+	const id = "reused"
+	oldBundle, err := NewBundle(ctx, root, state, id, nil)
+	require.NoError(t, err)
+	newBundle := &Bundle{ID: id, Path: oldBundle.Path, Namespace: oldBundle.Namespace}
+
+	rt := runtime.NewNSMap[ShimInstance]()
+	cur := &shimTask{ShimInstance: &shim{bundle: newBundle}}
+	require.NoError(t, rt.Add(ctx, cur))
+
+	owned := cleanupAfterDeadShim(ctx, id, rt, nil, &binary{bundle: oldBundle})
+	assert.False(t, owned)
+	got, err := rt.Get(ctx, id)
+	require.NoError(t, err)
+	assert.Same(t, cur, got)
+	assert.DirExists(t, oldBundle.Path)
 }
