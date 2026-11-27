@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/core/remotes"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
@@ -137,10 +138,13 @@ func (r dockerFetcher) openReferrers(ctx context.Context, dgst digest.Digest, co
 		}
 		rc, cl, err := r.open(ctx, req, mediaType, 0, i == len(fallbackHosts)-1)
 		if err != nil {
-			if errdefs.IsNotFound(err) {
-				// Equivalent to empty referrers list
-				firstErr = err
-				break
+			status, ok := errors.AsType[remoteerrors.ErrUnexpectedStatus](err)
+			// A 404 or 400 from the fallback tag does not return a valid index.
+			// The OCI distribution spec recommends assuming no referrers:
+			// https://github.com/opencontainers/distribution-spec/blob/main/spec.md#listing-referrers
+			// Only ignore a 400 from this request, not from fetching an auth token.
+			if errdefs.IsNotFound(err) || (ok && status.StatusCode == http.StatusBadRequest && status.RequestMethod == http.MethodGet && status.RequestURL == req.String()) {
+				continue
 			}
 			log.G(ctx).WithError(err).WithField("host", host.Host).Debug("error fetching referrers via fallback")
 			if firstErr == nil {
