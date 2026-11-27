@@ -582,6 +582,22 @@ func (nw *namespacedWriter) createAndCopy(ctx context.Context, desc ocispec.Desc
 func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	ctx = namespaces.WithNamespace(ctx, nw.namespace)
 
+	// Finalization (e.g. fsverity) reads the whole blob, so run it after the
+	// metadata transaction commits and the metadata locks are released;
+	// otherwise a pending garbage collection would block all other writes.
+	// With a caller-owned transaction it runs when that transaction commits.
+	bf, finalize := nw.provider.(blobFinalizer)
+	if d, ok := nw.w.(interface{ DeferFinalize() }); ok && finalize {
+		d.DeferFinalize()
+	}
+	_, callerTx := boltutil.Transaction(ctx)
+	var finalizeDgst digest.Digest
+	defer func() {
+		if finalizeDgst != "" {
+			bf.FinalizeBlob(ctx, finalizeDgst)
+		}
+	}()
+
 	nw.l.RLock()
 	defer nw.l.RUnlock()
 
@@ -609,6 +625,11 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 			}
 			innerErr = err
 		}
+		// Finalizing on every successful commit also repairs a blob published
+		// by a commit that rolled back.
+		if finalize && callerTx {
+			tx.OnCommit(func() { bf.FinalizeBlob(ctx, dgst) })
+		}
 		actualDgst = dgst
 		actualSize = size
 		bkt := getIngestsBucket(tx, nw.namespace)
@@ -623,6 +644,9 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 		return addContentLease(ctx, tx, dgst)
 	}); err != nil {
 		return err
+	}
+	if finalize && !callerTx {
+		finalizeDgst = actualDgst
 	}
 	if innerErr != nil {
 		return innerErr
@@ -639,6 +663,12 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	}
 
 	return nil
+}
+
+// blobFinalizer is implemented by backends that do expensive work on a
+// published blob. Their writers' DeferFinalize moves that work out of Commit.
+type blobFinalizer interface {
+	FinalizeBlob(ctx context.Context, dgst digest.Digest)
 }
 
 func (nw *namespacedWriter) Sync() error {

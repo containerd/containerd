@@ -21,13 +21,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins/content/local"
@@ -92,6 +98,234 @@ func TestContent(t *testing.T) {
 		t, "metadata", createContentStoreWithPolicy([]DBOpt{
 			WithPolicyIsolated,
 		}...))
+}
+
+// finalizeStore observes when backend finalization runs.
+type finalizeStore struct {
+	content.Store
+	deferred bool
+	finalize func(context.Context)
+}
+
+func (s *finalizeStore) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
+	w, err := s.Store.Writer(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &finalizeWriter{Writer: w, s: s}, nil
+}
+
+func (s *finalizeStore) FinalizeBlob(ctx context.Context, _ digest.Digest) { s.finalize(ctx) }
+
+type finalizeWriter struct {
+	content.Writer
+	s *finalizeStore
+}
+
+func (w *finalizeWriter) DeferFinalize() { w.s.deferred = true }
+
+func TestContentFinalizeOutsideTransaction(t *testing.T) {
+	for _, callerTransaction := range []bool{false, true} {
+		t.Run(fmt.Sprintf("callerTransaction=%v", callerTransaction), func(t *testing.T) {
+			ctx, db := testDB(t)
+			cs := db.ContentStore().(*contentStore)
+			blob := []byte("finalize after metadata transaction")
+			dgst := digest.FromBytes(blob)
+			finalized := make(chan struct{})
+			cs.Store = &finalizeStore{Store: cs.Store, finalize: func(context.Context) {
+				defer close(finalized)
+				if _, err := cs.Info(ctx, dgst); err != nil {
+					t.Errorf("content not committed before finalization: %v", err)
+				}
+				// Fails if finalization runs while the write transaction is open.
+				done := make(chan error, 1)
+				go func() {
+					done <- db.Update(func(tx *bolt.Tx) error {
+						_, err := tx.CreateBucketIfNotExists([]byte("finalize-test"))
+						return err
+					})
+				}()
+				select {
+				case err := <-done:
+					if err != nil {
+						t.Error(err)
+					}
+				case <-time.After(10 * time.Second):
+					t.Error("finalization blocked an unrelated metadata write")
+				}
+			}}
+
+			w, err := cs.Writer(ctx, content.WithRef("finalize"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer w.Close()
+			if _, err := w.Write(blob); err != nil {
+				t.Fatal(err)
+			}
+			commit := func(ctx context.Context) error {
+				return w.Commit(ctx, int64(len(blob)), dgst)
+			}
+			if callerTransaction {
+				err = db.Update(func(tx *bolt.Tx) error {
+					if err := commit(boltutil.WithTransaction(ctx, tx)); err != nil {
+						return err
+					}
+					select {
+					case <-finalized:
+						t.Error("finalized before the caller's transaction committed")
+					default:
+					}
+					return nil
+				})
+			} else {
+				err = commit(ctx)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case <-finalized:
+			case <-time.After(20 * time.Second):
+				t.Fatal("content was not finalized")
+			}
+			if !cs.Store.(*finalizeStore).deferred {
+				t.Error("finalization was not deferred by the metadata writer")
+			}
+		})
+	}
+}
+
+func TestContentSharedCommitFinalizesAfterRollback(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore().(*contentStore)
+	root := t.TempDir()
+	backend, err := local.NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs.Store = backend
+	cs.shared = true
+	blob := []byte("published by a rolled back commit")
+	desc := ocispec.Descriptor{Digest: digest.FromBytes(blob), Size: int64(len(blob))}
+
+	w, err := cs.Writer(ctx, content.WithRef("rollback"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if _, err := w.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	rollback := errors.New("rollback")
+	if err := db.Update(func(tx *bolt.Tx) error {
+		if err := w.Commit(boltutil.WithTransaction(ctx, tx), desc.Size, desc.Digest); err != nil {
+			return err
+		}
+		return rollback
+	}); !errors.Is(err, rollback) {
+		t.Fatalf("expected rollback, got %v", err)
+	}
+
+	// The backend blob exists, so the retry takes the shared path and never
+	// reaches the backend commit.
+	retry, err := cs.Writer(ctx, content.WithRef("rollback"), content.WithDescriptor(desc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer retry.Close()
+	if retry.(*namespacedWriter).w != nil {
+		t.Fatal("expected a shared writer")
+	}
+	if err := retry.Commit(ctx, desc.Size, desc.Digest); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(root, "blobs", desc.Digest.Algorithm().String(), desc.Digest.Encoded())
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && fi.Mode()&0222 != 0 {
+		t.Errorf("blob left writable: %v", fi.Mode())
+	}
+	if ok, _ := fsverity.IsSupported(filepath.Dir(path)); ok {
+		if enabled, err := fsverity.IsEnabled(path); err != nil || !enabled {
+			t.Errorf("blob not sealed: enabled=%v err=%v", enabled, err)
+		}
+	} else {
+		t.Log("fsverity not supported, skipping seal check")
+	}
+}
+
+func TestContentFinalizeOutsideMetadataLocks(t *testing.T) {
+	ctx, db := testDB(t)
+	cs := db.ContentStore().(*contentStore)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	unblock := func() { once.Do(func() { close(release) }) }
+	defer unblock()
+	cs.Store = &finalizeStore{Store: cs.Store, finalize: func(context.Context) {
+		close(entered)
+		<-release
+	}}
+
+	blob := []byte("finalize outside metadata locks")
+	w, err := cs.Writer(ctx, content.WithRef("locks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if _, err := w.Write(blob); err != nil {
+		t.Fatal(err)
+	}
+	committed := make(chan error, 1)
+	go func() { committed <- w.Commit(ctx, int64(len(blob)), digest.FromBytes(blob)) }()
+	select {
+	case <-entered:
+	case <-time.After(10 * time.Second):
+		t.Fatal("commit did not finalize")
+	}
+
+	// Garbage collection takes both locks exclusively. Neither may wait on
+	// finalization, or unrelated writes queue behind it.
+	for name, l := range map[string]*sync.RWMutex{"db": &db.wlock, "content": &cs.l} {
+		locked := make(chan struct{})
+		go func() {
+			l.Lock()
+			l.Unlock()
+			close(locked)
+		}()
+		select {
+		case <-locked:
+		case <-time.After(10 * time.Second):
+			unblock()
+			<-committed
+			t.Fatalf("%s lock held during finalization", name)
+		}
+	}
+	updated := make(chan error, 1)
+	go func() {
+		updated <- db.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucketIfNotExists([]byte("finalize-locks"))
+			return err
+		})
+	}()
+	select {
+	case err := <-updated:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		unblock()
+		<-committed
+		t.Fatal("finalization blocked an unrelated metadata write")
+	}
+	unblock()
+	if err := <-committed; err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestContentLeased(t *testing.T) {
