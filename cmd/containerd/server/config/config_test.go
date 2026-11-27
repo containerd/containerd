@@ -565,7 +565,7 @@ func TestMergingPluginsWithTwoCriRuntimeWithPodAnnotationsDropInConfigs(t *testi
   [containerd.runtimes]
     [containerd.runtimes.runc]
       cni_conf_dir = '/bar'
-      pod_annotations = ['d', 'e', 'f']
+      pod_annotations = ['a', 'b', 'c', 'd', 'e', 'f']
       runtime_type = 'io.containerd.runc.v2'
 `
 	testMergeConfig(t, []string{runc1, runc2}, expected, "io.containerd.grpc.v1.cri")
@@ -576,10 +576,65 @@ func TestMergingPluginsWithTwoCriRuntimeWithPodAnnotationsDropInConfigs(t *testi
   [containerd.runtimes]
     [containerd.runtimes.runc]
       cni_conf_dir = '/foo'
-      pod_annotations = ['a', 'b', 'c']
+      pod_annotations = ['d', 'e', 'f', 'a', 'b', 'c']
       runtime_type = 'io.containerd.runc.v2'
 `
 	testMergeConfig(t, []string{runc2, runc1}, expected, "io.containerd.grpc.v1.cri")
+}
+
+func TestMergingPluginsWithNestedArraysDropInConfigs(t *testing.T) {
+	// Regression test for https://github.com/containerd/containerd/issues/14607:
+	// arrays nested inside plugin tables must be appended on import, like
+	// top-level arrays, instead of being replaced by the imported array.
+	transfer1 := `
+[plugins."io.containerd.transfer.v1.local"]
+    [[plugins."io.containerd.transfer.v1.local".unpack_config]]
+      platform = "linux/amd64"
+      snapshotter = "overlayfs"
+`
+	transfer2 := `
+[plugins."io.containerd.transfer.v1.local"]
+    [[plugins."io.containerd.transfer.v1.local".unpack_config]]
+      platform = "linux/arm64"
+      snapshotter = "native"
+`
+	expected := `
+[[unpack_config]]
+  platform = 'linux/amd64'
+  snapshotter = 'overlayfs'
+
+[[unpack_config]]
+  platform = 'linux/arm64'
+  snapshotter = 'native'
+`
+	testMergeConfig(t, []string{transfer1, transfer2}, expected, "io.containerd.transfer.v1.local")
+
+	// The other way around: transfer2 over transfer1
+	expected = `
+[[unpack_config]]
+  platform = 'linux/arm64'
+  snapshotter = 'native'
+
+[[unpack_config]]
+  platform = 'linux/amd64'
+  snapshotter = 'overlayfs'
+`
+	testMergeConfig(t, []string{transfer2, transfer1}, expected, "io.containerd.transfer.v1.local")
+
+	// An empty imported array leaves the earlier array untouched.
+	transferEmpty := `
+[plugins."io.containerd.transfer.v1.local"]
+    unpack_config = []
+`
+	expected = `
+[[unpack_config]]
+  platform = 'linux/amd64'
+  snapshotter = 'overlayfs'
+`
+	testMergeConfig(t, []string{transfer1, transferEmpty}, expected, "io.containerd.transfer.v1.local")
+
+	// An imported entry identical to an earlier one is not duplicated.
+	testMergeConfig(t, []string{transfer1, transfer1}, expected, "io.containerd.transfer.v1.local")
 }
 
 func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) {
