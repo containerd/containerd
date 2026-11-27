@@ -75,8 +75,8 @@ func isRegistryOrigin(u *url.URL, hosts []RegistryHost) bool {
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", desc.Digest))
 
-	hosts := r.filterHosts(HostCapabilityPull)
-	if len(hosts) == 0 {
+	pullHosts := r.filterHosts(HostCapabilityPull)
+	if len(pullHosts) == 0 {
 		return nil, fmt.Errorf("no pull hosts: %w", errdefs.ErrNotFound)
 	}
 
@@ -109,7 +109,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				Capabilities: HostCapabilityPull,
 			}
 			req := r.request(host, http.MethodGet)
-			if !isRegistryOrigin(u, hosts) {
+			if !isRegistryOrigin(u, pullHosts) {
 				stripSensitiveHeadersForExternalURLs(req.header)
 			}
 			// Strip namespace from base
@@ -137,7 +137,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 			ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
 
 			var firstErr error
-			for _, host := range r.hosts {
+			for _, host := range pullHosts {
 				req := r.request(host, http.MethodGet, "manifests", desc.Digest.String())
 				if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 					return nil, err
@@ -160,7 +160,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 
 		// Finally use blobs endpoints
 		var firstErr error
-		for _, host := range r.hosts {
+		for _, host := range pullHosts {
 			req := r.request(host, http.MethodGet, "blobs", desc.Digest.String())
 			if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 				return nil, err
@@ -217,8 +217,8 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 	var desc ocispec.Descriptor
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", dgst))
 
-	hosts := r.filterHosts(HostCapabilityPull)
-	if len(hosts) == 0 {
+	pullHosts := r.filterHosts(HostCapabilityPull)
+	if len(pullHosts) == 0 {
 		return nil, desc, fmt.Errorf("no pull hosts: %w", errdefs.ErrNotFound)
 	}
 
@@ -233,7 +233,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 		firstErr error
 	)
 
-	for _, host := range r.hosts {
+	for _, host := range pullHosts {
 		getReq, sz, err = r.createGetReq(ctx, host, "blobs", dgst.String())
 		if err == nil {
 			break
@@ -246,7 +246,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 
 	if getReq == nil {
 		// Fall back to the "manifests" endpoint
-		for _, host := range r.hosts {
+		for _, host := range pullHosts {
 			getReq, sz, err = r.createGetReq(ctx, host, "manifests", dgst.String())
 			if err == nil {
 				break
