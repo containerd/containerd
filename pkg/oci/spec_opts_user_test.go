@@ -280,16 +280,21 @@ sys:x:3:root,bin,adm
 			expected: []uint32{0},
 		},
 		{
+			// "bin" is a member of the "bin" group (gid 1); a group sharing
+			// the user's name is still a supplemental group unless it is the
+			// user's primary group.
 			user:     "bin",
-			expected: []uint32{0, 2, 3},
+			expected: []uint32{0, 1, 2, 3},
 		},
 		{
 			user:     "bin:root",
 			expected: []uint32{0},
 		},
 		{
+			// "daemon" is a member of the "daemon" group (gid 2); it must not
+			// be dropped just because it shares the user's name.
 			user:     "daemon",
-			expected: []uint32{0, 1},
+			expected: []uint32{0, 1, 2},
 		},
 	}
 	for _, testCase := range testCases {
@@ -299,6 +304,70 @@ sys:x:3:root,bin,adm
 				Version: specs.Version,
 				Root: &specs.Root{
 					Path: td,
+				},
+			}
+			err := WithAdditionalGIDs(testCase.user)(context.Background(), nil, &c, &s)
+			assert.NoError(t, err)
+			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
+		})
+	}
+}
+
+// TestWithAdditionalGIDsSharedUserGroupName reproduces
+// https://github.com/containerd/containerd/issues/11937.
+//
+// The container user "name" has uid 2 and primary gid 1 (daemon). There is
+// also a group "name" with gid 2 that lists "name" as a member. Because gid 2
+// is not the user's primary group, it is a genuine supplemental group and must
+// be included in the additional GID list. containerd currently drops it,
+// because WithAdditionalGIDs assumes any group whose name matches the user's
+// name is that user's primary group.
+func TestWithAdditionalGIDsSharedUserGroupName(t *testing.T) {
+	t.Parallel()
+	expectedPasswd := `name:x:2:1::/home/name:/usr/sbin/nologin
+`
+	expectedGroup := `daemon:x:1:
+name:x:2:name
+`
+	td := t.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
+		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0777),
+	)
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+	c := containers.Container{ID: t.Name()}
+
+	testCases := []struct {
+		user     string
+		expected []uint32
+	}{
+		// Resolve the supplemental groups by username.
+		{
+			user:     "name",
+			expected: []uint32{1, 2},
+		},
+		// Resolving by uid must produce the same result.
+		{
+			user:     "2",
+			expected: []uint32{1, 2},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.user, func(t *testing.T) {
+			t.Parallel()
+			s := Spec{
+				Version: specs.Version,
+				Root: &specs.Root{
+					Path: td,
+				},
+				Process: &specs.Process{
+					User: specs.User{
+						UID: 2,
+						GID: 1,
+					},
 				},
 			}
 			err := WithAdditionalGIDs(testCase.user)(context.Background(), nil, &c, &s)
