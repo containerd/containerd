@@ -617,3 +617,136 @@ func TestClose(t *testing.T) {
 	_, err = db.Begin(false)
 	assert.ErrorIs(t, err, bolterr.ErrDatabaseNotOpen)
 }
+
+type goneHandler struct{}
+
+func (goneHandler) Mount(_ context.Context, m mount.Mount, mp string, _ []mount.ActiveMount) (mount.ActiveMount, error) {
+	now := time.Now()
+	return mount.ActiveMount{Mount: m, MountedAt: &now, MountPoint: mp}, nil
+}
+
+func (goneHandler) Unmount(context.Context, string) error {
+	return fmt.Errorf("unmount: %w", os.ErrNotExist)
+}
+
+type gateHandler struct {
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (h *gateHandler) Mount(_ context.Context, m mount.Mount, mp string, _ []mount.ActiveMount) (mount.ActiveMount, error) {
+	now := time.Now()
+	return mount.ActiveMount{Mount: m, MountedAt: &now, MountPoint: mp}, nil
+}
+
+func (h *gateHandler) Unmount(context.Context, string) error {
+	close(h.entered)
+	<-h.release
+	return nil
+}
+
+func TestDeactivateIgnoresWrappedNotExist(t *testing.T) {
+	td := t.TempDir()
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	m, err := NewManager(db, filepath.Join(td, "m"), WithMountHandler("bind", goneHandler{}))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	sourcedir := filepath.Join(td, "source")
+	require.NoError(t, os.Mkdir(sourcedir, 0700))
+	_, err = m.Activate(ctx, "id1", []mount.Mount{{
+		Type:    "bind",
+		Source:  sourcedir,
+		Options: []string{"rbind"},
+	}})
+	require.NoError(t, err)
+	require.NoError(t, m.Deactivate(ctx, "id1"))
+}
+
+func TestDeactivateBlocksCollection(t *testing.T) {
+	td := t.TempDir()
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	db, err := bolt.Open(filepath.Join(td, "mounts.db"), 0600, nil)
+	require.NoError(t, err)
+	handler := &gateHandler{entered: make(chan struct{}), release: make(chan struct{})}
+	m, err := NewManager(db, filepath.Join(td, "m"), WithMountHandler("bind", handler))
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, m.(io.Closer).Close()) })
+
+	sourcedir := filepath.Join(td, "source")
+	require.NoError(t, os.Mkdir(sourcedir, 0700))
+	_, err = m.Activate(ctx, "id1", []mount.Mount{{
+		Type:    "bind",
+		Source:  sourcedir,
+		Options: []string{"rbind"},
+	}})
+	require.NoError(t, err)
+
+	deactivated := make(chan error, 1)
+	go func() {
+		deactivated <- m.Deactivate(ctx, "id1")
+	}()
+	select {
+	case <-handler.entered:
+	case err := <-deactivated:
+		t.Fatalf("deactivate finished before unmount: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for unmount")
+	}
+
+	collected := make(chan error, 1)
+	go func() {
+		cc, err := m.(interface {
+			StartCollection(context.Context) (metadata.CollectionContext, error)
+		}).StartCollection(ctx)
+		if err != nil {
+			collected <- err
+			return
+		}
+		collected <- cc.Cancel()
+	}()
+	select {
+	case err := <-collected:
+		t.Fatalf("collection proceeded while deactivate held the lock: %v", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(handler.release)
+	require.NoError(t, <-deactivated)
+	select {
+	case err := <-collected:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("collection did not proceed after deactivate finished")
+	}
+}
+
+func TestUnmountAllIgnoresAlreadyRemoved(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("missing root", func(t *testing.T) {
+		err := unmountAll(ctx, filepath.Join(t.TempDir(), "gone"), nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("type file already gone", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.Symlink("missing", filepath.Join(root, "3-type")))
+		require.NoError(t, unmountAll(ctx, root, nil))
+		_, err := os.Stat(root)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+
+	t.Run("wrapped not exist", func(t *testing.T) {
+		root := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(root, "3"), []byte("x"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(root, "3-type"), []byte("bind"), 0600))
+		require.NoError(t, unmountAll(ctx, root, map[string]mount.Handler{
+			"bind": goneHandler{},
+		}))
+		_, err := os.Stat(root)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	})
+}
