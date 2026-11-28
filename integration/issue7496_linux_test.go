@@ -43,8 +43,8 @@ import (
 //
 // NOTE: https://github.com/containerd/containerd/issues/8931 is the same issue.
 func TestIssue7496(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not use host umount2; strace injection does not apply")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("strace injection does not apply to this runtime")
 	}
 	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 

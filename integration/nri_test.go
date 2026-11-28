@@ -509,6 +509,9 @@ func TestNriAnnotationInjection(t *testing.T) {
 
 // Test linux device injection by NRI plugins.
 func TestNriLinuxDeviceInjection(t *testing.T) {
+	if runtimeHandlerIsKata() {
+		t.Skip("kata cannot inject NRI host devices into the guest")
+	}
 	skipNriTestIfNecessary(t)
 
 	t.Log("Test that NRI plugins can inject linux devices into containers.")
@@ -555,8 +558,8 @@ func TestNriLinuxDeviceInjection(t *testing.T) {
 
 // Test linux cpuset adjustment by NRI plugins.
 func TestNriLinuxCpusetAdjustment(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not propagate NRI cpuset adjustments to the container's /proc/self/status")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not propagate NRI cpuset adjustments to the container's /proc/self/status")
 	}
 	skipNriTestIfNecessary(t,
 		map[string]bool{
@@ -651,8 +654,8 @@ func TestNriLinuxMemsetAdjustment(t *testing.T) {
 
 // Test creation-time linux cpuset update of existing containers by NRI plugins.
 func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
-	if runtimeHandlerIsRunsc() {
-		t.Skip("runsc does not propagate NRI cpuset adjustments to the container's /proc/self/status")
+	if runtimeHandlerIsRunsc() || runtimeHandlerIsKata() {
+		t.Skip("this runtime does not propagate NRI cpuset adjustments to the container's /proc/self/status")
 	}
 	skipNriTestIfNecessary(t,
 		map[string]bool{
