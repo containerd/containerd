@@ -655,6 +655,13 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 		return err
 	}
 
+	// Hold the same read lock as Activate so a collection cannot start
+	// while this activation is being torn down. GC still removes leftovers
+	// after it drops the write lock, so a mount point that is already gone
+	// is success.
+	mm.rwlock.RLock()
+	defer mm.rwlock.RUnlock()
+
 	var (
 		mid       uint64
 		allActive []mount.ActiveMount
@@ -728,7 +735,7 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 		} else {
 			err = mount.Unmount(active.MountPoint, 0)
 		}
-		if err != nil {
+		if err != nil && !mountPointGone(err) {
 			mountErrors = errors.Join(mountErrors, err)
 		}
 	}
@@ -1098,9 +1105,17 @@ func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.H
 	return errors.Join(errs...)
 }
 
+// mountPointGone reports an unmount or removal of a path that is already gone.
+func mountPointGone(err error) bool {
+	return errors.Is(err, os.ErrNotExist)
+}
+
 func unmountAll(ctx context.Context, root string, handlers map[string]mount.Handler) error {
 	fd, err := os.Open(root)
 	if err != nil {
+		if mountPointGone(err) {
+			return nil
+		}
 		return err
 	}
 
@@ -1126,6 +1141,8 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 			}
 			if b, rerr := os.ReadFile(filepath.Join(root, d)); rerr == nil {
 				h = handlers[string(b)]
+			} else if mountPointGone(rerr) {
+				continue
 			} else {
 				return rerr
 			}
@@ -1147,8 +1164,7 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 		} else {
 			err = mount.Unmount(mp, 0)
 		}
-		if err != nil {
-			// TODO: Ignore already unmounted
+		if err != nil && !mountPointGone(err) {
 			mountErrs = append(mountErrs, fmt.Errorf("failure unmounting %s: %w", d, err))
 		}
 	}
